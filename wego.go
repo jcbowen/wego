@@ -6,6 +6,7 @@ import (
 	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/message"
+	"github.com/jcbowen/wego/mp"
 	"github.com/jcbowen/wego/storage"
 )
 
@@ -55,6 +56,16 @@ func (w *WeGo) Storage() *storage.StorageClient {
 	return storage.NewStorageClient()
 }
 
+// MP 返回微信公众号开发相关功能
+func (w *WeGo) MP(config *mp.MPConfig) *mp.MPClient {
+	return mp.NewMPClient(config)
+}
+
+// GetConfig 获取配置信息
+func (w *WeGo) GetConfig() *core.WeGoConfig {
+	return w.Client.GetConfig()
+}
+
 // 导出常用类型和常量
 var (
 	// API相关 - 这些常量需要在实际使用时定义
@@ -89,8 +100,6 @@ type (
 	APIResponse           = core.APIResponse
 	AuthorizationInfo     = core.AuthorizationInfo
 	AuthorizerInfo        = api.AuthorizerInfo
-	TextMessage           = auth.TextMessage
-	ImageMessage          = auth.ImageMessage
 	TokenStorage          = storage.TokenStorage
 	MemoryStorage         = storage.MemoryStorage
 	DBStorage             = storage.DBStorage
@@ -98,4 +107,30 @@ type (
 	ComponentAccessToken  = storage.ComponentAccessToken
 	PreAuthCode           = storage.PreAuthCode
 	AuthorizerAccessToken = storage.AuthorizerAccessToken
+	
+	// 微信公众号开发相关类型
+	MPConfig              = mp.MPConfig
+	MPClient              = mp.MPClient
+	MPAPIClient           = mp.MPAPIClient
+	MenuClient            = mp.MenuClient
+	MessageClient         = mp.MessageClient
+	TemplateClient        = mp.TemplateClient
+	CustomClient          = mp.CustomClient
+	MaterialClient        = mp.MaterialClient
+	
+	// 微信公众号数据结构体
+	Menu                  = mp.Menu
+	Button                = mp.Button
+	SendTemplateMsgRequest = mp.SendTemplateMsgRequest
+	TemplateData          = mp.TemplateData
+	MPTextMessage         = mp.TextMessage
+	MPImageMessage        = mp.ImageMessage
+	VoiceMessage          = mp.VoiceMessage
+	VideoMessage          = mp.VideoMessage
+	MusicMessage          = mp.MusicMessage
+	NewsMessage           = mp.NewsMessage
+	MPNewsMessage         = mp.MPNewsMessage
+	WXCardMessage         = mp.WXCardMessage
+	MiniProgramPageMessage = mp.MiniProgramPageMessage
+	NewsArticle           = mp.NewsArticle
 )
