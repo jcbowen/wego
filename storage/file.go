@@ -1,4 +1,4 @@
-package wego
+package storage
 
 import (
 	"context"

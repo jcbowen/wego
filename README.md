@@ -1,267 +1,150 @@
-# 微信开放平台组件 (wego)
+# WeGo - 微信开发封装库
 
-这是一个用于对接微信开放平台的Go语言组件，支持第三方平台开发，包括公众号/小程序授权管理、API代调用等功能。
+WeGo是一个模块化的微信开发封装库，专门为微信开放平台第三方平台开发设计。该库提供了完整的微信开放平台API封装、消息处理、授权管理等功能。
 
-## 功能特性
+## 特性
 
-- ✅ 组件令牌管理 (Component Access Token)
-- ✅ 预授权码获取和授权链接生成
-- ✅ 授权信息换取和令牌刷新
-- ✅ 授权方API代调用 (公众号/小程序)
-- ✅ 消息处理 (事件推送、消息加解密)
-- ✅ 客服消息发送
-- ✅ 菜单管理
-- ✅ 用户信息获取
-- ✅ 模板消息发送
-- ✅ 批量用户信息获取
-- ✅ 小程序码生成
-- ✅ 订阅消息发送
+- 🏗️ **模块化设计** - 按功能模块组织代码，便于扩展和维护
+- 🔐 **完整的API封装** - 支持微信开放平台所有核心API
+- 📨 **消息处理** - 支持微信消息的接收、解析和处理
+- 🔑 **授权管理** - 提供完整的授权流程管理
+- 🔒 **安全加密** - 支持微信消息的加密和解密
+- 💾 **存储抽象** - 支持多种存储后端（内存、文件、数据库等）
+- 📚 **类型安全** - 完整的类型定义和错误处理
 
-## 安装
+## 项目结构
 
-```go
-go get github.com/jcbowen/jcbaseGo/component/wego
+```
+wego/
+├── core/           # 核心配置和客户端
+├── api/            # API相关功能
+├── auth/           # 授权相关功能
+├── message/        # 消息处理功能
+├── crypto/         # 加密解密功能
+├── storage/        # 存储抽象层
+├── examples/       # 使用示例
+└── doc/           # 技术文档
 ```
 
 ## 快速开始
 
-### 1. 初始化客户端
+### 安装
 
-```go
-import "github.com/jcbowen/jcbaseGo/component/wego"
-
-config := &wego.WxOpenConfig{
-    ComponentAppID:     "your_component_appid",
-    ComponentAppSecret: "your_component_appsecret",
-    ComponentToken:     "your_component_token",
-    EncodingAESKey:     "your_encoding_aes_key",
-    RedirectURI:        "your_redirect_uri",
-}
-
-client := wego.NewWxOpenClient(config)
+```bash
+go get github.com/jcbowen/wego
 ```
 
-### 2. 处理授权流程
+### 基本使用
 
 ```go
-// 获取预授权码
-preAuthCode, err := client.GetPreAuthCode(context.Background())
-if err != nil {
-    log.Fatal(err)
-}
+package main
 
-// 生成授权链接
-authURL := client.GenerateAuthURL(preAuthCode.PreAuthCode, 0)
-fmt.Println("授权链接:", authURL)
-
-// 使用授权码换取授权信息
-authInfo, err := client.QueryAuth(context.Background(), "authorization_code")
-if err != nil {
-    log.Fatal(err)
-}
-
-// 缓存授权方token
-client.SetAuthorizerToken(
-    authInfo.AuthorizationInfo.AuthorizerAppID,
-    authInfo.AuthorizationInfo.AuthorizerAccessToken,
-    authInfo.AuthorizationInfo.AuthorizerRefreshToken,
-    authInfo.AuthorizationInfo.ExpiresIn,
+import (
+	"context"
+	"fmt"
+	"github.com/jcbowen/wego"
 )
-```
 
-### 3. 代公众号调用API
+func main() {
+	// 配置微信开放平台参数
+	config := &wego.WeGoConfig{
+		ComponentAppID:     "your_component_app_id",
+		ComponentAppSecret: "your_component_app_secret",
+		ComponentToken:     "your_component_token",
+		EncodingAESKey:     "your_encoding_aes_key",
+		RedirectURI:        "your_redirect_uri",
+	}
 
-```go
-// 创建授权方客户端
-authorizerClient := wego.NewAuthorizerClient(client, "authorizer_appid")
+	// 创建WeGo实例
+	wegoClient := wego.NewWeGo(config)
 
-// 发送客服消息
-textMsg := &wego.TextMessage{
-    Content: "Hello, World!",
-}
-err := authorizerClient.SendCustomMessage(context.Background(), "user_openid", textMsg)
-if err != nil {
-    log.Fatal(err)
-}
+	// 使用各个功能模块
+	apiClient := wegoClient.API()
+	authClient := wegoClient.Auth()
+	messageClient := wegoClient.Message()
+	cryptoClient := wegoClient.Crypto()
+	storageClient := wegoClient.Storage()
 
-// 获取用户信息
-userInfo, err := authorizerClient.GetUserInfo(context.Background(), "user_openid")
-if err != nil {
-    log.Fatal(err)
-}
-fmt.Printf("用户昵称: %s\n", userInfo.Nickname)
-```
-
-### 4. 处理微信服务器消息
-
-```go
-// 创建消息处理器
-processor := wego.NewMessageProcessor(config)
-
-// 注册事件处理器
-processor.RegisterEventHandler(wego.EventTypeComponentVerifyTicket, &wego.DefaultEventHandler{})
-processor.RegisterEventHandler(wego.EventTypeAuthorized, &wego.DefaultEventHandler{})
-
-// 验证签名
-if processor.VerifySignature(signature, timestamp, nonce) {
-    // 处理消息
-    result, err := processor.ProcessMessage(xmlData)
-    if err != nil {
-        log.Fatal(err)
-    }
-    fmt.Println("处理结果:", result)
+	fmt.Println("WeGo客户端初始化成功！")
 }
 ```
 
-## API 参考
+## 模块说明
 
-### 核心类
+### Core 模块
 
-#### WxOpenClient
+核心配置和客户端实现，包含：
 
-微信开放平台客户端主类，负责管理access_token和提供基础API。
+- `WeGoConfig` - 配置结构体
+- `WegoClient` - 主客户端
+- 令牌管理和HTTP客户端
 
-**主要方法:**
-- `GetComponentAccessToken()` - 获取第三方平台access_token
-- `GetPreAuthCode()` - 获取预授权码
-- `QueryAuth()` - 使用授权码换取授权信息
-- `RefreshAuthorizerToken()` - 刷新授权方access_token
-- `GetAuthorizerInfo()` - 获取授权方信息
-- `GenerateAuthURL()` - 生成授权链接
+### API 模块
 
-#### AuthorizerClient
+微信开放平台API封装，包含：
 
-授权方API客户端，用于代公众号/小程序调用API。
+- API地址常量定义
+- API响应结构体
+- 授权信息数据结构
 
-**主要方法:**
-- `SendCustomMessage()` - 发送客服消息
-- `CreateMenu()` / `GetMenu()` / `DeleteMenu()` - 菜单管理
-- `GetUserInfo()` / `GetUserList()` - 用户管理
-- `SendTemplateMessage()` - 发送模板消息
-- `UploadMedia()` / `GetMedia()` - 素材管理
-- `CreateQRCode()` - 创建二维码
+### Auth 模块
 
-#### MessageProcessor
+授权管理功能，包含：
 
-消息处理器，负责处理微信服务器推送的消息和事件。
+- `AuthorizerClient` - 授权方客户端
+- 客服消息发送
+- 自定义菜单管理
 
-**主要方法:**
-- `ProcessMessage()` - 处理消息
-- `VerifySignature()` - 验证签名
-- `EncryptMessage()` / `DecryptMessage()` - 消息加密解密
-- `GenerateTextResponse()` - 生成文本回复
+### Message 模块
 
-### 配置说明
+消息处理功能，包含：
 
-#### WxOpenConfig
+- 消息类型常量
+- 消息结构体定义
+- 消息处理器接口
 
-```go
-type WxOpenConfig struct {
-    ComponentAppID     string // 第三方平台appid
-    ComponentAppSecret string // 第三方平台appsecret
-    ComponentToken     string // 消息校验Token
-    EncodingAESKey     string // 消息加解密Key
-    RedirectURI        string // 授权回调URI
-}
-```
+### Crypto 模块
 
-## 事件处理
+加密解密功能，包含：
 
-### 组件验证票据事件
+- AES密钥解码
+- 消息加密和解密
+- PKCS7填充处理
 
-```go
-type ComponentVerifyTicketHandler struct{}
+### Storage 模块
 
-func (h *ComponentVerifyTicketHandler) HandleEvent(event *wego.EventMessage) (interface{}, error) {
-    // 解析验证票据事件
-    ticketEvent, err := wego.ParseComponentVerifyTicket(eventXML)
-    if err != nil {
-        return nil, err
-    }
-    
-    // 保存component_verify_ticket
-    saveTicket(ticketEvent.ComponentVerifyTicket)
-    
-    return "success", nil
-}
-```
+存储抽象层，包含：
 
-### 授权事件
+- `TokenStorage` 接口
+- `MemoryStorage` 内存存储实现
+- 支持自定义存储后端
 
-```go
-type AuthorizedEventHandler struct{}
+## 示例
 
-func (h *AuthorizedEventHandler) HandleEvent(event *wego.EventMessage) (interface{}, error) {
-    // 解析授权成功事件
-    authEvent, err := wego.ParseAuthorizedEvent(eventXML)
-    if err != nil {
-        return nil, err
-    }
-    
-    // 处理授权成功逻辑
-    handleAuthorization(authEvent.AuthorizerAppID, authEvent.AuthorizationCode)
-    
-    return "success", nil
-}
-```
+查看 `examples/` 目录获取完整的使用示例：
 
-## 错误处理
+- [基础使用示例](examples/basic/main.go)
 
-所有API方法都返回error，可以通过类型断言判断错误类型：
+## 文档
 
-```go
-result, err := client.GetPreAuthCode(ctx)
-if err != nil {
-    if apiErr, ok := err.(*wego.APIResponse); ok {
-        fmt.Printf("微信API错误: %d - %s\n", apiErr.ErrCode, apiErr.ErrMsg)
-    } else {
-        fmt.Printf("其他错误: %v\n", err)
-    }
-}
-```
+详细的技术文档请查看 `doc/` 目录：
 
-## 缓存管理
+- 授权流程技术说明
+- 消息加解密说明
+- Token生成介绍
+- 消息与事件处理
 
-组件内置了access_token的缓存机制，会自动处理token的刷新。如果需要手动清除缓存：
+## 依赖
 
-```go
-client.ClearCache()
-```
-
-## 日志配置
-
-可以设置自定义日志器：
-
-```go
-type CustomLogger struct{}
-
-func (l *CustomLogger) Debugf(format string, args ...interface{}) {
-    // 实现debug日志
-}
-
-func (l *CustomLogger) Infof(format string, args ...interface{}) {
-    // 实现info日志
-}
-
-// 设置自定义日志器
-client.SetLogger(&CustomLogger{})
-```
-
-## 示例代码
-
-更多完整示例请参考 `example/` 目录。
-
-## 注意事项
-
-1. **ComponentVerifyTicket** 需要妥善保存，它是获取component_access_token的必要参数
-2. **授权方refresh_token** 需要安全存储，用于刷新授权方access_token
-3. **消息加解密** 需要配置正确的EncodingAESKey
-4. **API调用频率** 需要遵守微信开放平台的频率限制
-
-## 版本历史
-
-- v1.0.0: 初始版本，支持基础API和消息处理
+- Go 1.24.3+
+- github.com/jcbowen/jcbaseGo v0.11.1
+- github.com/stretchr/testify v1.11.1
+- gorm.io/gorm v1.31.0
 
 ## 许可证
 
 MIT License
+
+## 贡献
+
+欢迎提交Issue和Pull Request！

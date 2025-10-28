@@ -1,9 +1,9 @@
-module github/jcbowen/wego
+module github.com/jcbowen/wego
 
 go 1.24.3
 
 require (
-	github.com/jcbowen/jcbaseGo v0.12.0
+	github.com/jcbowen/jcbaseGo v0.11.1
 	github.com/stretchr/testify v1.11.1
 	gorm.io/gorm v1.31.0
 )

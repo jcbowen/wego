@@ -1,4 +1,4 @@
-package wego
+package storage
 
 import (
 	"context"
@@ -193,6 +193,7 @@ func (s *DBStorage) GetAuthorizerToken(ctx context.Context, authorizerAppID stri
 	}
 
 	return &AuthorizerAccessToken{
+		AuthorizerAppID:        authorizerAppID,
 		AuthorizerAccessToken:  dbToken.AuthorizerAccessToken,
 		AuthorizerRefreshToken: dbToken.AuthorizerRefreshToken,
 		ExpiresIn:              dbToken.ExpiresIn,

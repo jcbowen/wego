@@ -234,7 +234,7 @@ import (
     "encoding/json"
     "fmt"
     "net/http"
-    "github.com/jcbowen/jcbaseGo/component/wego"
+    "github.com/jcbowen/wego"
 )
 
 func main() {

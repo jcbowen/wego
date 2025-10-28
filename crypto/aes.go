@@ -1,4 +1,4 @@
-package wego
+package crypto
 
 import (
 	"bytes"

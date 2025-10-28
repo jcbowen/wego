@@ -1,33 +1,10 @@
-package wego
+package storage
 
 import (
 	"context"
 	"sync"
 	"time"
 )
-
-// TokenStorage 令牌存储接口
-type TokenStorage interface {
-	// 组件令牌相关方法
-	SaveComponentToken(ctx context.Context, token *ComponentAccessToken) error
-	GetComponentToken(ctx context.Context) (*ComponentAccessToken, error)
-	DeleteComponentToken(ctx context.Context) error
-
-	// 预授权码相关方法
-	SavePreAuthCode(ctx context.Context, code *PreAuthCode) error
-	GetPreAuthCode(ctx context.Context) (*PreAuthCode, error)
-	DeletePreAuthCode(ctx context.Context) error
-
-	// 授权方令牌相关方法
-	SaveAuthorizerToken(ctx context.Context, authorizerAppID string, token *AuthorizerAccessToken) error
-	GetAuthorizerToken(ctx context.Context, authorizerAppID string) (*AuthorizerAccessToken, error)
-	DeleteAuthorizerToken(ctx context.Context, authorizerAppID string) error
-	ClearAuthorizerTokens(ctx context.Context) error            // 清除所有授权方令牌
-	ListAuthorizerTokens(ctx context.Context) ([]string, error) // 返回所有已存储的授权方appid
-
-	// 存储健康检查
-	Ping(ctx context.Context) error
-}
 
 // MemoryStorage 内存存储实现（默认）
 type MemoryStorage struct {
