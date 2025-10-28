@@ -1,4 +1,4 @@
-package mp
+package officialaccount
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ type MPClient struct {
 	httpClient core.HTTPClient
 	storage    storage.TokenStorage
 	logger     core.Logger
-	
+
 	stableTokenClient *StableTokenClient // 稳定版access_token客户端
 }
 
@@ -38,7 +38,7 @@ func NewMPClientWithStorage(config *MPConfig, storage storage.TokenStorage) *MPC
 	}
 
 	client.stableTokenClient = NewStableTokenClient(client)
-	
+
 	return client
 }
 

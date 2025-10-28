@@ -1,4 +1,4 @@
-package mp
+package officialaccount
 
 // 微信公众号API地址常量
 const (

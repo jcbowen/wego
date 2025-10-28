@@ -19,7 +19,7 @@ WeGo 是一个 Go 语言编写的微信公众号开发库，提供了完整的�
 ### 安装
 
 ```bash
-go get github.com/jcbowen/wego/mp
+go get github.com/jcbowen/wego/officialaccount
 ```
 
 ### 基本使用
@@ -32,12 +32,12 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/jcbowen/wego/mp"
+	"github.com/jcbowen/wego/officialaccount"
 )
 
 func main() {
 	// 1. 创建配置
-	config := &mp.MPConfig{
+	config := &officialaccount.MPConfig{
 		AppID:     "your_app_id",
 		AppSecret: "your_app_secret",
 		Token:     "your_token",
@@ -50,13 +50,13 @@ func main() {
 	}
 
 	// 2. 创建客户端
-	client := mp.NewMPClient(config)
+	client := officialaccount.NewMPClient(config)
 
 	// 3. 使用各种功能客户端
 	ctx := context.Background()
 
 	// 基础接口
-	apiClient := mp.NewMPAPIClient(client)
+	apiClient := officialaccount.NewMPAPIClient(client)
 	ips, err := apiClient.GetApiDomainIp(ctx)
 	if err != nil {
 		log.Printf("获取API服务器IP失败: %v", err)
@@ -65,9 +65,9 @@ func main() {
 	}
 
 	// 自定义菜单
-	menuClient := mp.NewMenuClient(client)
-	menu := &mp.Menu{
-		Button: []mp.Button{
+	menuClient := officialaccount.NewMenuClient(client)
+	menu := &officialaccount.Menu{
+		Button: []officialaccount.Button{
 			{
 				Type: "click",
 				Name: "今日歌曲",
@@ -89,7 +89,7 @@ func main() {
 ### 配置
 
 ```go
-config := &mp.MPConfig{
+config := &officialaccount.MPConfig{
 	AppID:     "wx1234567890abcdef",  // 公众号AppID
 	AppSecret: "your_app_secret",     // 公众号AppSecret
 	Token:     "your_token",          // 消息校验Token
@@ -106,7 +106,7 @@ if err := config.Validate(); err != nil {
 
 ```go
 // 创建基础客户端
-client := mp.NewMPClient(config)
+client := officialaccount.NewMPClient(config)
 
 // 如果需要使用存储（推荐）
 storage := core.NewMemoryStorage() // 内存存储
@@ -119,7 +119,7 @@ client.SetStorage(storage)
 #### 1. 基础接口
 
 ```go
-apiClient := mp.NewMPAPIClient(client)
+apiClient := officialaccount.NewMPAPIClient(client)
 
 // 获取API服务器IP
 ips, err := apiClient.GetApiDomainIp(ctx)
@@ -134,11 +134,11 @@ checkResult, err := apiClient.CallbackCheck(ctx, "action", "check_operator")
 #### 2. 自定义菜单
 
 ```go
-menuClient := mp.NewMenuClient(client)
+menuClient := officialaccount.NewMenuClient(client)
 
 // 创建菜单
-menu := &mp.Menu{
-	Button: []mp.Button{
+menu := &officialaccount.Menu{
+	Button: []officialaccount.Button{
 		{
 			Type: "click",
 			Name: "菜单1",
@@ -158,13 +158,13 @@ deleteResp, err := menuClient.DeleteMenu(ctx)
 #### 3. 模板消息
 
 ```go
-templateClient := mp.NewTemplateClient(client)
+templateClient := officialaccount.NewTemplateClient(client)
 
 // 发送模板消息
-msg := &mp.SendTemplateMsgRequest{
+msg := &officialaccount.SendTemplateMsgRequest{
 	Touser:     "user_openid",
 	TemplateID: "template_id",
-	Data: map[string]mp.TemplateData{
+	Data: map[string]officialaccount.TemplateData{
 		"first": {
 			Value: "您好，您有新的订单",
 			Color: "#173177",
@@ -183,10 +183,10 @@ setResp, err := templateClient.SetIndustry(ctx, "1", "2")
 #### 4. 客服消息
 
 ```go
-customClient := mp.NewCustomClient(client)
+customClient := officialaccount.NewCustomClient(client)
 
 // 发送文本消息
-textMsg := &mp.TextMessage{
+textMsg := &officialaccount.TextMessage{
 	MsgType: "text",
 	Text: struct {
 		Content string `json:"content"`
@@ -203,7 +203,7 @@ addResp, err := customClient.AddCustomAccount(ctx, "test@test", "客服昵称")
 #### 5. 素材管理
 
 ```go
-materialClient := mp.NewMaterialClient(client)
+materialClient := officialaccount.NewMaterialClient(client)
 
 // 获取素材总数
 countResp, err := materialClient.GetMaterialCount(ctx)
@@ -218,15 +218,15 @@ uploadResp, err := materialClient.UploadTempMedia(ctx, "image", "image.jpg", fil
 #### 6. 消息管理
 
 ```go
-messageClient := mp.NewMessageClient(client)
+messageClient := officialaccount.NewMessageClient(client)
 
 // 群发消息
-massMsg := &mp.MassMessage{
-	Filter: &mp.Filter{
+massMsg := &officialaccount.MassMessage{
+	Filter: &officialaccount.Filter{
 		IsToAll: true,
 	},
 	MsgType: "text",
-	Text: &mp.TextContent{
+	Text: &officialaccount.TextContent{
 		Content: "群发消息内容",
 	},
 }

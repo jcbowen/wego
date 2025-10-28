@@ -6,7 +6,7 @@ import (
 	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/message"
-	"github.com/jcbowen/wego/mp"
+	"github.com/jcbowen/wego/officialaccount"
 	"github.com/jcbowen/wego/storage"
 )
 
@@ -57,8 +57,8 @@ func (w *WeGo) Storage() *storage.StorageClient {
 }
 
 // MP 返回微信公众号开发相关功能
-func (w *WeGo) MP(config *mp.MPConfig) *mp.MPClient {
-	return mp.NewMPClient(config)
+func (w *WeGo) MP(config *officialaccount.MPConfig) *officialaccount.MPClient {
+	return officialaccount.NewMPClient(config)
 }
 
 // GetConfig 获取配置信息
@@ -68,30 +68,30 @@ func (w *WeGo) GetConfig() *core.WeGoConfig {
 
 // 导出常用类型和常量
 var (
-	// API相关 - 这些常量需要在实际使用时定义
-	// APIComponentTokenURL     = api.APIComponentTokenURL
-	// APICreatePreAuthCodeURL = api.APICreatePreAuthCodeURL
-	// APIQueryAuthURL         = api.APIQueryAuthURL
-	// APIComponentAPIURL      = api.APIComponentAPIURL
-	// APIComponentAPIURLV2    = api.APIComponentAPIURLV2
+// API相关 - 这些常量需要在实际使用时定义
+// APIComponentTokenURL     = api.APIComponentTokenURL
+// APICreatePreAuthCodeURL = api.APICreatePreAuthCodeURL
+// APIQueryAuthURL         = api.APIQueryAuthURL
+// APIComponentAPIURL      = api.APIComponentAPIURL
+// APIComponentAPIURLV2    = api.APIComponentAPIURLV2
 
-	// 消息类型 - 这些常量需要在实际使用时定义
-	// MsgTypeText       = message.MsgTypeText
-	// MsgTypeImage      = message.MsgTypeImage
-	// MsgTypeVoice      = message.MsgTypeVoice
-	// MsgTypeVideo      = message.MsgTypeVideo
-	// MsgTypeShortVideo = message.MsgTypeShortVideo
-	// MsgTypeLocation   = message.MsgTypeLocation
-	// MsgTypeLink       = message.MsgTypeLink
-	// MsgTypeEvent      = message.MsgTypeEvent
+// 消息类型 - 这些常量需要在实际使用时定义
+// MsgTypeText       = message.MsgTypeText
+// MsgTypeImage      = message.MsgTypeImage
+// MsgTypeVoice      = message.MsgTypeVoice
+// MsgTypeVideo      = message.MsgTypeVideo
+// MsgTypeShortVideo = message.MsgTypeShortVideo
+// MsgTypeLocation   = message.MsgTypeLocation
+// MsgTypeLink       = message.MsgTypeLink
+// MsgTypeEvent      = message.MsgTypeEvent
 
-	// 事件类型 - 这些常量需要在实际使用时定义
-	// EventSubscribe   = message.EventSubscribe
-	// EventUnsubscribe = message.EventUnsubscribe
-	// EventScan        = message.EventScan
-	// EventLocation    = message.EventLocation
-	// EventClick       = message.EventClick
-	// EventView        = message.EventView
+// 事件类型 - 这些常量需要在实际使用时定义
+// EventSubscribe   = message.EventSubscribe
+// EventUnsubscribe = message.EventUnsubscribe
+// EventScan        = message.EventScan
+// EventLocation    = message.EventLocation
+// EventClick       = message.EventClick
+// EventView        = message.EventView
 )
 
 // 导出常用结构体类型
@@ -107,30 +107,30 @@ type (
 	ComponentAccessToken  = storage.ComponentAccessToken
 	PreAuthCode           = storage.PreAuthCode
 	AuthorizerAccessToken = storage.AuthorizerAccessToken
-	
+
 	// 微信公众号开发相关类型
-	MPConfig              = mp.MPConfig
-	MPClient              = mp.MPClient
-	MPAPIClient           = mp.MPAPIClient
-	MenuClient            = mp.MenuClient
-	MessageClient         = mp.MessageClient
-	TemplateClient        = mp.TemplateClient
-	CustomClient          = mp.CustomClient
-	MaterialClient        = mp.MaterialClient
-	
+	MPConfig       = officialaccount.MPConfig
+	MPClient       = officialaccount.MPClient
+	MPAPIClient    = officialaccount.MPAPIClient
+	MenuClient     = officialaccount.MenuClient
+	MessageClient  = officialaccount.MessageClient
+	TemplateClient = officialaccount.TemplateClient
+	CustomClient   = officialaccount.CustomClient
+	MaterialClient = officialaccount.MaterialClient
+
 	// 微信公众号数据结构体
-	Menu                  = mp.Menu
-	Button                = mp.Button
-	SendTemplateMsgRequest = mp.SendTemplateMsgRequest
-	TemplateData          = mp.TemplateData
-	MPTextMessage         = mp.TextMessage
-	MPImageMessage        = mp.ImageMessage
-	VoiceMessage          = mp.VoiceMessage
-	VideoMessage          = mp.VideoMessage
-	MusicMessage          = mp.MusicMessage
-	NewsMessage           = mp.NewsMessage
-	MPNewsMessage         = mp.MPNewsMessage
-	WXCardMessage         = mp.WXCardMessage
-	MiniProgramPageMessage = mp.MiniProgramPageMessage
-	NewsArticle           = mp.NewsArticle
+	Menu                   = officialaccount.Menu
+	Button                 = officialaccount.Button
+	SendTemplateMsgRequest = officialaccount.SendTemplateMsgRequest
+	TemplateData           = officialaccount.TemplateData
+	MPTextMessage          = officialaccount.TextMessage
+	MPImageMessage         = officialaccount.ImageMessage
+	VoiceMessage           = officialaccount.VoiceMessage
+	VideoMessage           = officialaccount.VideoMessage
+	MusicMessage           = officialaccount.MusicMessage
+	NewsMessage            = officialaccount.NewsMessage
+	MPNewsMessage          = officialaccount.MPNewsMessage
+	WXCardMessage          = officialaccount.WXCardMessage
+	MiniProgramPageMessage = officialaccount.MiniProgramPageMessage
+	NewsArticle            = officialaccount.NewsArticle
 )
