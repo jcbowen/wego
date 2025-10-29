@@ -88,15 +88,15 @@ type OAuthAccessTokenResponse struct {
 // OAuthUserInfoResponse OAuth用户信息响应
 type OAuthUserInfoResponse struct {
 	APIResponse
-	OpenID     string   `json:"openid"`     // 用户OpenID
-	Nickname   string   `json:"nickname"`   // 用户昵称
-	Sex        int      `json:"sex"`        // 用户性别，1为男性，2为女性
-	Province   string   `json:"province"`   // 用户所在省份
-	City       string   `json:"city"`       // 用户所在城市
-	Country    string   `json:"country"`    // 用户所在国家
-	HeadImgURL string   `json:"headimgurl"` // 用户头像URL
-	Privilege  []string `json:"privilege"`  // 用户特权信息
-	UnionID    string   `json:"unionid"`    // 开放平台UnionID
+	OpenID     string   `json:"openid"`            // 用户OpenID
+	Nickname   string   `json:"nickname"`          // 用户昵称
+	Sex        int      `json:"sex"`               // 用户性别，1为男性，2为女性
+	Province   string   `json:"province"`          // 用户所在省份
+	City       string   `json:"city"`              // 用户所在城市
+	Country    string   `json:"country"`           // 用户所在国家
+	HeadImgURL string   `json:"headimgurl"`        // 用户头像URL
+	Privilege  []string `json:"privilege"`         // 用户特权信息
+	UnionID    string   `json:"unionid,omitempty"` // 开放平台UnionID
 }
 
 // MessageEvent 消息事件基础结构

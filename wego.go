@@ -2,12 +2,12 @@ package wego
 
 import (
 	"github.com/jcbowen/wego/api"
-	"github.com/jcbowen/wego/auth"
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/message"
 	"github.com/jcbowen/wego/officialaccount"
 	"github.com/jcbowen/wego/openplatform"
 	"github.com/jcbowen/wego/storage"
+	"github.com/jcbowen/wego/types"
 )
 
 // WeGo 微信开发封装库主结构体
@@ -80,11 +80,11 @@ func (w *WeGo) OpenPlatformAPI() *api.APIClient {
 }
 
 // OpenPlatformAuth 返回开放平台授权相关功能
-func (w *WeGo) OpenPlatformAuth() *auth.AuthClient {
+func (w *WeGo) OpenPlatformAuth() *openplatform.AuthClient {
 	if w.OpenPlatformClient == nil {
 		panic("未初始化开放平台客户端")
 	}
-	return auth.NewAuthClient(w.OpenPlatformClient)
+	return openplatform.NewAuthClient(w.OpenPlatformClient)
 }
 
 // OpenPlatformMessage 返回开放平台消息处理相关功能
@@ -221,5 +221,5 @@ type (
 	WXCardMessage          = officialaccount.WXCardMessage
 	MiniProgramPageMessage = officialaccount.MiniProgramPageMessage
 	NewsArticle            = officialaccount.NewsArticle
-	UserInfo               = auth.UserInfo
+	UserInfo               = types.OAuthUserInfoResponse
 )

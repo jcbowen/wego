@@ -1,4 +1,4 @@
-package auth
+package openplatform
 
 import (
 	"bytes"
@@ -16,17 +16,15 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/jcbowen/wego/openplatform"
 )
 
 // AuthClient 授权相关客户端
 type AuthClient struct {
-	client *openplatform.APIClient
+	client *APIClient
 }
 
 // NewAuthClient 创建授权客户端
-func NewAuthClient(client *openplatform.APIClient) *AuthClient {
+func NewAuthClient(client *APIClient) *AuthClient {
 	return &AuthClient{
 		client: client,
 	}
@@ -114,7 +112,7 @@ func (c *AuthorizerClient) SendCustomMessage(ctx context.Context, toUser string,
 		return fmt.Errorf("不支持的客服消息类型")
 	}
 
-	var result openplatform.APIResponse
+	var result APIResponse
 	err = c.authClient.client.MakeRequest(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return err
@@ -170,7 +168,7 @@ func (c *AuthorizerClient) CreateMenu(ctx context.Context, menu *Menu) error {
 
 	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/menu/create?access_token=%s", url.QueryEscape(accessToken))
 
-	var result openplatform.APIResponse
+	var result APIResponse
 	err = c.authClient.client.MakeRequest(ctx, "POST", apiURL, menu, &result)
 	if err != nil {
 		return err
@@ -193,7 +191,7 @@ func (c *AuthorizerClient) GetMenu(ctx context.Context) (*Menu, error) {
 	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/menu/get?access_token=%s", url.QueryEscape(accessToken))
 
 	var result struct {
-		openplatform.APIResponse
+		APIResponse
 		Menu Menu `json:"menu"`
 	}
 
@@ -218,7 +216,7 @@ func (c *AuthorizerClient) DeleteMenu(ctx context.Context) error {
 
 	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/menu/delete?access_token=%s", url.QueryEscape(accessToken))
 
-	var result openplatform.APIResponse
+	var result APIResponse
 	err = c.authClient.client.MakeRequest(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return err
@@ -278,7 +276,7 @@ func (c *AuthorizerClient) CallAPI(ctx context.Context, apiURL string, params in
 	}
 
 	// 6. 解析响应
-	var apiResp openplatform.APIResponse
+	var apiResp APIResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
 		return nil, fmt.Errorf("响应解析失败: %v", err)
 	}
@@ -517,7 +515,7 @@ func (jm *JSSDKManager) validateURL(url string) error {
 
 // UserInfo 用户信息
 type UserInfo struct {
-	openplatform.APIResponse
+	APIResponse
 	Subscribe      int    `json:"subscribe"`
 	OpenID         string `json:"openid"`
 	Nickname       string `json:"nickname"`
@@ -570,7 +568,7 @@ func (c *AuthorizerClient) GetUserInfo(ctx context.Context, openID string) (*Use
 
 // UserList 用户列表
 type UserList struct {
-	openplatform.APIResponse
+	APIResponse
 	Total int `json:"total"`
 	Count int `json:"count"`
 	Data  struct {
@@ -649,7 +647,7 @@ func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *Te
 	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=%s", url.QueryEscape(accessToken))
 
 	var result struct {
-		openplatform.APIResponse
+		APIResponse
 		MsgID int64 `json:"msgid"`
 	}
 
@@ -667,7 +665,7 @@ func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *Te
 
 // MediaResponse 媒体文件响应
 type MediaResponse struct {
-	openplatform.APIResponse
+	APIResponse
 	Type      string `json:"type"`
 	MediaID   string `json:"media_id"`
 	CreatedAt int64  `json:"created_at"`
@@ -790,7 +788,7 @@ func (c *AuthorizerClient) GetMedia(ctx context.Context, mediaID string) ([]byte
 			return nil, fmt.Errorf("读取响应失败: %v", err)
 		}
 
-		var result openplatform.APIResponse
+		var result APIResponse
 		if err := json.Unmarshal(respBody, &result); err != nil {
 			return nil, fmt.Errorf("解析响应失败: %v", err)
 		}
@@ -863,7 +861,7 @@ func (oc *OAuthClient) GetUserInfoAuthorizeURL(state string) string {
 
 // OAuthToken 网页授权Token
 type OAuthToken struct {
-	openplatform.APIResponse
+	APIResponse
 	AccessToken  string `json:"access_token"`
 	ExpiresIn    int64  `json:"expires_in"`
 	RefreshToken string `json:"refresh_token"`
@@ -1039,7 +1037,7 @@ type QRCodeRequest struct {
 
 // QRCodeResponse 二维码响应
 type QRCodeResponse struct {
-	openplatform.APIResponse
+	APIResponse
 	Ticket        string `json:"ticket"`
 	ExpireSeconds int64  `json:"expire_seconds"`
 	URL           string `json:"url"`
@@ -1084,7 +1082,7 @@ func (c *AuthorizerClient) GetQRCodeURL(ticket string) (string, error) {
 	if ticket == "" {
 		return "", fmt.Errorf("二维码ticket不能为空")
 	}
-	
+
 	return fmt.Sprintf("https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=%s", url.QueryEscape(ticket)), nil
 }
 
@@ -1108,7 +1106,7 @@ type WXACodeRequest struct {
 
 // WXACodeResponse 小程序码响应
 type WXACodeResponse struct {
-	openplatform.APIResponse
+	APIResponse
 	ContentType string `json:"contentType"`
 	Buffer      []byte `json:"buffer"`
 }
@@ -1148,7 +1146,7 @@ func (mpc *MiniProgramClient) GetWXACode(ctx context.Context, request *WXACodeRe
 
 // OAuthUserInfo 网页授权用户信息
 type OAuthUserInfo struct {
-	openplatform.APIResponse
+	APIResponse
 	OpenID     string   `json:"openid"`
 	Nickname   string   `json:"nickname"`
 	Sex        int      `json:"sex"`
