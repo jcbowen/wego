@@ -99,20 +99,25 @@ func (c *WXBizMsgCrypt) DecryptMsg(msgSignature, timestamp, nonce, encryptedMsg 
 	return DecryptMsg(encryptedMsg, aesKey)
 }
 
-// VerifyURL 验证URL
+// VerifyURL 验证URL（符合微信官方规范）
 func (c *WXBizMsgCrypt) VerifyURL(msgSignature, timestamp, nonce, echostr string) (string, error) {
 	// 验证签名
-	if !validateSignature(c.Token, timestamp, nonce, echostr, msgSignature) {
+	if !c.VerifySignature(msgSignature, timestamp, nonce, echostr) {
 		return "", fmt.Errorf("签名验证失败")
 	}
 	
 	// 解密echostr
 	aesKey, err := DecodeAESKey(c.EncodingAESKey)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("AES密钥解码失败: %v", err)
 	}
 	
-	return DecryptMsg(echostr, aesKey)
+	decryptedEchostr, err := DecryptMsg(echostr, aesKey)
+	if err != nil {
+		return "", fmt.Errorf("echostr解密失败: %v", err)
+	}
+	
+	return decryptedEchostr, nil
 }
 
 // VerifySignature 验证消息签名（符合微信官方规范）

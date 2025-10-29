@@ -100,6 +100,17 @@ type GetAuthorizerListResponse struct {
 
 // GetComponentAccessToken 获取第三方平台access_token
 func (c *APIClient) GetComponentAccessToken(ctx context.Context, verifyTicket string) (*storage.ComponentAccessToken, error) {
+	// 验证参数
+	if verifyTicket == "" {
+		return nil, fmt.Errorf("验证票据不能为空")
+	}
+	if c.Client.GetConfig().ComponentAppID == "" {
+		return nil, fmt.Errorf("第三方平台AppID不能为空")
+	}
+	if c.Client.GetConfig().ComponentAppSecret == "" {
+		return nil, fmt.Errorf("第三方平台AppSecret不能为空")
+	}
+
 	// 先从存储中获取
 	if token, err := c.Client.GetComponentToken(ctx); err == nil && token != nil && token.ExpiresAt.After(time.Now()) {
 		return token, nil
@@ -188,6 +199,14 @@ func (c *APIClient) GetPreAuthCode(ctx context.Context) (*PreAuthCodeResponse, e
 
 // QueryAuth 使用授权码换取授权信息
 func (c *APIClient) QueryAuth(ctx context.Context, authorizationCode string) (*QueryAuthResponse, error) {
+	// 验证参数
+	if authorizationCode == "" {
+		return nil, fmt.Errorf("授权码不能为空")
+	}
+	if c.Client.GetConfig().ComponentAppID == "" {
+		return nil, fmt.Errorf("第三方平台AppID不能为空")
+	}
+
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -224,6 +243,17 @@ func (c *APIClient) QueryAuth(ctx context.Context, authorizationCode string) (*Q
 
 // RefreshAuthorizerToken 刷新授权方access_token
 func (c *APIClient) RefreshAuthorizerToken(ctx context.Context, authorizerAppID, refreshToken string) (*AuthorizerTokenResponse, error) {
+	// 验证参数
+	if authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+	if refreshToken == "" {
+		return nil, fmt.Errorf("刷新令牌不能为空")
+	}
+	if c.Client.GetConfig().ComponentAppID == "" {
+		return nil, fmt.Errorf("第三方平台AppID不能为空")
+	}
+
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -261,6 +291,14 @@ func (c *APIClient) RefreshAuthorizerToken(ctx context.Context, authorizerAppID,
 
 // GetAuthorizerInfo 获取授权方信息
 func (c *APIClient) GetAuthorizerInfo(ctx context.Context, authorizerAppID string) (*GetAuthorizerInfoResponse, error) {
+	// 验证参数
+	if authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+	if c.Client.GetConfig().ComponentAppID == "" {
+		return nil, fmt.Errorf("第三方平台AppID不能为空")
+	}
+
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err

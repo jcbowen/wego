@@ -3,6 +3,8 @@ package message
 import (
 	"encoding/xml"
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/openplatform"
@@ -34,7 +36,7 @@ func NewSecureMessageProcessor() *SecureMessageProcessor {
 	}
 }
 
-// ProcessSecureMessage 处理安全消息（包含加解密）
+// ProcessSecureMessage 处理安全消息（包含加解密，符合微信官方规范）
 func (p *SecureMessageProcessor) ProcessSecureMessage(
 	authorizerAppID string,
 	msgSignature string,
@@ -42,10 +44,21 @@ func (p *SecureMessageProcessor) ProcessSecureMessage(
 	nonce string,
 	encryptedMsg string,
 ) (interface{}, error) {
+	// 验证时间戳（防止重放攻击）
+	if err := p.validateTimestamp(timestamp); err != nil {
+		return nil, fmt.Errorf("时间戳验证失败: %v", err)
+	}
+
 	// 获取加解密实例
 	cryptoInstance, err := p.getCryptoInstance(authorizerAppID)
 	if err != nil {
 		return nil, fmt.Errorf("获取加解密实例失败: %v", err)
+	}
+
+	// 验证签名
+	valid := cryptoInstance.VerifySignature(msgSignature, timestamp, nonce, encryptedMsg)
+	if !valid {
+		return nil, fmt.Errorf("签名验证不通过")
 	}
 
 	// 解密消息
@@ -55,7 +68,29 @@ func (p *SecureMessageProcessor) ProcessSecureMessage(
 	}
 
 	// 处理消息
-	return p.processor.ProcessMessage([]byte(decryptedMsg))
+	reply, err := p.processor.ProcessMessage([]byte(decryptedMsg))
+	if err != nil {
+		return nil, err
+	}
+
+	// 如果回复是"success"，直接返回
+	if replyStr, ok := reply.(string); ok && replyStr == "success" {
+		return "success", nil
+	}
+
+	// 将回复转换为XML
+	replyXML, err := p.convertReplyToXML(reply)
+	if err != nil {
+		return nil, fmt.Errorf("转换回复为XML失败: %v", err)
+	}
+
+	// 加密回复
+	encryptedReply, err := cryptoInstance.EncryptMsg(replyXML, timestamp, nonce)
+	if err != nil {
+		return nil, fmt.Errorf("回复加密失败: %v", err)
+	}
+
+	return encryptedReply, nil
 }
 
 // EncryptReply 加密回复消息
@@ -103,11 +138,213 @@ func (p *SecureMessageProcessor) getCryptoInstance(authorizerAppID string) (*cry
 	return cryptoInstance, nil
 }
 
+// validateTimestamp 验证时间戳（防止重放攻击，符合微信官方规范）
+func (p *SecureMessageProcessor) validateTimestamp(timestamp string) error {
+	// 解析时间戳
+	ts, err := parseTimestamp(timestamp)
+	if err != nil {
+		return fmt.Errorf("时间戳格式错误: %v", err)
+	}
+
+	// 获取当前时间
+	now := time.Now().Unix()
+
+	// 检查时间戳是否在合理的时间范围内（前后5分钟内）
+	// 微信官方建议的时间窗口为5分钟
+	const timeWindow = 5 * 60 // 5分钟，单位秒
+
+	if ts < now-timeWindow || ts > now+timeWindow {
+		return fmt.Errorf("时间戳超出有效范围，当前时间戳: %d, 服务器时间: %d", ts, now)
+	}
+
+	return nil
+}
+
+// parseTimestamp 解析时间戳字符串
+func parseTimestamp(timestamp string) (int64, error) {
+	// 尝试解析为整数
+	ts, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("时间戳必须是有效的整数: %v", err)
+	}
+
+	// 验证时间戳范围（不能是未来太远的时间）
+	if ts < 0 {
+		return 0, fmt.Errorf("时间戳不能为负数")
+	}
+
+	// 检查时间戳是否在合理范围内（不能超过当前时间10年）
+	maxFuture := time.Now().Add(10 * 365 * 24 * time.Hour).Unix()
+	if ts > maxFuture {
+		return 0, fmt.Errorf("时间戳超出合理范围")
+	}
+
+	return ts, nil
+}
+
+// VerifyURL 验证URL（符合微信官方规范）
+func (p *SecureMessageProcessor) VerifyURL(
+	authorizerAppID string,
+	msgSignature string,
+	timestamp string,
+	nonce string,
+	echostr string,
+) (string, error) {
+	// 获取加解密实例
+	cryptoInstance, err := p.getCryptoInstance(authorizerAppID)
+	if err != nil {
+		return "", fmt.Errorf("获取加解密实例失败: %v", err)
+	}
+
+	// 验证URL
+	decryptedEchostr, err := cryptoInstance.VerifyURL(msgSignature, timestamp, nonce, echostr)
+	if err != nil {
+		return "", fmt.Errorf("URL验证失败: %v", err)
+	}
+
+	return decryptedEchostr, nil
+}
+
 // convertReplyToXML 将回复转换为XML
 func (p *SecureMessageProcessor) convertReplyToXML(reply interface{}) (string, error) {
-	// 这里需要实现将各种回复类型转换为XML的逻辑
-	// 暂时返回空字符串，需要根据实际回复类型实现
-	return "", nil
+	switch v := reply.(type) {
+	case string:
+		// 如果是字符串，直接返回
+		return v, nil
+	case *TextMessage:
+		// 文本消息回复
+		return p.convertTextMessageToXML(v)
+	case *ImageMessage:
+		// 图片消息回复
+		return p.convertImageMessageToXML(v)
+	case *VoiceMessage:
+		// 语音消息回复
+		return p.convertVoiceMessageToXML(v)
+	case *VideoMessage:
+		// 视频消息回复
+		return p.convertVideoMessageToXML(v)
+	default:
+		return "", fmt.Errorf("不支持的回复类型: %T", reply)
+	}
+}
+
+// convertTextMessageToXML 将文本消息转换为XML
+func (p *SecureMessageProcessor) convertTextMessageToXML(msg *TextMessage) (string, error) {
+	type TextReply struct {
+		XMLName      xml.Name `xml:"xml"`
+		ToUserName   CDATA    `xml:"ToUserName"`
+		FromUserName CDATA    `xml:"FromUserName"`
+		CreateTime   int64    `xml:"CreateTime"`
+		MsgType      CDATA    `xml:"MsgType"`
+		Content      CDATA    `xml:"Content"`
+	}
+
+	reply := TextReply{
+		ToUserName:   CDATA{Value: msg.ToUserName},
+		FromUserName: CDATA{Value: msg.FromUserName},
+		CreateTime:   msg.CreateTime,
+		MsgType:      CDATA{Value: "text"},
+		Content:      CDATA{Value: msg.Content},
+	}
+
+	output, err := xml.MarshalIndent(reply, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
+}
+
+// convertImageMessageToXML 将图片消息转换为XML
+func (p *SecureMessageProcessor) convertImageMessageToXML(msg *ImageMessage) (string, error) {
+	type ImageReply struct {
+		XMLName      xml.Name `xml:"xml"`
+		ToUserName   CDATA    `xml:"ToUserName"`
+		FromUserName CDATA    `xml:"FromUserName"`
+		CreateTime   int64    `xml:"CreateTime"`
+		MsgType      CDATA    `xml:"MsgType"`
+		Image        struct {
+			MediaID CDATA `xml:"MediaId"`
+		} `xml:"Image"`
+	}
+
+	reply := ImageReply{
+		ToUserName:   CDATA{Value: msg.ToUserName},
+		FromUserName: CDATA{Value: msg.FromUserName},
+		CreateTime:   msg.CreateTime,
+		MsgType:      CDATA{Value: "image"},
+	}
+	reply.Image.MediaID = CDATA{Value: msg.MediaID}
+
+	output, err := xml.MarshalIndent(reply, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
+}
+
+// convertVoiceMessageToXML 将语音消息转换为XML
+func (p *SecureMessageProcessor) convertVoiceMessageToXML(msg *VoiceMessage) (string, error) {
+	type VoiceReply struct {
+		XMLName      xml.Name `xml:"xml"`
+		ToUserName   CDATA    `xml:"ToUserName"`
+		FromUserName CDATA    `xml:"FromUserName"`
+		CreateTime   int64    `xml:"CreateTime"`
+		MsgType      CDATA    `xml:"MsgType"`
+		Voice        struct {
+			MediaID CDATA `xml:"MediaId"`
+		} `xml:"Voice"`
+	}
+
+	reply := VoiceReply{
+		ToUserName:   CDATA{Value: msg.ToUserName},
+		FromUserName: CDATA{Value: msg.FromUserName},
+		CreateTime:   msg.CreateTime,
+		MsgType:      CDATA{Value: "voice"},
+	}
+	reply.Voice.MediaID = CDATA{Value: msg.MediaID}
+
+	output, err := xml.MarshalIndent(reply, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
+}
+
+// convertVideoMessageToXML 将视频消息转换为XML
+func (p *SecureMessageProcessor) convertVideoMessageToXML(msg *VideoMessage) (string, error) {
+	type VideoReply struct {
+		XMLName      xml.Name `xml:"xml"`
+		ToUserName   CDATA    `xml:"ToUserName"`
+		FromUserName CDATA    `xml:"FromUserName"`
+		CreateTime   int64    `xml:"CreateTime"`
+		MsgType      CDATA    `xml:"MsgType"`
+		Video        struct {
+			MediaID     CDATA `xml:"MediaId"`
+			Title       CDATA `xml:"Title"`
+			Description CDATA `xml:"Description"`
+		} `xml:"Video"`
+	}
+
+	reply := VideoReply{
+		ToUserName:   CDATA{Value: msg.ToUserName},
+		FromUserName: CDATA{Value: msg.FromUserName},
+		CreateTime:   msg.CreateTime,
+		MsgType:      CDATA{Value: "video"},
+	}
+	reply.Video.MediaID = CDATA{Value: msg.MediaID}
+	reply.Video.Title = CDATA{Value: ""}
+	reply.Video.Description = CDATA{Value: ""}
+
+	output, err := xml.MarshalIndent(reply, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
+}
+
+// CDATA XML CDATA类型
+type CDATA struct {
+	Value string `xml:",cdata"`
 }
 
 // MessageType 消息类型常量
@@ -299,14 +536,14 @@ func (p *MessageProcessor) handleThirdPartyMessage(xmlData []byte, msg *Message)
 		return nil, fmt.Errorf("解析第三方平台事件失败: %v", err)
 	}
 
-	// 根据事件类型处理
+	// 根据事件类型进行处理
 	switch event.Event {
 	case EventTypeComponentVerifyTicket:
 		return p.handleComponentVerifyTicketEvent(xmlData)
 	case EventTypeAuthorized, EventTypeUpdateAuthorized, EventTypeUnauthorized:
 		return p.handleAuthorizeEvent(xmlData)
 	default:
-		// 普通事件，使用原有的事件处理逻辑
+		// 如果不是第三方平台特定事件，则按普通事件处理
 		return p.processEventMessage(xmlData)
 	}
 }

@@ -435,6 +435,17 @@ func (c *JSSDKCacher) generateCacheKey(url string, jsAPIList []string) string {
 
 // GetConfigOptimized 优化后的JS-SDK配置获取
 func (jm *JSSDKManager) GetConfigOptimized(url string, jsAPIList []string) (*JSSDKConfig, error) {
+	// 验证参数
+	if url == "" {
+		return nil, fmt.Errorf("URL不能为空")
+	}
+	if len(jsAPIList) == 0 {
+		return nil, fmt.Errorf("JSAPI列表不能为空")
+	}
+	if jm.authorizerClient.authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+
 	// 先尝试从缓存获取
 	if cachedConfig, err := jm.cacher.GetCachedConfig(url, jsAPIList); err == nil && cachedConfig != nil {
 		return cachedConfig, nil
@@ -462,6 +473,20 @@ func (jm *JSSDKManager) GetConfigOptimized(url string, jsAPIList []string) (*JSS
 
 // GetConfigWithRetry 带重试的JS-SDK配置获取
 func (jm *JSSDKManager) GetConfigWithRetry(url string, jsAPIList []string, maxRetries int) (*JSSDKConfig, error) {
+	// 验证参数
+	if url == "" {
+		return nil, fmt.Errorf("URL不能为空")
+	}
+	if len(jsAPIList) == 0 {
+		return nil, fmt.Errorf("JSAPI列表不能为空")
+	}
+	if jm.authorizerClient.authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+	if maxRetries <= 0 {
+		return nil, fmt.Errorf("重试次数必须大于0")
+	}
+
 	var lastErr error
 
 	for i := 0; i < maxRetries; i++ {
@@ -514,6 +539,14 @@ type UserInfo struct {
 
 // GetUserInfo 获取用户信息
 func (c *AuthorizerClient) GetUserInfo(ctx context.Context, openID string) (*UserInfo, error) {
+	// 验证参数
+	if openID == "" {
+		return nil, fmt.Errorf("用户OpenID不能为空")
+	}
+	if c.authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+
 	accessToken, err := c.authClient.client.GetAuthorizerAccessToken(ctx, c.authorizerAppID)
 	if err != nil {
 		return nil, err
@@ -594,6 +627,20 @@ type TemplateMiniProgramInfo struct {
 
 // SendTemplateMessage 发送模板消息
 func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *TemplateMessage) error {
+	// 验证参数
+	if template == nil {
+		return fmt.Errorf("模板消息不能为空")
+	}
+	if template.ToUser == "" {
+		return fmt.Errorf("接收用户不能为空")
+	}
+	if template.TemplateID == "" {
+		return fmt.Errorf("模板ID不能为空")
+	}
+	if c.authorizerAppID == "" {
+		return fmt.Errorf("授权方AppID不能为空")
+	}
+
 	accessToken, err := c.authClient.client.GetAuthorizerAccessToken(ctx, c.authorizerAppID)
 	if err != nil {
 		return err
@@ -628,6 +675,20 @@ type MediaResponse struct {
 
 // UploadMedia 上传临时素材
 func (c *AuthorizerClient) UploadMedia(ctx context.Context, mediaType, filename string, data []byte) (*MediaResponse, error) {
+	// 验证参数
+	if mediaType == "" {
+		return nil, fmt.Errorf("媒体类型不能为空")
+	}
+	if filename == "" {
+		return nil, fmt.Errorf("文件名不能为空")
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("媒体数据不能为空")
+	}
+	if c.authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+
 	accessToken, err := c.authClient.client.GetAuthorizerAccessToken(ctx, c.authorizerAppID)
 	if err != nil {
 		return nil, err
@@ -691,6 +752,14 @@ func (c *AuthorizerClient) UploadMedia(ctx context.Context, mediaType, filename 
 
 // GetMedia 获取临时素材
 func (c *AuthorizerClient) GetMedia(ctx context.Context, mediaID string) ([]byte, error) {
+	// 验证参数
+	if mediaID == "" {
+		return nil, fmt.Errorf("媒体ID不能为空")
+	}
+	if c.authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+
 	accessToken, err := c.authClient.client.GetAuthorizerAccessToken(ctx, c.authorizerAppID)
 	if err != nil {
 		return nil, err
@@ -756,14 +825,29 @@ func (c *AuthorizerClient) GetOAuthClient(redirectURI string) *OAuthClient {
 
 // GetAuthorizeURL 生成授权页面URL
 func (oc *OAuthClient) GetAuthorizeURL(scope, state string) string {
+	// 验证参数
+	if oc.authorizerClient.authorizerAppID == "" {
+		panic("authorizerAppID不能为空")
+	}
+	if oc.redirectURI == "" {
+		panic("redirectURI不能为空")
+	}
+	if scope == "" {
+		panic("scope不能为空")
+	}
+
+	// 严格按照微信官方文档要求的参数顺序和大小写
 	params := url.Values{}
 	params.Set("appid", oc.authorizerClient.authorizerAppID)
 	params.Set("redirect_uri", oc.redirectURI)
 	params.Set("response_type", "code")
 	params.Set("scope", scope)
-	params.Set("state", state)
+	if state != "" {
+		params.Set("state", state)
+	}
 	params.Set("component_appid", oc.authorizerClient.authClient.client.GetConfig().ComponentAppID)
 
+	// 使用微信官方文档指定的授权URL
 	return "https://open.weixin.qq.com/connect/oauth2/authorize?" + params.Encode() + "#wechat_redirect"
 }
 
@@ -789,14 +873,24 @@ type OAuthToken struct {
 
 // GetAccessToken 使用授权码获取AccessToken
 func (oc *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthToken, error) {
+	// 验证参数
+	if code == "" {
+		return nil, fmt.Errorf("授权码不能为空")
+	}
+	if oc.authorizerClient.authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+
 	// 需要先获取组件令牌
 	componentToken, err := oc.authorizerClient.authClient.client.GetComponentToken(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取ComponentAccessToken失败: %v", err)
 	}
 
+	// 使用微信官方文档指定的URL
 	apiURL := "https://api.weixin.qq.com/sns/oauth2/component/access_token"
 
+	// 严格按照微信官方文档要求的参数格式
 	params := map[string]interface{}{
 		"appid":                  oc.authorizerClient.authorizerAppID,
 		"code":                   code,
@@ -843,6 +937,17 @@ type JSSDKConfig struct {
 
 // GetConfig 生成JS-SDK配置
 func (jm *JSSDKManager) GetConfig(ctx context.Context, url string, jsAPIList []string) (*JSSDKConfig, error) {
+	// 验证参数
+	if url == "" {
+		return nil, fmt.Errorf("URL不能为空")
+	}
+	if len(jsAPIList) == 0 {
+		return nil, fmt.Errorf("JSAPI列表不能为空")
+	}
+	if jm.authorizerClient.authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+
 	// 获取授权方AccessToken
 	accessToken, err := jm.authorizerClient.authClient.client.GetAuthorizerAccessToken(ctx, jm.authorizerClient.authorizerAppID)
 	if err != nil {
@@ -942,6 +1047,17 @@ type QRCodeResponse struct {
 
 // CreateQRCode 创建二维码
 func (c *AuthorizerClient) CreateQRCode(ctx context.Context, qrCode *QRCodeRequest) (*QRCodeResponse, error) {
+	// 验证参数
+	if qrCode == nil {
+		return nil, fmt.Errorf("二维码请求不能为空")
+	}
+	if qrCode.ActionName == "" {
+		return nil, fmt.Errorf("二维码动作名称不能为空")
+	}
+	if c.authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+
 	accessToken, err := c.authClient.client.GetAuthorizerAccessToken(ctx, c.authorizerAppID)
 	if err != nil {
 		return nil, err
@@ -963,8 +1079,13 @@ func (c *AuthorizerClient) CreateQRCode(ctx context.Context, qrCode *QRCodeReque
 }
 
 // GetQRCodeURL 获取二维码图片URL
-func (c *AuthorizerClient) GetQRCodeURL(ticket string) string {
-	return fmt.Sprintf("https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=%s", url.QueryEscape(ticket))
+func (c *AuthorizerClient) GetQRCodeURL(ticket string) (string, error) {
+	// 验证参数
+	if ticket == "" {
+		return "", fmt.Errorf("二维码ticket不能为空")
+	}
+	
+	return fmt.Sprintf("https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=%s", url.QueryEscape(ticket)), nil
 }
 
 // MiniProgramClient 小程序客户端
@@ -994,6 +1115,17 @@ type WXACodeResponse struct {
 
 // GetWXACode 获取小程序码
 func (mpc *MiniProgramClient) GetWXACode(ctx context.Context, request *WXACodeRequest) (*WXACodeResponse, error) {
+	// 验证参数
+	if request == nil {
+		return nil, fmt.Errorf("小程序码请求不能为空")
+	}
+	if request.Path == "" {
+		return nil, fmt.Errorf("小程序码路径不能为空")
+	}
+	if mpc.authorizerClient.authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+
 	accessToken, err := mpc.authorizerClient.authClient.client.GetAuthorizerAccessToken(ctx, mpc.authorizerClient.authorizerAppID)
 	if err != nil {
 		return nil, err
@@ -1030,8 +1162,18 @@ type OAuthUserInfo struct {
 
 // GetUserInfo 获取用户信息
 func (oc *OAuthClient) GetUserInfo(ctx context.Context, accessToken, openID string) (*OAuthUserInfo, error) {
+	// 验证参数
+	if accessToken == "" {
+		return nil, fmt.Errorf("accessToken不能为空")
+	}
+	if openID == "" {
+		return nil, fmt.Errorf("openID不能为空")
+	}
+
+	// 使用微信官方文档指定的URL
 	apiURL := "https://api.weixin.qq.com/sns/userinfo"
 
+	// 严格按照微信官方文档要求的参数格式
 	params := map[string]interface{}{
 		"access_token": accessToken,
 		"openid":       openID,
@@ -1053,14 +1195,24 @@ func (oc *OAuthClient) GetUserInfo(ctx context.Context, accessToken, openID stri
 
 // RefreshToken 刷新AccessToken
 func (oc *OAuthClient) RefreshToken(ctx context.Context, refreshToken string) (*OAuthToken, error) {
+	// 验证参数
+	if refreshToken == "" {
+		return nil, fmt.Errorf("refreshToken不能为空")
+	}
+	if oc.authorizerClient.authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+
 	// 需要先获取组件令牌
 	componentToken, err := oc.authorizerClient.authClient.client.GetComponentToken(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取ComponentAccessToken失败: %v", err)
 	}
 
+	// 使用微信官方文档指定的URL
 	apiURL := "https://api.weixin.qq.com/sns/oauth2/component/refresh_token"
 
+	// 严格按照微信官方文档要求的参数格式
 	params := map[string]interface{}{
 		"appid":                  oc.authorizerClient.authorizerAppID,
 		"grant_type":             "refresh_token",
