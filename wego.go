@@ -1,7 +1,6 @@
 package wego
 
 import (
-	"github.com/jcbowen/wego/api"
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/message"
 	"github.com/jcbowen/wego/officialaccount"
@@ -69,14 +68,6 @@ func NewWeGoWithStorage(storage storage.TokenStorage, configs ...any) *WeGo {
 	}
 
 	return wego
-}
-
-// OpenPlatformAPI 返回开放平台API相关功能
-func (w *WeGo) OpenPlatformAPI() *api.APIClient {
-	if w.OpenPlatformClient == nil {
-		panic("未初始化开放平台客户端")
-	}
-	return api.NewAPIClient(w.OpenPlatformClient)
 }
 
 // OpenPlatformAuth 返回开放平台授权相关功能
@@ -187,7 +178,7 @@ type (
 	OpenPlatformConfig    = openplatform.OpenPlatformConfig
 	APIResponse           = openplatform.APIResponse
 	AuthorizationInfo     = openplatform.AuthorizationInfo
-	AuthorizerInfo        = api.AuthorizerInfo
+	AuthorizerInfo        = openplatform.AuthorizerInfo
 	TokenStorage          = storage.TokenStorage
 	MemoryStorage         = storage.MemoryStorage
 	DBStorage             = storage.DBStorage
