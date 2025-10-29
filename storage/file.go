@@ -12,13 +12,13 @@ import (
 // FileStorage 文件存储实现
 // 将令牌数据持久化到本地文件系统
 type FileStorage struct {
-	mu                  sync.RWMutex
-	baseDir             string
-	componentTokenFile  string
-	preAuthCodeFile     string
-	verifyTicketFile    string
-	authorizerTokensDir string
-	prevEncodingAESKeysDir string // 上一次EncodingAESKey存储目录
+	mu                        sync.RWMutex
+	baseDir                   string
+	componentTokenFile        string
+	preAuthCodeFile           string
+	componentVerifyTicketFile string
+	authorizerTokensDir       string
+	prevEncodingAESKeysDir    string // 上一次EncodingAESKey存储目录
 }
 
 // NewFileStorage 创建文件存储实例
@@ -29,12 +29,12 @@ func NewFileStorage(baseDir string) (*FileStorage, error) {
 	}
 
 	storage := &FileStorage{
-		baseDir:             baseDir,
-		componentTokenFile:  filepath.Join(baseDir, "component_token.json"),
-		preAuthCodeFile:     filepath.Join(baseDir, "pre_auth_code.json"),
-		verifyTicketFile:    filepath.Join(baseDir, "verify_ticket.txt"),
-		authorizerTokensDir: filepath.Join(baseDir, "authorizer_tokens"),
-		prevEncodingAESKeysDir: filepath.Join(baseDir, "prev_encoding_aes_keys"),
+		baseDir:                   baseDir,
+		componentTokenFile:        filepath.Join(baseDir, "component_token.json"),
+		preAuthCodeFile:           filepath.Join(baseDir, "pre_auth_code.json"),
+		componentVerifyTicketFile: filepath.Join(baseDir, "component_verify_ticket.txt"),
+		authorizerTokensDir:       filepath.Join(baseDir, "authorizer_tokens"),
+		prevEncodingAESKeysDir:    filepath.Join(baseDir, "prev_encoding_aes_keys"),
 	}
 
 	// 确保授权方令牌目录存在
@@ -136,7 +136,7 @@ func (s *FileStorage) SaveVerifyTicket(ctx context.Context, ticket string) error
 		ExpiresAt: time.Now().Add(12 * time.Hour), // 12小时有效期
 	}
 
-	return s.saveToFile(s.verifyTicketFile, verifyTicket)
+	return s.saveToFile(s.componentVerifyTicketFile, verifyTicket)
 }
 
 // GetVerifyTicket 从文件读取验证票据
@@ -145,7 +145,7 @@ func (s *FileStorage) GetVerifyTicket(ctx context.Context) (*VerifyTicket, error
 	defer s.mu.RUnlock()
 
 	var verifyTicket VerifyTicket
-	if err := s.loadFromFile(s.verifyTicketFile, &verifyTicket); err != nil {
+	if err := s.loadFromFile(s.componentVerifyTicketFile, &verifyTicket); err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
@@ -165,7 +165,7 @@ func (s *FileStorage) DeleteVerifyTicket(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return os.Remove(s.verifyTicketFile)
+	return os.Remove(s.componentVerifyTicketFile)
 }
 
 // SaveAuthorizerToken 保存授权方令牌到文件
@@ -309,13 +309,13 @@ func (s *FileStorage) loadFromFile(filename string, data interface{}) error {
 func (s *FileStorage) SavePrevEncodingAESKey(ctx context.Context, appID string, prevKey string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	prevKeyData := &PrevEncodingAESKey{
-		AppID:           appID,
+		AppID:              appID,
 		PrevEncodingAESKey: prevKey,
-		UpdatedAt:       time.Now(),
+		UpdatedAt:          time.Now(),
 	}
-	
+
 	filename := filepath.Join(s.prevEncodingAESKeysDir, appID+".json")
 	return s.saveToFile(filename, prevKeyData)
 }
@@ -324,7 +324,7 @@ func (s *FileStorage) SavePrevEncodingAESKey(ctx context.Context, appID string, 
 func (s *FileStorage) GetPrevEncodingAESKey(ctx context.Context, appID string) (*PrevEncodingAESKey, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	filename := filepath.Join(s.prevEncodingAESKeysDir, appID+".json")
 	var prevKey PrevEncodingAESKey
 	if err := s.loadFromFile(filename, &prevKey); err != nil {
@@ -333,7 +333,7 @@ func (s *FileStorage) GetPrevEncodingAESKey(ctx context.Context, appID string) (
 		}
 		return nil, err
 	}
-	
+
 	return &prevKey, nil
 }
 
@@ -341,7 +341,7 @@ func (s *FileStorage) GetPrevEncodingAESKey(ctx context.Context, appID string) (
 func (s *FileStorage) DeletePrevEncodingAESKey(ctx context.Context, appID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	filename := filepath.Join(s.prevEncodingAESKeysDir, appID+".json")
 	return os.Remove(filename)
 }
