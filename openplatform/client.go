@@ -516,24 +516,24 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 	switch baseEvent.InfoType {
 	case "authorized":
 		var event AuthorizedEvent
-		err := xml.Unmarshal(xmlData, &event)
+		err = xml.Unmarshal(xmlData, &event)
 		if err != nil {
 			c.logger.Errorf("解析授权成功事件失败: %v", err)
 			break
 		}
-
+		c.logger.Debugf("解析授权成功事件成功，事件内容: %+v", event)
 		if err := c.GetEventHandler().HandleAuthorized(ctx, &event); err != nil {
 			c.logger.Errorf("处理授权成功事件失败: %v", err)
 		}
 
 	case "unauthorized":
 		var event UnauthorizedEvent
-		err := xml.Unmarshal(xmlData, &event)
+		err = xml.Unmarshal(xmlData, &event)
 		if err != nil {
 			c.logger.Errorf("解析取消授权事件失败: %v", err)
 			break
 		}
-
+		c.logger.Debugf("解析取消授权事件成功，事件内容: %+v", event)
 		if err := c.GetEventHandler().HandleUnauthorized(ctx, &event); err != nil {
 			c.logger.Errorf("处理取消授权事件失败: %v", err)
 		}
@@ -545,8 +545,8 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 			c.logger.Errorf("解析授权更新事件失败: %v", err)
 			break
 		}
-
-		if err := c.GetEventHandler().HandleUpdateAuthorized(ctx, &event); err != nil {
+		c.logger.Debugf("解析授权更新事件成功，事件内容: %+v", event)
+		if err = c.GetEventHandler().HandleUpdateAuthorized(ctx, &event); err != nil {
 			c.logger.Errorf("处理授权更新事件失败: %v", err)
 		}
 
@@ -558,7 +558,7 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 			// 根据微信官方文档要求，即使解析失败也必须返回success
 			break
 		}
-
+		c.logger.Debugf("解析验证票据事件成功，事件内容: %+v", event)
 		// 存储验证票据
 		if err := c.storage.SaveComponentVerifyTicket(ctx, event.ComponentVerifyTicket); err != nil {
 			c.logger.Errorf("存储验证票据失败: %v", err)
@@ -577,7 +577,7 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 			c.logger.Errorf("解析EncodingAESKey变更事件失败: %v", err)
 			break
 		}
-
+		c.logger.Debugf("解析EncodingAESKey变更事件成功，事件内容: %+v", event)
 		// 保存上一次的EncodingAESKey
 		if c.crypt != nil {
 			c.crypt.SetPrevEncodingAESKey(c.config.EncodingAESKey)
