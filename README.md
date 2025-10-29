@@ -22,7 +22,9 @@ wego/
 ├── message/        # 消息处理功能
 ├── crypto/         # 加密解密功能
 ├── storage/        # 存储抽象层
-├── examples/       # 使用示例
+├── types/          # 类型定义
+├── openplatform/   # 开放平台功能
+├── officialaccount/ # 公众号开发功能
 └── doc/           # 技术文档
 ```
 
@@ -92,8 +94,9 @@ func main() {
 授权管理功能，包含：
 
 - `AuthorizerClient` - 授权方客户端
-- 客服消息发送
-- 自定义菜单管理
+- 代调用API接口
+- 用户信息管理
+- 媒体文件上传下载
 
 ### Message 模块
 
@@ -121,9 +124,11 @@ func main() {
 
 ## 示例
 
-查看 `examples/` 目录获取完整的使用示例：
+查看 `doc/` 目录获取完整的使用示例和技术文档：
 
-- [基础使用示例](examples/basic/main.go)
+- [微信公众号开发库使用指南](doc/officialaccount/README.md)
+- [授权流程技术说明](doc/01-授权流程技术说明.md)
+- [消息加解密技术介绍](doc/06-消息加解密技术介绍.md)
 
 ## 文档
 
@@ -136,9 +141,7 @@ func main() {
 
 ## 依赖
 
-- Go 1.24.3+
-- github.com/jcbowen/jcbaseGo v0.11.1
-- github.com/stretchr/testify v1.11.1
+- Go 1.23.0+
 - gorm.io/gorm v1.31.0
 
 ## 许可证

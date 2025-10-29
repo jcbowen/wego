@@ -1,6 +1,6 @@
 module github.com/jcbowen/wego
 
-go 1.24.3
+go 1.23.0
 
 require gorm.io/gorm v1.31.0
 

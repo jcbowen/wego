@@ -104,6 +104,8 @@ wego/
 ├── crypto/         # 加密解密功能
 ├── storage/        # 存储抽象层
 ├── types/          # 类型定义
+├── openplatform/   # 开放平台功能
+├── officialaccount/ # 公众号开发功能
 └── doc/           # 技术文档
 ```
 
