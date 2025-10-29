@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"time"
@@ -53,7 +54,7 @@ type APIClient struct {
 	httpClient   HTTPClient
 	storage      storage.TokenStorage
 	logger       Logger
-	eventHandler EventHandler // 事件处理器
+	eventHandler EventHandler          // 事件处理器
 	crypt        *crypto.WXBizMsgCrypt // 消息加解密实例
 }
 
@@ -538,7 +539,15 @@ func (c *APIClient) validateAuthorizationEvent(event *AuthorizationEvent) error 
 
 	// 验证时间戳，防止重放攻击
 	currentTime := time.Now().Unix()
-	if currentTime-event.CreateTime > 300 { // 5分钟容忍
+
+	// 处理CreateTime为0的情况（某些微信回调可能不包含CreateTime字段）
+	if event.CreateTime == 0 {
+		c.logger.Warnf("授权事件CreateTime为0，跳过时间戳验证")
+		return nil
+	}
+
+	// 检查时间戳是否在有效范围内（当前时间±5分钟）
+	if math.Abs(float64(currentTime-event.CreateTime)) > 300 { // 5分钟容忍
 		return fmt.Errorf("时间戳过期: current=%d, event=%d", currentTime, event.CreateTime)
 	}
 
@@ -554,13 +563,13 @@ func (c *APIClient) DecryptMessage(encryptedMsg, msgSignature, timestamp, nonce 
 
 	// 使用crypto包中的解密实现
 	wxCrypt := crypto.NewWXBizMsgCrypt(c.config.ComponentToken, c.config.EncodingAESKey, c.config.ComponentAppID)
-	
+
 	// 解密消息
 	decryptedMsg, err := wxCrypt.DecryptMsg(msgSignature, timestamp, nonce, encryptedMsg)
 	if err != nil {
 		return nil, fmt.Errorf("消息解密失败: %v", err)
 	}
-	
+
 	return []byte(decryptedMsg), nil
 }
 
@@ -568,18 +577,18 @@ func (c *APIClient) DecryptMessage(encryptedMsg, msgSignature, timestamp, nonce 
 func (c *APIClient) verifySignature(signature, timestamp, nonce, encryptedMsg string) error {
 	// 根据微信开放平台签名算法验证签名
 	// 签名算法：sha1(sort(token, timestamp, nonce, encryptedMsg))
-	
+
 	// 获取配置中的Token
 	token := c.config.ComponentToken
-	
+
 	// 使用crypto包中的签名验证实现
 	wxCrypt := crypto.NewWXBizMsgCrypt(token, c.config.EncodingAESKey, c.config.ComponentAppID)
-	
+
 	// 验证签名
 	if !wxCrypt.VerifySignature(signature, timestamp, nonce, encryptedMsg) {
 		return fmt.Errorf("签名验证失败")
 	}
-	
+
 	return nil
 }
 

@@ -221,4 +221,5 @@ type (
 	WXCardMessage          = officialaccount.WXCardMessage
 	MiniProgramPageMessage = officialaccount.MiniProgramPageMessage
 	NewsArticle            = officialaccount.NewsArticle
+	UserInfo               = auth.UserInfo
 )
