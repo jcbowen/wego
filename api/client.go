@@ -6,17 +6,17 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/jcbowen/wego/core"
+	"github.com/jcbowen/wego/openplatform"
 	"github.com/jcbowen/wego/storage"
 )
 
 // APIClient API客户端
 type APIClient struct {
-	Client *core.WegoClient
+	Client *openplatform.OpenPlatformClient
 }
 
 // NewAPIClient 创建新的API客户端
-func NewAPIClient(client *core.WegoClient) *APIClient {
+func NewAPIClient(client *openplatform.OpenPlatformClient) *APIClient {
 	return &APIClient{
 		Client: client,
 	}

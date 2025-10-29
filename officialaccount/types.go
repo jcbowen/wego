@@ -9,10 +9,10 @@ import (
 
 // StableAccessTokenRequest 获取稳定版access_token请求参数
 type StableAccessTokenRequest struct {
-	GrantType    string                `json:"grant_type"`              // 获取access_token填写client_credential
-	AppID        string                `json:"appid"`                  // 公众号appid
-	Secret       string                `json:"secret"`                 // 公众号appsecret
-	ForceRefresh bool                  `json:"force_refresh,omitempty"` // 是否强制刷新，true-是；false-否
+	GrantType    string `json:"grant_type"`              // 获取access_token填写client_credential
+	AppID        string `json:"appid"`                   // 公众号appid
+	Secret       string `json:"secret"`                  // 公众号appsecret
+	ForceRefresh bool   `json:"force_refresh,omitempty"` // 是否强制刷新，true-是；false-否
 }
 
 // StableAccessTokenResponse 获取稳定版access_token响应
@@ -24,10 +24,10 @@ type StableAccessTokenResponse struct {
 
 // StableAccessTokenInfo 稳定版access_token信息
 type StableAccessTokenInfo struct {
-	AccessToken string    `json:"access_token"` // 稳定版access_token
-	ExpiresIn   int       `json:"expires_in"`   // 凭证有效时间，单位：秒
-	ExpiresAt   time.Time `json:"expires_at"`   // 过期时间
-	Mode        StableAccessTokenMode `json:"mode"` // 获取模式
+	AccessToken string                `json:"access_token"` // 稳定版access_token
+	ExpiresIn   int                   `json:"expires_in"`   // 凭证有效时间，单位：秒
+	ExpiresAt   time.Time             `json:"expires_at"`   // 过期时间
+	Mode        StableAccessTokenMode `json:"mode"`         // 获取模式
 }
 
 // StableAccessTokenStorage 稳定版access_token存储接口
@@ -82,10 +82,10 @@ func (s *DefaultStableAccessTokenStorage) GetStableAccessToken(appID string) (*S
 
 // StableAccessTokenConfig 稳定版access_token配置
 type StableAccessTokenConfig struct {
-	AppID        string                `json:"app_id"`        // 公众号appid
-	AppSecret    string                `json:"app_secret"`    // 公众号appsecret
-	DefaultMode  StableAccessTokenMode `json:"default_mode"`  // 默认获取模式
-	Storage      StableAccessTokenStorage `json:"-"`          // 存储接口
+	AppID       string                   `json:"app_id" ini:"app_id"`             // 公众号appid
+	AppSecret   string                   `json:"app_secret" ini:"app_secret"`     // 公众号appsecret
+	DefaultMode StableAccessTokenMode    `json:"default_mode" ini:"default_mode"` // 默认获取模式
+	Storage     StableAccessTokenStorage `json:"-"`                               // 存储接口
 }
 
 // Validate 验证稳定版access_token配置的有效性

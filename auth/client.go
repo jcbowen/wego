@@ -17,16 +17,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jcbowen/wego/core"
+	"github.com/jcbowen/wego/openplatform"
 )
 
 // AuthClient 授权相关客户端
 type AuthClient struct {
-	client *core.WegoClient
+	client *openplatform.OpenPlatformClient
 }
 
 // NewAuthClient 创建授权客户端
-func NewAuthClient(client *core.WegoClient) *AuthClient {
+func NewAuthClient(client *openplatform.OpenPlatformClient) *AuthClient {
 	return &AuthClient{
 		client: client,
 	}
@@ -34,14 +34,14 @@ func NewAuthClient(client *core.WegoClient) *AuthClient {
 
 // AuthorizerClient 授权方API客户端
 type AuthorizerClient struct {
-	authClient    *AuthClient
+	authClient      *AuthClient
 	authorizerAppID string
 }
 
 // NewAuthorizerClient 创建授权方API客户端
 func (c *AuthClient) NewAuthorizerClient(authorizerAppID string) *AuthorizerClient {
 	return &AuthorizerClient{
-		authClient:     c,
+		authClient:      c,
 		authorizerAppID: authorizerAppID,
 	}
 }
@@ -114,7 +114,7 @@ func (c *AuthorizerClient) SendCustomMessage(ctx context.Context, toUser string,
 		return fmt.Errorf("不支持的客服消息类型")
 	}
 
-	var result core.APIResponse
+	var result openplatform.APIResponse
 	err = c.authClient.client.MakeRequest(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return err
@@ -170,7 +170,7 @@ func (c *AuthorizerClient) CreateMenu(ctx context.Context, menu *Menu) error {
 
 	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/menu/create?access_token=%s", url.QueryEscape(accessToken))
 
-	var result core.APIResponse
+	var result openplatform.APIResponse
 	err = c.authClient.client.MakeRequest(ctx, "POST", apiURL, menu, &result)
 	if err != nil {
 		return err
@@ -193,7 +193,7 @@ func (c *AuthorizerClient) GetMenu(ctx context.Context) (*Menu, error) {
 	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/menu/get?access_token=%s", url.QueryEscape(accessToken))
 
 	var result struct {
-		core.APIResponse
+		openplatform.APIResponse
 		Menu Menu `json:"menu"`
 	}
 
@@ -218,7 +218,7 @@ func (c *AuthorizerClient) DeleteMenu(ctx context.Context) error {
 
 	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/menu/delete?access_token=%s", url.QueryEscape(accessToken))
 
-	var result core.APIResponse
+	var result openplatform.APIResponse
 	err = c.authClient.client.MakeRequest(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return err
@@ -238,10 +238,10 @@ func (c *AuthorizerClient) CallAPI(ctx context.Context, apiURL string, params in
 	if err != nil {
 		return nil, fmt.Errorf("获取AccessToken失败: %v", err)
 	}
-	
+
 	// 2. 构造完整URL
 	fullURL := fmt.Sprintf("%s?access_token=%s", apiURL, token)
-	
+
 	// 3. 创建HTTP请求
 	var req *http.Request
 	if params != nil {
@@ -250,7 +250,7 @@ func (c *AuthorizerClient) CallAPI(ctx context.Context, apiURL string, params in
 		if err != nil {
 			return nil, fmt.Errorf("参数序列化失败: %v", err)
 		}
-		
+
 		req, err = http.NewRequestWithContext(ctx, "POST", fullURL, strings.NewReader(string(jsonData)))
 		if err != nil {
 			return nil, fmt.Errorf("创建请求失败: %v", err)
@@ -263,31 +263,31 @@ func (c *AuthorizerClient) CallAPI(ctx context.Context, apiURL string, params in
 			return nil, fmt.Errorf("创建请求失败: %v", err)
 		}
 	}
-	
+
 	// 4. 发送HTTP请求
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("API调用失败: %v", err)
 	}
 	defer resp.Body.Close()
-	
+
 	// 5. 读取响应
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %v", err)
 	}
-	
+
 	// 6. 解析响应
-	var apiResp core.APIResponse
+	var apiResp openplatform.APIResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
 		return nil, fmt.Errorf("响应解析失败: %v", err)
 	}
-	
+
 	// 7. 检查错误码
 	if apiResp.ErrCode != 0 {
 		return nil, fmt.Errorf("API返回错误: %d - %s", apiResp.ErrCode, apiResp.ErrMsg)
 	}
-	
+
 	return respBody, nil
 }
 
@@ -298,24 +298,22 @@ func (c *AuthorizerClient) CallAPIWithQuery(ctx context.Context, baseURL string,
 	if err != nil {
 		return nil, fmt.Errorf("获取AccessToken失败: %v", err)
 	}
-	
+
 	// 构造查询参数
 	params := url.Values{}
 	params.Set("access_token", token)
 	for key, value := range queryParams {
 		params.Set(key, value)
 	}
-	
+
 	fullURL := fmt.Sprintf("%s?%s", baseURL, params.Encode())
-	
+
 	// 根据是否有postData决定请求方法
 	if postData != nil {
 		return c.CallAPI(ctx, fullURL, postData)
 	}
 	return c.CallAPI(ctx, fullURL, nil)
 }
-
-
 
 // SendTextMessage 发送文本消息
 func (c *AuthorizerClient) SendTextMessage(ctx context.Context, toUser, content string) error {
@@ -336,9 +334,9 @@ func (c *AuthorizerClient) SendNewsMessage(ctx context.Context, toUser string, a
 			"articles": articles,
 		},
 	}
-	
+
 	apiURL := "https://api.weixin.qq.com/cgi-bin/message/custom/send"
-	
+
 	_, err := c.CallAPI(ctx, apiURL, message)
 	return err
 }
@@ -347,20 +345,20 @@ func (c *AuthorizerClient) SendNewsMessage(ctx context.Context, toUser string, a
 type ConditionalMenu struct {
 	Button    []Button `json:"button"`
 	MatchRule struct {
-		TagID               string `json:"tag_id,omitempty"`
-		Sex                 string `json:"sex,omitempty"`
-		Country             string `json:"country,omitempty"`
-		Province            string `json:"province,omitempty"`
-		City                string `json:"city,omitempty"`
+		TagID              string `json:"tag_id,omitempty"`
+		Sex                string `json:"sex,omitempty"`
+		Country            string `json:"country,omitempty"`
+		Province           string `json:"province,omitempty"`
+		City               string `json:"city,omitempty"`
 		ClientPlatformType string `json:"client_platform_type,omitempty"`
-		Language            string `json:"language,omitempty"`
+		Language           string `json:"language,omitempty"`
 	} `json:"matchrule"`
 }
 
 // CreateConditionalMenu 创建个性化菜单
 func (c *AuthorizerClient) CreateConditionalMenu(ctx context.Context, menu *ConditionalMenu) error {
 	apiURL := "https://api.weixin.qq.com/cgi-bin/menu/addconditional"
-	
+
 	_, err := c.CallAPI(ctx, apiURL, menu)
 	return err
 }
@@ -368,11 +366,11 @@ func (c *AuthorizerClient) CreateConditionalMenu(ctx context.Context, menu *Cond
 // DeleteConditionalMenu 删除个性化菜单
 func (c *AuthorizerClient) DeleteConditionalMenu(ctx context.Context, menuID string) error {
 	apiURL := "https://api.weixin.qq.com/cgi-bin/menu/delconditional"
-	
+
 	params := map[string]interface{}{
 		"menuid": menuID,
 	}
-	
+
 	_, err := c.CallAPI(ctx, apiURL, params)
 	return err
 }
@@ -384,18 +382,18 @@ func (c *AuthorizerClient) CallAPIWithRetry(ctx context.Context, apiURL string, 
 		if err == nil {
 			return resp, nil
 		}
-		
+
 		// 检查是否是Token过期错误
 		if strings.Contains(err.Error(), "40001") || strings.Contains(err.Error(), "42001") {
 			// Token过期，清除缓存并重试
 			// 这里需要实现缓存清除逻辑
 			continue
 		}
-		
+
 		// 其他错误，直接返回
 		return nil, err
 	}
-	
+
 	return nil, fmt.Errorf("API调用重试%d次后失败", maxRetries)
 }
 
@@ -407,13 +405,13 @@ type JSSDKCacher struct {
 // GetCachedConfig 获取缓存的JS-SDK配置
 func (c *JSSDKCacher) GetCachedConfig(url string, jsAPIList []string) (*JSSDKConfig, error) {
 	cacheKey := c.generateCacheKey(url, jsAPIList)
-	
+
 	if cached, exists := c.cache.Load(cacheKey); exists {
 		if config, ok := cached.(*JSSDKConfig); ok {
 			return config, nil
 		}
 	}
-	
+
 	return nil, fmt.Errorf("缓存未命中")
 }
 
@@ -428,9 +426,9 @@ func (c *JSSDKCacher) generateCacheKey(url string, jsAPIList []string) string {
 	sortedAPIs := make([]string, len(jsAPIList))
 	copy(sortedAPIs, jsAPIList)
 	sort.Strings(sortedAPIs)
-	
+
 	keyData := url + "|" + strings.Join(sortedAPIs, ",")
-	
+
 	hash := sha1.Sum([]byte(keyData))
 	return hex.EncodeToString(hash[:])
 }
@@ -441,7 +439,7 @@ func (jm *JSSDKManager) GetConfigOptimized(url string, jsAPIList []string) (*JSS
 	if cachedConfig, err := jm.cacher.GetCachedConfig(url, jsAPIList); err == nil && cachedConfig != nil {
 		return cachedConfig, nil
 	}
-	
+
 	// 缓存未命中，重新生成配置
 	ctx := context.Background()
 	accessToken, err := jm.authorizerClient.authClient.client.GetAuthorizerAccessToken(ctx, jm.authorizerClient.authorizerAppID)
@@ -455,27 +453,27 @@ func (jm *JSSDKManager) GetConfigOptimized(url string, jsAPIList []string) (*JSS
 	}
 
 	config := jm.generateSignature(url, ticket, jsAPIList)
-	
+
 	// 缓存新生成的配置
 	jm.cacher.CacheConfig(url, jsAPIList, config)
-	
+
 	return config, nil
 }
 
 // GetConfigWithRetry 带重试的JS-SDK配置获取
 func (jm *JSSDKManager) GetConfigWithRetry(url string, jsAPIList []string, maxRetries int) (*JSSDKConfig, error) {
 	var lastErr error
-	
+
 	for i := 0; i < maxRetries; i++ {
 		config, err := jm.GetConfigOptimized(url, jsAPIList)
 		if err == nil {
 			return config, nil
 		}
-		
+
 		lastErr = err
 		time.Sleep(time.Duration(i+1) * time.Second) // 指数退避
 	}
-	
+
 	return nil, fmt.Errorf("获取JS-SDK配置失败，重试%d次后仍然失败: %v", maxRetries, lastErr)
 }
 
@@ -484,17 +482,17 @@ func (jm *JSSDKManager) validateURL(url string) error {
 	if url == "" {
 		return fmt.Errorf("URL不能为空")
 	}
-	
+
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 		return fmt.Errorf("URL必须以http://或https://开头")
 	}
-	
+
 	return nil
 }
 
 // UserInfo 用户信息
 type UserInfo struct {
-	core.APIResponse
+	openplatform.APIResponse
 	Subscribe      int    `json:"subscribe"`
 	OpenID         string `json:"openid"`
 	Nickname       string `json:"nickname"`
@@ -539,7 +537,7 @@ func (c *AuthorizerClient) GetUserInfo(ctx context.Context, openID string) (*Use
 
 // UserList 用户列表
 type UserList struct {
-	core.APIResponse
+	openplatform.APIResponse
 	Total int `json:"total"`
 	Count int `json:"count"`
 	Data  struct {
@@ -604,7 +602,7 @@ func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *Te
 	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=%s", url.QueryEscape(accessToken))
 
 	var result struct {
-		core.APIResponse
+		openplatform.APIResponse
 		MsgID int64 `json:"msgid"`
 	}
 
@@ -622,7 +620,7 @@ func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *Te
 
 // MediaResponse 媒体文件响应
 type MediaResponse struct {
-	core.APIResponse
+	openplatform.APIResponse
 	Type      string `json:"type"`
 	MediaID   string `json:"media_id"`
 	CreatedAt int64  `json:"created_at"`
@@ -723,7 +721,7 @@ func (c *AuthorizerClient) GetMedia(ctx context.Context, mediaID string) ([]byte
 			return nil, fmt.Errorf("读取响应失败: %v", err)
 		}
 
-		var result core.APIResponse
+		var result openplatform.APIResponse
 		if err := json.Unmarshal(respBody, &result); err != nil {
 			return nil, fmt.Errorf("解析响应失败: %v", err)
 		}
@@ -781,7 +779,7 @@ func (oc *OAuthClient) GetUserInfoAuthorizeURL(state string) string {
 
 // OAuthToken 网页授权Token
 type OAuthToken struct {
-	core.APIResponse
+	openplatform.APIResponse
 	AccessToken  string `json:"access_token"`
 	ExpiresIn    int64  `json:"expires_in"`
 	RefreshToken string `json:"refresh_token"`
@@ -836,11 +834,11 @@ func (c *AuthorizerClient) GetJSSDKManager() *JSSDKManager {
 
 // JSSDKConfig JS-SDK配置结构
 type JSSDKConfig struct {
-	AppID     string   `json:"appId"`
-	Timestamp int64    `json:"timestamp"`
-	NonceStr  string   `json:"nonceStr"`
-	Signature string   `json:"signature"`
-	JSAPIList []string `json:"jsApiList"`
+	AppID     string   `json:"appId" ini:"app_id"`          // 公众号appid
+	Timestamp int64    `json:"timestamp" ini:"timestamp"`   // 时间戳
+	NonceStr  string   `json:"nonceStr" ini:"nonce_str"`    // 随机字符串
+	Signature string   `json:"signature" ini:"signature"`   // 签名
+	JSAPIList []string `json:"jsApiList" ini:"js_api_list"` // JS-SDK调用权限列表
 }
 
 // GetConfig 生成JS-SDK配置
@@ -936,7 +934,7 @@ type QRCodeRequest struct {
 
 // QRCodeResponse 二维码响应
 type QRCodeResponse struct {
-	core.APIResponse
+	openplatform.APIResponse
 	Ticket        string `json:"ticket"`
 	ExpireSeconds int64  `json:"expire_seconds"`
 	URL           string `json:"url"`
@@ -989,7 +987,7 @@ type WXACodeRequest struct {
 
 // WXACodeResponse 小程序码响应
 type WXACodeResponse struct {
-	core.APIResponse
+	openplatform.APIResponse
 	ContentType string `json:"contentType"`
 	Buffer      []byte `json:"buffer"`
 }
@@ -1018,7 +1016,7 @@ func (mpc *MiniProgramClient) GetWXACode(ctx context.Context, request *WXACodeRe
 
 // OAuthUserInfo 网页授权用户信息
 type OAuthUserInfo struct {
-	core.APIResponse
+	openplatform.APIResponse
 	OpenID     string   `json:"openid"`
 	Nickname   string   `json:"nickname"`
 	Sex        int      `json:"sex"`

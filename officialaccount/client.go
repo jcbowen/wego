@@ -23,9 +23,17 @@ type MPClient struct {
 	stableTokenClient *StableTokenClient // 稳定版access_token客户端
 }
 
-// NewMPClient 创建新的微信公众号客户端（使用默认内存存储）
+// NewMPClient 创建新的微信公众号客户端（使用默认文件存储）
 func NewMPClient(config *MPConfig) *MPClient {
-	return NewMPClientWithStorage(config, storage.NewMemoryStorage())
+	// 使用当前工作目录下的 wego_storage 文件夹作为默认存储路径
+	fileStorage, err := storage.NewFileStorage("wego_storage")
+	if err != nil {
+		// 如果文件存储创建失败，回退到内存存储并输出日志
+		logger := &core.DefaultLogger{}
+		logger.Warnf("文件存储创建失败，回退到内存存储: %v", err)
+		return NewMPClientWithStorage(config, storage.NewMemoryStorage())
+	}
+	return NewMPClientWithStorage(config, fileStorage)
 }
 
 // NewMPClientWithStorage 创建新的微信公众号客户端（使用自定义存储）

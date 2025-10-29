@@ -36,20 +36,34 @@ wego/
 go get github.com/jcbowen/wego
 ```
 
+### 存储说明
+
+WeGo库提供多种存储后端支持：
+
+- **文件存储（默认）**：使用`wego_storage`目录保存Token数据
+- **内存存储**：适合开发和测试环境，重启后数据丢失
+- **自定义存储**：支持数据库等自定义存储实现
+
+**默认存储策略**：
+- 默认使用文件存储，数据持久化到本地文件
+- 如果文件存储创建失败，会自动回退到内存存储并记录警告日志
+- 可通过`NewWeGoWithStorage`方法指定自定义存储
+
 ### 基本使用
+
+#### 只使用开放平台
 
 ```go
 package main
 
 import (
-	"context"
 	"fmt"
 	"github.com/jcbowen/wego"
 )
 
 func main() {
 	// 配置微信开放平台参数
-	config := &wego.WeGoConfig{
+	openPlatformConfig := &wego.OpenPlatformConfig{
 		ComponentAppID:     "your_component_app_id",
 		ComponentAppSecret: "your_component_app_secret",
 		ComponentToken:     "your_component_token",
@@ -57,17 +71,95 @@ func main() {
 		RedirectURI:        "your_redirect_uri",
 	}
 
-	// 创建WeGo实例
-	wegoClient := wego.NewWeGo(config)
+	// 创建WeGo实例（只初始化开放平台）
+	wegoClient := wego.NewWeGo(openPlatformConfig)
 
-	// 使用各个功能模块
-	apiClient := wegoClient.API()
-	authClient := wegoClient.Auth()
-	messageClient := wegoClient.Message()
+	// 使用开放平台功能
+	apiClient := wegoClient.OpenPlatformAPI()
+	authClient := wegoClient.OpenPlatformAuth()
+	messageClient := wegoClient.OpenPlatformMessage()
+
+	fmt.Println("开放平台客户端初始化成功！")
+}
+```
+
+#### 只使用公众号
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/jcbowen/wego"
+)
+
+func main() {
+	// 配置公众号参数
+	officialAccountConfig := &wego.MPConfig{
+		AppID:     "your_mp_app_id",
+		AppSecret: "your_mp_app_secret",
+		Token:     "your_mp_token",
+		AESKey:    "your_mp_aes_key",
+	}
+
+	// 创建WeGo实例（只初始化公众号）
+	wegoClient := wego.NewWeGo(officialAccountConfig)
+
+	// 使用公众号功能
+	apiClient := wegoClient.OfficialAccountAPI()
+	menuClient := wegoClient.OfficialAccountMenu()
+	messageClient := wegoClient.OfficialAccountMessage()
+
+	fmt.Println("公众号客户端初始化成功！")
+}
+```
+
+#### 同时使用开放平台和公众号
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/jcbowen/wego"
+)
+
+func main() {
+	// 配置开放平台参数
+	openPlatformConfig := &wego.OpenPlatformConfig{
+		ComponentAppID:     "your_component_app_id",
+		ComponentAppSecret: "your_component_app_secret",
+		ComponentToken:     "your_component_token",
+		EncodingAESKey:     "your_encoding_aes_key",
+		RedirectURI:        "your_redirect_uri",
+	}
+
+	// 配置公众号参数
+	officialAccountConfig := &wego.MPConfig{
+		AppID:     "your_mp_app_id",
+		AppSecret: "your_mp_app_secret",
+		Token:     "your_mp_token",
+		AESKey:    "your_mp_aes_key",
+	}
+
+	// 创建WeGo实例（同时初始化开放平台和公众号）
+	wegoClient := wego.NewWeGo(openPlatformConfig, officialAccountConfig)
+
+	// 检查客户端是否初始化
+	fmt.Printf("开放平台已初始化: %v\n", wegoClient.HasOpenPlatform())
+	fmt.Printf("公众号已初始化: %v\n", wegoClient.HasOfficialAccount())
+
+	// 使用开放平台功能
+	openPlatformAPI := wegoClient.OpenPlatformAPI()
+	
+	// 使用公众号功能
+	officialAccountAPI := wegoClient.OfficialAccountAPI()
+	
+	// 使用通用功能
 	cryptoClient := wegoClient.Crypto()
 	storageClient := wegoClient.Storage()
 
-	fmt.Println("WeGo客户端初始化成功！")
+	fmt.Println("所有客户端初始化成功！")
 }
 ```
 
@@ -77,7 +169,7 @@ func main() {
 
 核心配置和客户端实现，包含：
 
-- `WeGoConfig` - 配置结构体
+- `OpenPlatformConfig` - 开放平台配置结构体
 - `WegoClient` - 主客户端
 - 令牌管理和HTTP客户端
 
@@ -120,7 +212,13 @@ func main() {
 
 - `TokenStorage` 接口
 - `MemoryStorage` 内存存储实现
+- `FileStorage` 文件存储实现（默认存储）
 - 支持自定义存储后端
+
+**默认存储策略**：
+- 默认存储为文件存储
+- 文件存储使用`wego_storage`目录保存Token数据
+- 如果文件存储创建失败，会自动回退到内存存储并记录警告日志
 
 ## 示例
 

@@ -4,16 +4,16 @@ import (
 	"encoding/xml"
 	"fmt"
 
-	"github.com/jcbowen/wego/core"
+	"github.com/jcbowen/wego/openplatform"
 )
 
 // MessageClient 消息客户端
 type MessageClient struct {
-	Client *core.WegoClient
+	Client *openplatform.OpenPlatformClient
 }
 
 // NewMessageClient 创建新的消息客户端
-func NewMessageClient(client *core.WegoClient) *MessageClient {
+func NewMessageClient(client *openplatform.OpenPlatformClient) *MessageClient {
 	return &MessageClient{
 		Client: client,
 	}
