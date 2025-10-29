@@ -122,44 +122,35 @@ func (s *FileStorage) SaveVerifyTicket(ctx context.Context, ticket string) error
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// 创建临时文件
-	tempFile := s.verifyTicketFile + ".tmp"
-	
-	file, err := os.Create(tempFile)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// 直接写入票据内容
-	if _, err := file.WriteString(ticket); err != nil {
-		os.Remove(tempFile)
-		return err
+	// 创建票据结构，记录创建时间和过期时间
+	verifyTicket := &VerifyTicket{
+		Ticket:    ticket,
+		CreatedAt: time.Now(),
+		ExpiresAt: time.Now().Add(12 * time.Hour), // 12小时有效期
 	}
 
-	// 原子性替换文件
-	if err := file.Close(); err != nil {
-		os.Remove(tempFile)
-		return err
-	}
-
-	return os.Rename(tempFile, s.verifyTicketFile)
+	return s.saveToFile(s.verifyTicketFile, verifyTicket)
 }
 
 // GetVerifyTicket 从文件读取验证票据
-func (s *FileStorage) GetVerifyTicket(ctx context.Context) (string, error) {
+func (s *FileStorage) GetVerifyTicket(ctx context.Context) (*VerifyTicket, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	data, err := os.ReadFile(s.verifyTicketFile)
-	if err != nil {
+	var verifyTicket VerifyTicket
+	if err := s.loadFromFile(s.verifyTicketFile, &verifyTicket); err != nil {
 		if os.IsNotExist(err) {
-			return "", nil
+			return nil, nil
 		}
-		return "", err
+		return nil, err
 	}
 
-	return string(data), nil
+	// 检查票据是否过期
+	if time.Now().After(verifyTicket.ExpiresAt) {
+		return nil, nil
+	}
+
+	return &verifyTicket, nil
 }
 
 // DeleteVerifyTicket 删除验证票据文件

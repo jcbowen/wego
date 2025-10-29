@@ -11,7 +11,7 @@ type MemoryStorage struct {
 	mu               sync.RWMutex
 	componentToken   *ComponentAccessToken
 	preAuthCode      *PreAuthCode
-	verifyTicket     string
+	verifyTicket     *VerifyTicket
 	authorizerTokens map[string]*AuthorizerAccessToken
 }
 
@@ -95,14 +95,32 @@ func (s *MemoryStorage) SaveVerifyTicket(ctx context.Context, ticket string) err
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.verifyTicket = ticket
+	// 创建票据结构，记录创建时间和过期时间
+	s.verifyTicket = &VerifyTicket{
+		Ticket:    ticket,
+		CreatedAt: time.Now(),
+		ExpiresAt: time.Now().Add(12 * time.Hour), // 12小时有效期
+	}
 	return nil
 }
 
 // GetVerifyTicket 获取验证票据
-func (s *MemoryStorage) GetVerifyTicket(ctx context.Context) (string, error) {
+func (s *MemoryStorage) GetVerifyTicket(ctx context.Context) (*VerifyTicket, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	if s.verifyTicket == nil {
+		return nil, nil
+	}
+
+	// 检查票据是否过期
+	if time.Now().After(s.verifyTicket.ExpiresAt) {
+		s.mu.RUnlock()
+		s.mu.Lock()
+		s.verifyTicket = nil
+		s.mu.Unlock()
+		return nil, nil
+	}
 
 	return s.verifyTicket, nil
 }
@@ -112,7 +130,7 @@ func (s *MemoryStorage) DeleteVerifyTicket(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.verifyTicket = ""
+	s.verifyTicket = nil
 	return nil
 }
 

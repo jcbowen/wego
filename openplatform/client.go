@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/storage"
 )
 
@@ -329,6 +330,18 @@ func (c *APIClient) GetComponentAccessToken(ctx context.Context, verifyTicket st
 		return token, nil
 	}
 
+	// 如果verifyTicket为空，从存储中获取验证票据
+	if verifyTicket == "" {
+		verifyTicketObj, err := c.storage.GetVerifyTicket(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("获取验证票据失败: %v", err)
+		}
+		if verifyTicketObj == nil {
+			return nil, fmt.Errorf("验证票据不存在或已过期")
+		}
+		verifyTicket = verifyTicketObj.Ticket
+	}
+
 	request := ComponentTokenRequest{
 		ComponentAppID:        c.config.ComponentAppID,
 		ComponentAppSecret:    c.config.ComponentAppSecret,
@@ -466,6 +479,26 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 			c.logger.Errorf("处理授权更新事件失败: %v", err)
 		}
 
+	case "component_verify_ticket":
+		var event ComponentVerifyTicketEvent
+		err := xml.Unmarshal(xmlData, &event)
+		if err != nil {
+			c.logger.Errorf("解析验证票据事件失败: %v", err)
+			// 根据微信官方文档要求，即使解析失败也必须返回success
+			break
+		}
+
+		// 存储验证票据
+		if err := c.storage.SaveVerifyTicket(ctx, event.ComponentVerifyTicket); err != nil {
+			c.logger.Errorf("存储验证票据失败: %v", err)
+			// 根据微信官方文档要求，即使存储失败也必须返回success
+		}
+
+		if err := c.GetEventHandler().HandleComponentVerifyTicket(ctx, &event); err != nil {
+			c.logger.Errorf("处理验证票据事件失败: %v", err)
+			// 根据微信官方文档要求，即使处理失败也必须返回success
+		}
+
 	default:
 		c.logger.Warnf("收到未知的授权事件类型: %s", baseEvent.InfoType)
 	}
@@ -492,25 +525,39 @@ func (c *APIClient) validateAuthorizationEvent(event *AuthorizationEvent) error 
 
 // DecryptMessage 解密消息（用于处理加密的授权事件）
 func (c *APIClient) DecryptMessage(encryptedMsg, msgSignature, timestamp, nonce string) ([]byte, error) {
-	// 这里需要实现消息解密逻辑
-	// 根据微信开放平台的消息加密规范进行解密
-	// 暂时返回原始消息，实际实现需要根据EncodingAESKey进行解密
-
 	// 验证消息签名
 	if err := c.verifySignature(msgSignature, timestamp, nonce, encryptedMsg); err != nil {
 		return nil, fmt.Errorf("消息签名验证失败: %v", err)
 	}
 
-	// 实际实现中需要解密消息
-	// 这里返回原始消息作为占位符
-	return []byte(encryptedMsg), nil
+	// 使用crypto包中的解密实现
+	wxCrypt := crypto.NewWXBizMsgCrypt(c.config.ComponentToken, c.config.EncodingAESKey, c.config.ComponentAppID)
+	
+	// 解密消息
+	decryptedMsg, err := wxCrypt.DecryptMsg(msgSignature, timestamp, nonce, encryptedMsg)
+	if err != nil {
+		return nil, fmt.Errorf("消息解密失败: %v", err)
+	}
+	
+	return []byte(decryptedMsg), nil
 }
 
 // verifySignature 验证消息签名
 func (c *APIClient) verifySignature(signature, timestamp, nonce, encryptedMsg string) error {
-	// 这里需要实现签名验证逻辑
-	// 根据微信开放平台的签名算法进行验证
-	// 暂时返回nil，实际实现需要验证签名
+	// 根据微信开放平台签名算法验证签名
+	// 签名算法：sha1(sort(token, timestamp, nonce, encryptedMsg))
+	
+	// 获取配置中的Token
+	token := c.config.ComponentToken
+	
+	// 使用crypto包中的签名验证实现
+	wxCrypt := crypto.NewWXBizMsgCrypt(token, c.config.EncodingAESKey, c.config.ComponentAppID)
+	
+	// 验证签名
+	if !wxCrypt.VerifySignature(signature, timestamp, nonce, encryptedMsg) {
+		return fmt.Errorf("签名验证失败")
+	}
+	
 	return nil
 }
 

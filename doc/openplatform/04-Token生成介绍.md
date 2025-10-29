@@ -61,7 +61,7 @@ type TokenStorage interface {
     
     // VerifyTicket相关
     SaveVerifyTicket(ctx context.Context, ticket string) error
-    GetVerifyTicket(ctx context.Context) (string, error)
+    GetVerifyTicket(ctx context.Context) (*VerifyTicket, error)
 }
 
 // ComponentAccessToken 第三方平台Token结构体
@@ -85,6 +85,13 @@ type PreAuthCode struct {
     PreAuthCode string    `json:"pre_auth_code"`
     ExpiresIn   int       `json:"expires_in"`
     ExpiresAt   time.Time `json:"expires_at"`
+}
+
+// VerifyTicket 验证票据结构体
+type VerifyTicket struct {
+    Ticket    string    `json:"ticket"`
+    CreatedAt time.Time `json:"created_at"`
+    ExpiresAt time.Time `json:"expires_at"`
 }
 ```
 
@@ -110,10 +117,12 @@ func (c *OpenPlatformClient) GetComponentToken(ctx context.Context) (*ComponentA
     }
     
     // 获取VerifyTicket
-    ticket, err := c.storage.GetVerifyTicket(ctx)
-    if err != nil || ticket == "" {
+    ticketObj, err := c.storage.GetVerifyTicket(ctx)
+    if err != nil || ticketObj == nil {
         return nil, fmt.Errorf("获取VerifyTicket失败: %v", err)
     }
+    
+    ticket := ticketObj.Ticket
     
     // 调用API获取新Token
     apiClient := api.NewAPIClient(c)
@@ -174,6 +183,8 @@ func (c *OpenPlatformClient) isTokenExpired(token interface{}) bool {
     case *AuthorizerAccessToken:
         return time.Now().After(t.ExpiresAt)
     case *PreAuthCode:
+        return time.Now().After(t.ExpiresAt)
+    case *VerifyTicket:
         return time.Now().After(t.ExpiresAt)
     }
     return true
@@ -394,31 +405,37 @@ func (s *DatabaseStorage) GetPreAuthCode(ctx context.Context) (*wego.PreAuthCode
 
 func (s *DatabaseStorage) SaveVerifyTicket(ctx context.Context, ticket string) error {
     _, err := s.db.ExecContext(ctx, `
-        INSERT INTO verify_tickets (ticket, created_at) 
-        VALUES (?, ?) 
-        ON DUPLICATE KEY UPDATE ticket = ?, created_at = ?
-    `, ticket, time.Now(), ticket, time.Now())
+        INSERT INTO verify_tickets (ticket, created_at, expires_at) 
+        VALUES (?, ?, ?) 
+        ON DUPLICATE KEY UPDATE ticket = ?, created_at = ?, expires_at = ?
+    `, ticket, time.Now(), time.Now().Add(12*time.Hour),
+       ticket, time.Now(), time.Now().Add(12*time.Hour))
     return err
 }
 
-func (s *DatabaseStorage) GetVerifyTicket(ctx context.Context) (string, error) {
+func (s *DatabaseStorage) GetVerifyTicket(ctx context.Context) (*wego.VerifyTicket, error) {
     var ticket string
-    var createdAt time.Time
+    var createdAt, expiresAt time.Time
     
     err := s.db.QueryRowContext(ctx, `
-        SELECT ticket, created_at FROM verify_tickets 
+        SELECT ticket, created_at, expires_at FROM verify_tickets 
+        WHERE expires_at > ? 
         ORDER BY created_at DESC LIMIT 1
-    `).Scan(&ticket, &createdAt)
+    `, time.Now()).Scan(&ticket, &createdAt, &expiresAt)
     
     if err == sql.ErrNoRows {
-        return "", nil
+        return nil, nil
     }
     
     if err != nil {
-        return "", err
+        return nil, err
     }
     
-    return ticket, nil
+    return &wego.VerifyTicket{
+        Ticket:    ticket,
+        CreatedAt: createdAt,
+        ExpiresAt: expiresAt,
+    }, nil
 }
 
 // 使用自定义存储
@@ -536,5 +553,6 @@ A: 实现TokenStorage接口的所有方法，然后使用`wego.NewWeGoWithStorag
 ### 5. 客户端创建
 - `NewWeGoWithStorage(storage TokenStorage, config *OpenPlatformConfig)` - 使用自定义存储创建客户端
 - `SaveVerifyTicket(ctx context.Context, ticket string)` - 保存VerifyTicket（用于获取ComponentAccessToken）
+- `GetVerifyTicket(ctx context.Context) (*VerifyTicket, error)` - 获取验证票据（包含12小时有效期检查）
 
 通过WeGo库，您可以轻松管理各种Token，确保第三方平台服务的稳定运行。

@@ -23,23 +23,6 @@ const (
 	APIDeleteTemplateURL       = "https://api.weixin.qq.com/wxa/deletetemplate"
 )
 
-// 授权变更事件类型常量
-// 对应微信官方文档中的InfoType字段说明
-// https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/authorize_event.html
-const (
-	// InfoTypeAuthorized 授权成功事件
-	// 当公众号/服务号/小程序/微信小店/带货助手/视频号助手对第三方平台进行授权时触发
-	InfoTypeAuthorized = "authorized"
-
-	// InfoTypeUnauthorized 取消授权事件
-	// 当公众号/服务号/小程序/微信小店/带货助手/视频号助手取消对第三方平台的授权时触发
-	InfoTypeUnauthorized = "unauthorized"
-
-	// InfoTypeUpdateAuthorized 授权更新事件
-	// 当授权方更新授权时触发。如果更新授权时，授权的权限集没有发生变化，将不会触发授权更新通知
-	InfoTypeUpdateAuthorized = "updateauthorized"
-)
-
 // 事件处理相关常量
 const (
 	// EventResponseSuccess 事件处理成功响应

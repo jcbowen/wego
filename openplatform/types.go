@@ -261,6 +261,38 @@ type UpdateAuthorizedEvent struct {
 	AuthorizationEvent
 }
 
+// ComponentVerifyTicketEvent 验证票据推送事件
+// InfoType: component_verify_ticket
+// 微信服务器每隔10分钟推送component_verify_ticket到第三方平台的消息接收URL
+// 根据微信官方文档<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/component_verify_ticket.html" index="0">0</mcreference>，
+// 接收POST请求后只需直接返回字符串"success"
+type ComponentVerifyTicketEvent struct {
+	AuthorizationEvent
+	ComponentVerifyTicket string `xml:"ComponentVerifyTicket" json:"component_verify_ticket"`
+}
+
+// 授权变更事件类型常量
+// 对应微信官方文档中的InfoType字段说明
+// https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/authorize_event.html
+const (
+	// InfoTypeAuthorized 授权成功事件
+	// 当公众号/服务号/小程序/微信小店/带货助手/视频号助手对第三方平台进行授权时触发
+	InfoTypeAuthorized = "authorized"
+
+	// InfoTypeUnauthorized 取消授权事件
+	// 当公众号/服务号/小程序/微信小店/带货助手/视频号助手取消对第三方平台的授权时触发
+	InfoTypeUnauthorized = "unauthorized"
+
+	// InfoTypeUpdateAuthorized 授权更新事件
+	// 当授权方更新授权时触发。如果更新授权时，授权的权限集没有发生变化，将不会触发授权更新通知
+	InfoTypeUpdateAuthorized = "updateauthorized"
+
+	// InfoTypeComponentVerifyTicket 验证票据推送事件
+	// 微信服务器每隔10分钟推送component_verify_ticket到第三方平台的消息接收URL
+	// https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/component_verify_ticket.html
+	InfoTypeComponentVerifyTicket = "component_verify_ticket"
+)
+
 // EventHandler 事件处理器接口
 type EventHandler interface {
 	// HandleAuthorized 处理授权成功事件
@@ -271,6 +303,11 @@ type EventHandler interface {
 
 	// HandleUpdateAuthorized 处理授权更新事件
 	HandleUpdateAuthorized(ctx context.Context, event *UpdateAuthorizedEvent) error
+
+	// HandleComponentVerifyTicket 处理验证票据推送事件
+	// 根据微信官方文档<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/component_verify_ticket.html" index="0">0</mcreference>，
+	// 接收POST请求后只需直接返回字符串"success"
+	HandleComponentVerifyTicket(ctx context.Context, event *ComponentVerifyTicketEvent) error
 }
 
 // DefaultEventHandler 默认事件处理器
@@ -285,5 +322,12 @@ func (h *DefaultEventHandler) HandleUnauthorized(ctx context.Context, event *Una
 }
 
 func (h *DefaultEventHandler) HandleUpdateAuthorized(ctx context.Context, event *UpdateAuthorizedEvent) error {
+	return nil
+}
+
+func (h *DefaultEventHandler) HandleComponentVerifyTicket(ctx context.Context, event *ComponentVerifyTicketEvent) error {
+	// 根据微信官方文档<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/component_verify_ticket.html" index="0">0</mcreference>，
+	// 接收POST请求后只需直接返回字符串"success"
+	// 这里可以添加票据存储逻辑，但即使处理失败也必须返回success
 	return nil
 }
