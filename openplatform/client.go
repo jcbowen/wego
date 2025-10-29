@@ -166,6 +166,22 @@ func (c *APIClient) GetAuthorizerAccessToken(ctx context.Context, authorizerAppI
 	return c.refreshAuthorizerAccessToken(ctx, authorizerAppID)
 }
 
+// GetComponentVerifyTicket 获取验证票据
+// @param ctx context.Context 上下文
+// @return *storage.ComponentVerifyTicket 验证票据结构，包含票据内容和有效期信息
+// @return error 错误信息
+func (c *APIClient) GetComponentVerifyTicket(ctx context.Context) (*storage.ComponentVerifyTicket, error) {
+	return c.storage.GetComponentVerifyTicket(ctx)
+}
+
+// SaveComponentVerifyTicket 保存验证票据
+// @param ctx context.Context 上下文
+// @param ticket string 票据内容
+// @return error 错误信息
+func (c *APIClient) SaveComponentVerifyTicket(ctx context.Context, ticket string) error {
+	return c.storage.SaveComponentVerifyTicket(ctx, ticket)
+}
+
 // refreshAuthorizerAccessToken 刷新授权方access_token
 func (c *APIClient) refreshAuthorizerAccessToken(ctx context.Context, authorizerAppID string) (string, error) {
 	// 双重检查：再次从存储中获取
