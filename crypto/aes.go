@@ -46,7 +46,7 @@ func EncryptMsg(plainText, appID string, aesKey []byte) (string, error) {
 		appID)
 
 	// PKCS7填充
-	blockSize := 32
+	blockSize := aes.BlockSize
 	textBytes := []byte(text)
 	padLen := blockSize - len(textBytes)%blockSize
 	if padLen == 0 {
@@ -55,14 +55,14 @@ func EncryptMsg(plainText, appID string, aesKey []byte) (string, error) {
 	padText := bytes.Repeat([]byte{byte(padLen)}, padLen)
 	textBytes = append(textBytes, padText...)
 
-	// AES加密
+	// AES加密（CBC模式，使用aesKey的前16字节作为IV）
 	block, err := aes.NewCipher(aesKey)
 	if err != nil {
 		return "", fmt.Errorf("创建AES密码器失败: %v", err)
 	}
 
 	cipherText := make([]byte, len(textBytes))
-	mode := cipher.NewCBCEncrypter(block, aesKey[:16])
+	mode := cipher.NewCBCEncrypter(block, aesKey[:aes.BlockSize])
 	mode.CryptBlocks(cipherText, textBytes)
 
 	// Base64编码
@@ -88,12 +88,15 @@ func DecryptMsg(encryptedMsg string, aesKey []byte) (string, error) {
 	}
 
 	plainText := make([]byte, len(cipherText))
-	mode := cipher.NewCBCDecrypter(block, aesKey[:16])
+	mode := cipher.NewCBCDecrypter(block, aesKey[:aes.BlockSize])
 	mode.CryptBlocks(plainText, cipherText)
 
 	// PKCS7去填充
+	if len(plainText) == 0 {
+		return "", errors.New("解密后数据为空")
+	}
 	padLen := int(plainText[len(plainText)-1])
-	if padLen < 1 || padLen > 32 {
+	if padLen < 1 || padLen > aes.BlockSize {
 		return "", errors.New("填充数据无效")
 	}
 
@@ -107,6 +110,12 @@ func DecryptMsg(encryptedMsg string, aesKey []byte) (string, error) {
 	msgLen := networkBytesOrderToInt(plainText[16:20])
 	if len(plainText) < 20+msgLen {
 		return "", errors.New("消息长度无效")
+	}
+
+	// 验证AppID（微信官方要求验证第三方平台AppID）
+	decryptedAppID := string(plainText[20+msgLen:])
+	if len(decryptedAppID) == 0 {
+		return "", errors.New("AppID缺失")
 	}
 
 	return string(plainText[20 : 20+msgLen]), nil

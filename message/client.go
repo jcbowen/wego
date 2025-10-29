@@ -44,7 +44,7 @@ func (p *SecureMessageProcessor) ProcessSecureMessage(
 	nonce string,
 	encryptedMsg string,
 ) (interface{}, error) {
-	// 验证时间戳（防止重放攻击）
+	// 验证时间戳（防止重放攻击，微信官方建议5分钟时间窗口）
 	if err := p.validateTimestamp(timestamp); err != nil {
 		return nil, fmt.Errorf("时间戳验证失败: %v", err)
 	}
@@ -55,10 +55,10 @@ func (p *SecureMessageProcessor) ProcessSecureMessage(
 		return nil, fmt.Errorf("获取加解密实例失败: %v", err)
 	}
 
-	// 验证签名
+	// 验证消息签名（必须使用msg_signature参数）
 	valid := cryptoInstance.VerifySignature(msgSignature, timestamp, nonce, encryptedMsg)
 	if !valid {
-		return nil, fmt.Errorf("签名验证不通过")
+		return nil, fmt.Errorf("消息签名验证不通过，请检查msg_signature参数")
 	}
 
 	// 解密消息
@@ -73,7 +73,7 @@ func (p *SecureMessageProcessor) ProcessSecureMessage(
 		return nil, err
 	}
 
-	// 如果回复是"success"，直接返回
+	// 如果回复是"success"，直接返回（微信官方要求）
 	if replyStr, ok := reply.(string); ok && replyStr == "success" {
 		return "success", nil
 	}
@@ -84,7 +84,7 @@ func (p *SecureMessageProcessor) ProcessSecureMessage(
 		return nil, fmt.Errorf("转换回复为XML失败: %v", err)
 	}
 
-	// 加密回复
+	// 加密回复（使用相同的timestamp和nonce）
 	encryptedReply, err := cryptoInstance.EncryptMsg(replyXML, timestamp, nonce)
 	if err != nil {
 		return nil, fmt.Errorf("回复加密失败: %v", err)
