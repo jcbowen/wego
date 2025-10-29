@@ -322,7 +322,6 @@ type GetAuthorizerListResponse struct {
 	} `json:"list"`
 }
 
-
 // GetComponentAccessToken 获取第三方平台access_token
 func (c *APIClient) GetComponentAccessToken(ctx context.Context, verifyTicket string) (*storage.ComponentAccessToken, error) {
 	// 先从存储中获取
@@ -652,13 +651,15 @@ func (c *APIClient) GetAuthorizerList(ctx context.Context, offset, count int) (*
 // platform: 平台类型 ("pc": PC端, "mobile": 移动端)
 func (c *APIClient) GenerateAuthURL(preAuthCode string, authType int, bizAppID string, platform string) string {
 	var baseURL string
-	
+
 	if platform == "mobile" {
+		// 移动端授权页面URL
 		baseURL = "https://open.weixin.qq.com/connect/oauth2/authorize"
 	} else {
+		// PC端授权页面URL
 		baseURL = "https://mp.weixin.qq.com/cgi-bin/componentloginpage"
 	}
-	
+
 	params := url.Values{
 		"component_appid": {c.config.ComponentAppID},
 		"pre_auth_code":   {preAuthCode},
@@ -680,12 +681,12 @@ func (c *APIClient) GenerateAuthURL(preAuthCode string, authType int, bizAppID s
 	}
 
 	urlStr := fmt.Sprintf("%s?%s", baseURL, params.Encode())
-	
+
 	// 移动端授权链接需要添加#wechat_redirect后缀
 	if platform == "mobile" {
 		urlStr += "#wechat_redirect"
 	}
-	
+
 	return urlStr
 }
 
