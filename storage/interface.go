@@ -40,6 +40,11 @@ type TokenStorage interface {
 	GetPreAuthCode(ctx context.Context) (*PreAuthCode, error)
 	DeletePreAuthCode(ctx context.Context) error
 
+	// 验证票据相关方法
+	SaveVerifyTicket(ctx context.Context, ticket string) error
+	GetVerifyTicket(ctx context.Context) (string, error)
+	DeleteVerifyTicket(ctx context.Context) error
+
 	// 授权方令牌相关方法
 	SaveAuthorizerToken(ctx context.Context, authorizerAppID string, token *AuthorizerAccessToken) error
 	GetAuthorizerToken(ctx context.Context, authorizerAppID string) (*AuthorizerAccessToken, error)

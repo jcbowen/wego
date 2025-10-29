@@ -16,6 +16,7 @@ type FileStorage struct {
 	baseDir             string
 	componentTokenFile  string
 	preAuthCodeFile     string
+	verifyTicketFile    string
 	authorizerTokensDir string
 }
 
@@ -30,6 +31,7 @@ func NewFileStorage(baseDir string) (*FileStorage, error) {
 		baseDir:             baseDir,
 		componentTokenFile:  filepath.Join(baseDir, "component_token.json"),
 		preAuthCodeFile:     filepath.Join(baseDir, "pre_auth_code.json"),
+		verifyTicketFile:    filepath.Join(baseDir, "verify_ticket.txt"),
 		authorizerTokensDir: filepath.Join(baseDir, "authorizer_tokens"),
 	}
 
@@ -113,6 +115,59 @@ func (s *FileStorage) DeletePreAuthCode(ctx context.Context) error {
 	defer s.mu.Unlock()
 
 	return os.Remove(s.preAuthCodeFile)
+}
+
+// SaveVerifyTicket 保存验证票据到文件
+func (s *FileStorage) SaveVerifyTicket(ctx context.Context, ticket string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 创建临时文件
+	tempFile := s.verifyTicketFile + ".tmp"
+	
+	file, err := os.Create(tempFile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// 直接写入票据内容
+	if _, err := file.WriteString(ticket); err != nil {
+		os.Remove(tempFile)
+		return err
+	}
+
+	// 原子性替换文件
+	if err := file.Close(); err != nil {
+		os.Remove(tempFile)
+		return err
+	}
+
+	return os.Rename(tempFile, s.verifyTicketFile)
+}
+
+// GetVerifyTicket 从文件读取验证票据
+func (s *FileStorage) GetVerifyTicket(ctx context.Context) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	data, err := os.ReadFile(s.verifyTicketFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+
+	return string(data), nil
+}
+
+// DeleteVerifyTicket 删除验证票据文件
+func (s *FileStorage) DeleteVerifyTicket(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return os.Remove(s.verifyTicketFile)
 }
 
 // SaveAuthorizerToken 保存授权方令牌到文件

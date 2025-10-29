@@ -13,7 +13,7 @@ import (
 // WeGo 微信开发封装库主结构体
 type WeGo struct {
 	// 开放平台客户端
-	OpenPlatformClient *openplatform.OpenPlatformClient
+	OpenPlatformClient *openplatform.APIClient
 
 	// 公众号客户端
 	OfficialAccountClient *officialaccount.MPClient
@@ -29,7 +29,7 @@ func NewWeGo(configs ...any) *WeGo {
 		case *openplatform.OpenPlatformConfig:
 			// 如果还没有初始化过开放平台客户端，则初始化
 			if wego.OpenPlatformClient == nil {
-				wego.OpenPlatformClient = openplatform.NewOpenPlatformClient(cfg)
+				wego.OpenPlatformClient = openplatform.NewAPIClient(cfg)
 			}
 		case *officialaccount.MPConfig:
 			// 如果还没有初始化过公众号客户端，则初始化
@@ -55,7 +55,7 @@ func NewWeGoWithStorage(storage storage.TokenStorage, configs ...any) *WeGo {
 		case *openplatform.OpenPlatformConfig:
 			// 如果还没有初始化过开放平台客户端，则初始化
 			if wego.OpenPlatformClient == nil {
-				wego.OpenPlatformClient = openplatform.NewOpenPlatformClientWithStorage(cfg, storage)
+				wego.OpenPlatformClient = openplatform.NewAPIClientWithStorage(cfg, storage)
 			}
 		case *officialaccount.MPConfig:
 			// 如果还没有初始化过公众号客户端，则初始化

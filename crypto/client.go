@@ -115,6 +115,16 @@ func (c *WXBizMsgCrypt) VerifyURL(msgSignature, timestamp, nonce, echostr string
 	return DecryptMsg(echostr, aesKey)
 }
 
+// VerifySignature 验证消息签名（符合微信官方规范）
+func (c *WXBizMsgCrypt) VerifySignature(msgSignature, timestamp, nonce, encryptedMsg string) bool {
+	return validateSignature(c.Token, timestamp, nonce, encryptedMsg, msgSignature)
+}
+
+// GenerateSignature 生成消息签名（符合微信官方规范）
+func (c *WXBizMsgCrypt) GenerateSignature(timestamp, nonce, encryptedMsg string) string {
+	return genSignature(c.Token, timestamp, nonce, encryptedMsg)
+}
+
 // validateSignature 验证签名
 func validateSignature(token, timestamp, nonce, encrypted, msgSignature string) bool {
 	expectedSignature := genSignature(token, timestamp, nonce, encrypted)

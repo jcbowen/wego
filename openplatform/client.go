@@ -1,24 +1,249 @@
 package openplatform
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"encoding/xml"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/jcbowen/wego/storage"
 )
 
-// APIClient API客户端
-type APIClient struct {
-	Client *OpenPlatformClient
+// HTTPClient HTTP客户端接口
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
 }
 
-// NewAPIClient 创建新的API客户端
-func NewAPIClient(client *OpenPlatformClient) *APIClient {
-	return &APIClient{
-		Client: client,
+// Logger 日志接口
+type Logger interface {
+	Debugf(format string, args ...interface{})
+	Infof(format string, args ...interface{})
+	Warnf(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
+}
+
+// DefaultLogger 默认日志实现
+type DefaultLogger struct{}
+
+func (l *DefaultLogger) Debugf(format string, args ...interface{}) {
+	fmt.Printf("[DEBUG] "+format+"\n", args...)
+}
+
+func (l *DefaultLogger) Infof(format string, args ...interface{}) {
+	fmt.Printf("[INFO] "+format+"\n", args...)
+}
+
+func (l *DefaultLogger) Warnf(format string, args ...interface{}) {
+	fmt.Printf("[WARN] "+format+"\n", args...)
+}
+
+func (l *DefaultLogger) Errorf(format string, args ...interface{}) {
+	fmt.Printf("[ERROR] "+format+"\n", args...)
+}
+
+// APIClient API客户端
+type APIClient struct {
+	config       *OpenPlatformConfig
+	httpClient   HTTPClient
+	storage      storage.TokenStorage
+	logger       Logger
+	eventHandler EventHandler // 事件处理器
+}
+
+// NewAPIClient 创建新的API客户端（使用默认文件存储）
+func NewAPIClient(config *OpenPlatformConfig) *APIClient {
+	// 使用当前工作目录下的 wego_storage 文件夹作为默认存储路径
+	fileStorage, err := storage.NewFileStorage("wego_storage")
+	if err != nil {
+		// 如果文件存储创建失败，回退到内存存储并输出日志
+		logger := &DefaultLogger{}
+		logger.Warnf("文件存储创建失败，回退到内存存储: %v", err)
+		return NewAPIClientWithStorage(config, storage.NewMemoryStorage())
 	}
+	return NewAPIClientWithStorage(config, fileStorage)
+}
+
+// NewAPIClientWithStorage 创建新的API客户端（使用自定义存储）
+func NewAPIClientWithStorage(config *OpenPlatformConfig, storage storage.TokenStorage) *APIClient {
+	client := &APIClient{
+		config:     config,
+		httpClient: &http.Client{Timeout: 30 * time.Second},
+		storage:    storage,
+		logger:     &DefaultLogger{},
+	}
+
+	return client
+}
+
+// SetLogger 设置自定义日志器
+func (c *APIClient) SetLogger(logger Logger) {
+	c.logger = logger
+}
+
+// SetHTTPClient 设置自定义HTTP客户端
+func (c *APIClient) SetHTTPClient(client HTTPClient) {
+	c.httpClient = client
+}
+
+// SetEventHandler 设置事件处理器
+func (c *APIClient) SetEventHandler(handler EventHandler) {
+	c.eventHandler = handler
+}
+
+// GetEventHandler 获取事件处理器
+func (c *APIClient) GetEventHandler() EventHandler {
+	if c.eventHandler == nil {
+		return &DefaultEventHandler{}
+	}
+	return c.eventHandler
+}
+
+// GetConfig 获取配置信息
+func (c *APIClient) GetConfig() *OpenPlatformConfig {
+	return c.config
+}
+
+// GetLogger 获取日志器
+func (c *APIClient) GetLogger() Logger {
+	return c.logger
+}
+
+// SetComponentToken 设置组件令牌
+func (c *APIClient) SetComponentToken(token *storage.ComponentAccessToken) error {
+	return c.storage.SaveComponentToken(context.Background(), token)
+}
+
+// GetComponentToken 获取组件令牌
+func (c *APIClient) GetComponentToken(ctx context.Context) (*storage.ComponentAccessToken, error) {
+	return c.storage.GetComponentToken(ctx)
+}
+
+// SetPreAuthCode 设置预授权码
+func (c *APIClient) SetPreAuthCode(ctx context.Context, preAuthCode *storage.PreAuthCode) error {
+	return c.storage.SavePreAuthCode(ctx, preAuthCode)
+}
+
+// GetPreAuthCode 获取预授权码
+func (c *APIClient) GetPreAuthCode(ctx context.Context) (*storage.PreAuthCode, error) {
+	return c.storage.GetPreAuthCode(ctx)
+}
+
+// SetAuthorizerToken 设置授权方token信息
+func (c *APIClient) SetAuthorizerToken(authorizerAppID, accessToken, refreshToken string, expiresIn int) error {
+	token := &storage.AuthorizerAccessToken{
+		AuthorizerAppID:        authorizerAppID,
+		AuthorizerAccessToken:  accessToken,
+		ExpiresIn:              expiresIn,
+		ExpiresAt:              time.Now().Add(time.Duration(expiresIn) * time.Second),
+		AuthorizerRefreshToken: refreshToken,
+	}
+
+	return c.storage.SaveAuthorizerToken(context.Background(), authorizerAppID, token)
+}
+
+// GetAuthorizerAccessToken 获取授权方access_token
+func (c *APIClient) GetAuthorizerAccessToken(ctx context.Context, authorizerAppID string) (string, error) {
+	// 从存储中获取授权方token
+	token, err := c.storage.GetAuthorizerToken(ctx, authorizerAppID)
+	if err != nil {
+		return "", err
+	}
+
+	if token != nil && time.Now().Before(token.ExpiresAt) {
+		return token.AuthorizerAccessToken, nil
+	}
+
+	// 重新获取授权方access_token
+	return c.refreshAuthorizerAccessToken(ctx, authorizerAppID)
+}
+
+// refreshAuthorizerAccessToken 刷新授权方access_token
+func (c *APIClient) refreshAuthorizerAccessToken(ctx context.Context, authorizerAppID string) (string, error) {
+	// 双重检查：再次从存储中获取
+	token, err := c.storage.GetAuthorizerToken(ctx, authorizerAppID)
+	if err != nil {
+		return "", err
+	}
+
+	if token != nil && time.Now().Before(token.ExpiresAt) {
+		return token.AuthorizerAccessToken, nil
+	}
+
+	// 调用微信API刷新授权方access_token
+	if token != nil && token.AuthorizerRefreshToken != "" {
+		// 使用refresh_token刷新access_token
+		result, err := c.RefreshAuthorizerToken(ctx, authorizerAppID, token.AuthorizerRefreshToken)
+		if err != nil {
+			return "", err
+		}
+
+		// 更新存储
+		newToken := &storage.AuthorizerAccessToken{
+			AuthorizerAppID:        authorizerAppID,
+			AuthorizerAccessToken:  result.AuthorizerAccessToken,
+			ExpiresIn:              result.ExpiresIn,
+			ExpiresAt:              time.Now().Add(time.Duration(result.ExpiresIn) * time.Second),
+			AuthorizerRefreshToken: result.AuthorizerRefreshToken,
+		}
+
+		if err := c.storage.SaveAuthorizerToken(ctx, authorizerAppID, newToken); err != nil {
+			return "", fmt.Errorf("保存授权方token失败: %v", err)
+		}
+
+		return result.AuthorizerAccessToken, nil
+	}
+
+	return "", fmt.Errorf("无法获取授权方access_token：缺少refresh_token")
+}
+
+// MakeRequest 发送HTTP请求的通用方法
+func (c *APIClient) MakeRequest(ctx context.Context, method, url string, body interface{}, result interface{}) error {
+	var reqBody []byte
+	if body != nil {
+		var err error
+		reqBody, err = json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("序列化请求体失败: %v", err)
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("创建请求失败: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("发送请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("读取响应体失败: %v", err)
+	}
+
+	if err := json.Unmarshal(respBody, result); err != nil {
+		return fmt.Errorf("解析响应失败: %v", err)
+	}
+
+	return nil
+}
+
+// MakeRequestRaw 发送原始HTTP请求，返回响应对象
+func (c *APIClient) MakeRequestRaw(req *http.Request) (*http.Response, error) {
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("发送请求失败: %v", err)
+	}
+	return resp, nil
 }
 
 // ComponentTokenRequest 获取component_access_token请求参数
@@ -97,16 +322,17 @@ type GetAuthorizerListResponse struct {
 	} `json:"list"`
 }
 
+
 // GetComponentAccessToken 获取第三方平台access_token
 func (c *APIClient) GetComponentAccessToken(ctx context.Context, verifyTicket string) (*storage.ComponentAccessToken, error) {
 	// 先从存储中获取
-	if token, err := c.Client.GetComponentToken(ctx); err == nil && token != nil && token.ExpiresAt.After(time.Now()) {
+	if token, err := c.GetComponentToken(ctx); err == nil && token != nil && token.ExpiresAt.After(time.Now()) {
 		return token, nil
 	}
 
 	request := ComponentTokenRequest{
-		ComponentAppID:        c.Client.GetConfig().ComponentAppID,
-		ComponentAppSecret:    c.Client.GetConfig().ComponentAppSecret,
+		ComponentAppID:        c.config.ComponentAppID,
+		ComponentAppSecret:    c.config.ComponentAppSecret,
 		ComponentVerifyTicket: verifyTicket,
 	}
 
@@ -116,7 +342,7 @@ func (c *APIClient) GetComponentAccessToken(ctx context.Context, verifyTicket st
 		ExpiresIn            int    `json:"expires_in"`
 	}
 
-	err := c.Client.MakeRequest(ctx, "POST", APIComponentTokenURL, request, &result)
+	err := c.MakeRequest(ctx, "POST", APIComponentTokenURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -132,17 +358,17 @@ func (c *APIClient) GetComponentAccessToken(ctx context.Context, verifyTicket st
 	}
 
 	// 保存到存储
-	if err := c.Client.SetComponentToken(token); err != nil {
-		c.Client.GetLogger().Warnf("保存组件令牌失败: %v", err)
+	if err := c.SetComponentToken(token); err != nil {
+		c.logger.Warnf("保存组件令牌失败: %v", err)
 	}
 
 	return token, nil
 }
 
-// GetPreAuthCode 获取预授权码
-func (c *APIClient) GetPreAuthCode(ctx context.Context) (*PreAuthCodeResponse, error) {
+// GetPreAuthCodeFromAPI 从微信API获取预授权码
+func (c *APIClient) GetPreAuthCodeFromAPI(ctx context.Context) (*PreAuthCodeResponse, error) {
 	// 先从存储中获取
-	if preAuthCode, err := c.Client.GetPreAuthCode(ctx); err == nil && preAuthCode != nil && preAuthCode.ExpiresAt.After(time.Now()) {
+	if preAuthCode, err := c.storage.GetPreAuthCode(ctx); err == nil && preAuthCode != nil && preAuthCode.ExpiresAt.After(time.Now()) {
 		return &PreAuthCodeResponse{
 			APIResponse: APIResponse{ErrCode: 0, ErrMsg: ""},
 			PreAuthCode: preAuthCode.PreAuthCode,
@@ -156,12 +382,12 @@ func (c *APIClient) GetPreAuthCode(ctx context.Context) (*PreAuthCodeResponse, e
 	}
 
 	request := PreAuthCodeRequest{
-		ComponentAppID: c.Client.GetConfig().ComponentAppID,
+		ComponentAppID: c.config.ComponentAppID,
 	}
 
 	var result PreAuthCodeResponse
 	apiURL := fmt.Sprintf("%s?component_access_token=%s", APIPreAuthCodeURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.MakeRequest(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -178,11 +404,115 @@ func (c *APIClient) GetPreAuthCode(ctx context.Context) (*PreAuthCodeResponse, e
 	}
 
 	// 保存到存储
-	if err := c.Client.SetPreAuthCode(ctx, preAuthCode); err != nil {
-		c.Client.GetLogger().Warnf("保存预授权码失败: %v", err)
+	if err := c.SetPreAuthCode(ctx, preAuthCode); err != nil {
+		c.logger.Warnf("保存预授权码失败: %v", err)
 	}
 
 	return &result, nil
+}
+
+// HandleAuthorizationEvent 处理授权变更事件
+// 根据微信官方文档<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/authorize_event.html" index="0">0</mcreference>，
+// 接收POST请求后只需直接返回字符串"success"
+func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte) (string, error) {
+	// 解析XML获取基础事件信息
+	var baseEvent AuthorizationEvent
+	err := xml.Unmarshal(xmlData, &baseEvent)
+	if err != nil {
+		c.logger.Errorf("解析授权事件XML失败: %v", err)
+		return "success", nil // 即使解析失败也返回success
+	}
+
+	// 验证事件签名和时间戳
+	if err := c.validateAuthorizationEvent(&baseEvent); err != nil {
+		c.logger.Errorf("授权事件验证失败: %v", err)
+		return "success", nil // 即使验证失败也返回success
+	}
+
+	// 根据事件类型进行处理
+	switch baseEvent.InfoType {
+	case "authorized":
+		var event AuthorizedEvent
+		err := xml.Unmarshal(xmlData, &event)
+		if err != nil {
+			c.logger.Errorf("解析授权成功事件失败: %v", err)
+			break
+		}
+
+		if err := c.GetEventHandler().HandleAuthorized(ctx, &event); err != nil {
+			c.logger.Errorf("处理授权成功事件失败: %v", err)
+		}
+
+	case "unauthorized":
+		var event UnauthorizedEvent
+		err := xml.Unmarshal(xmlData, &event)
+		if err != nil {
+			c.logger.Errorf("解析取消授权事件失败: %v", err)
+			break
+		}
+
+		if err := c.GetEventHandler().HandleUnauthorized(ctx, &event); err != nil {
+			c.logger.Errorf("处理取消授权事件失败: %v", err)
+		}
+
+	case "updateauthorized":
+		var event UpdateAuthorizedEvent
+		err := xml.Unmarshal(xmlData, &event)
+		if err != nil {
+			c.logger.Errorf("解析授权更新事件失败: %v", err)
+			break
+		}
+
+		if err := c.GetEventHandler().HandleUpdateAuthorized(ctx, &event); err != nil {
+			c.logger.Errorf("处理授权更新事件失败: %v", err)
+		}
+
+	default:
+		c.logger.Warnf("收到未知的授权事件类型: %s", baseEvent.InfoType)
+	}
+
+	// 根据微信官方文档要求，必须返回"success"字符串
+	return "success", nil
+}
+
+// validateAuthorizationEvent 验证授权事件
+func (c *APIClient) validateAuthorizationEvent(event *AuthorizationEvent) error {
+	// 验证AppID是否匹配
+	if event.AppId != c.config.ComponentAppID {
+		return fmt.Errorf("AppID不匹配: expected=%s, actual=%s", c.config.ComponentAppID, event.AppId)
+	}
+
+	// 验证时间戳，防止重放攻击
+	currentTime := time.Now().Unix()
+	if currentTime-event.CreateTime > 300 { // 5分钟容忍
+		return fmt.Errorf("时间戳过期: current=%d, event=%d", currentTime, event.CreateTime)
+	}
+
+	return nil
+}
+
+// DecryptMessage 解密消息（用于处理加密的授权事件）
+func (c *APIClient) DecryptMessage(encryptedMsg, msgSignature, timestamp, nonce string) ([]byte, error) {
+	// 这里需要实现消息解密逻辑
+	// 根据微信开放平台的消息加密规范进行解密
+	// 暂时返回原始消息，实际实现需要根据EncodingAESKey进行解密
+
+	// 验证消息签名
+	if err := c.verifySignature(msgSignature, timestamp, nonce, encryptedMsg); err != nil {
+		return nil, fmt.Errorf("消息签名验证失败: %v", err)
+	}
+
+	// 实际实现中需要解密消息
+	// 这里返回原始消息作为占位符
+	return []byte(encryptedMsg), nil
+}
+
+// verifySignature 验证消息签名
+func (c *APIClient) verifySignature(signature, timestamp, nonce, encryptedMsg string) error {
+	// 这里需要实现签名验证逻辑
+	// 根据微信开放平台的签名算法进行验证
+	// 暂时返回nil，实际实现需要验证签名
+	return nil
 }
 
 // QueryAuth 使用授权码换取授权信息
@@ -193,13 +523,13 @@ func (c *APIClient) QueryAuth(ctx context.Context, authorizationCode string) (*Q
 	}
 
 	request := QueryAuthRequest{
-		ComponentAppID:    c.Client.GetConfig().ComponentAppID,
+		ComponentAppID:    c.config.ComponentAppID,
 		AuthorizationCode: authorizationCode,
 	}
 
 	var result QueryAuthResponse
 	url := fmt.Sprintf("%s?component_access_token=%s", APIQueryAuthURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "POST", url, request, &result)
+	err = c.MakeRequest(ctx, "POST", url, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -209,34 +539,40 @@ func (c *APIClient) QueryAuth(ctx context.Context, authorizationCode string) (*Q
 	}
 
 	// 缓存授权方token
-	if err := c.Client.SetAuthorizerToken(
+	if err := c.SetAuthorizerToken(
 		result.AuthorizationInfo.AuthorizerAppID,
 		result.AuthorizationInfo.AuthorizerAccessToken,
 		result.AuthorizationInfo.AuthorizerRefreshToken,
 		result.AuthorizationInfo.ExpiresIn,
 	); err != nil {
-		c.Client.GetLogger().Warnf("缓存授权方token失败: %v", err)
+		c.logger.Warnf("缓存授权方token失败: %v", err)
 	}
 
 	return &result, nil
 }
 
 // RefreshAuthorizerToken 刷新授权方access_token
-func (c *APIClient) RefreshAuthorizerToken(ctx context.Context, authorizerAppID, refreshToken string) (*AuthorizerTokenResponse, error) {
+func (c *APIClient) RefreshAuthorizerToken(ctx context.Context, authorizerAppID, refreshToken string) (*AuthorizationInfo, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
 	}
 
 	request := AuthorizerTokenRequest{
-		ComponentAppID:         c.Client.GetConfig().ComponentAppID,
+		ComponentAppID:         c.config.ComponentAppID,
 		AuthorizerAppID:        authorizerAppID,
 		AuthorizerRefreshToken: refreshToken,
 	}
 
-	var result AuthorizerTokenResponse
-	url := fmt.Sprintf("%s?component_access_token=%s", APIAuthorizerTokenURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "POST", url, request, &result)
+	var result struct {
+		APIResponse
+		AuthorizationInfo
+	}
+
+	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/component/api_authorizer_token?component_access_token=%s",
+		url.QueryEscape(componentToken.AccessToken))
+
+	err = c.MakeRequest(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -246,16 +582,16 @@ func (c *APIClient) RefreshAuthorizerToken(ctx context.Context, authorizerAppID,
 	}
 
 	// 更新缓存
-	if err := c.Client.SetAuthorizerToken(
+	if err := c.SetAuthorizerToken(
 		authorizerAppID,
 		result.AuthorizerAccessToken,
 		result.AuthorizerRefreshToken,
 		result.ExpiresIn,
 	); err != nil {
-		c.Client.GetLogger().Warnf("更新授权方token失败: %v", err)
+		c.logger.Warnf("更新授权方token失败: %v", err)
 	}
 
-	return &result, nil
+	return &result.AuthorizationInfo, nil
 }
 
 // GetAuthorizerInfo 获取授权方信息
@@ -266,13 +602,13 @@ func (c *APIClient) GetAuthorizerInfo(ctx context.Context, authorizerAppID strin
 	}
 
 	request := GetAuthorizerInfoRequest{
-		ComponentAppID:  c.Client.GetConfig().ComponentAppID,
+		ComponentAppID:  c.config.ComponentAppID,
 		AuthorizerAppID: authorizerAppID,
 	}
 
 	var result GetAuthorizerInfoResponse
 	url := fmt.Sprintf("%s?component_access_token=%s", APIGetAuthorizerInfoURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "POST", url, request, &result)
+	err = c.MakeRequest(ctx, "POST", url, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -292,14 +628,14 @@ func (c *APIClient) GetAuthorizerList(ctx context.Context, offset, count int) (*
 	}
 
 	request := GetAuthorizerListRequest{
-		ComponentAppID: c.Client.GetConfig().ComponentAppID,
+		ComponentAppID: c.config.ComponentAppID,
 		Offset:         offset,
 		Count:          count,
 	}
 
 	var result GetAuthorizerListResponse
 	url := fmt.Sprintf("%s?component_access_token=%s", "https://api.weixin.qq.com/cgi-bin/component/api_get_authorizer_list", url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "POST", url, request, &result)
+	err = c.MakeRequest(ctx, "POST", url, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -312,12 +648,21 @@ func (c *APIClient) GetAuthorizerList(ctx context.Context, offset, count int) (*
 }
 
 // GenerateAuthURL 生成授权链接
-func (c *APIClient) GenerateAuthURL(preAuthCode string, authType int, bizAppID string) string {
-	baseURL := "https://mp.weixin.qq.com/cgi-bin/componentloginpage"
+// authType: 授权类型 (1:手机端仅展示公众号, 2:仅展示小程序, 3:公众号和小程序都展示, 4:小程序推客账号, 5:视频号账号, 6:全部, 8:带货助手账号)
+// platform: 平台类型 ("pc": PC端, "mobile": 移动端)
+func (c *APIClient) GenerateAuthURL(preAuthCode string, authType int, bizAppID string, platform string) string {
+	var baseURL string
+	
+	if platform == "mobile" {
+		baseURL = "https://open.weixin.qq.com/connect/oauth2/authorize"
+	} else {
+		baseURL = "https://mp.weixin.qq.com/cgi-bin/componentloginpage"
+	}
+	
 	params := url.Values{
-		"component_appid": {c.Client.GetConfig().ComponentAppID},
+		"component_appid": {c.config.ComponentAppID},
 		"pre_auth_code":   {preAuthCode},
-		"redirect_uri":    {c.Client.GetConfig().RedirectURI},
+		"redirect_uri":    {c.config.RedirectURI},
 	}
 
 	if authType > 0 {
@@ -328,7 +673,30 @@ func (c *APIClient) GenerateAuthURL(preAuthCode string, authType int, bizAppID s
 		params.Set("biz_appid", bizAppID)
 	}
 
-	return fmt.Sprintf("%s?%s", baseURL, params.Encode())
+	// 移动端授权链接需要添加response_type和scope参数
+	if platform == "mobile" {
+		params.Set("response_type", "code")
+		params.Set("scope", "snsapi_base")
+	}
+
+	urlStr := fmt.Sprintf("%s?%s", baseURL, params.Encode())
+	
+	// 移动端授权链接需要添加#wechat_redirect后缀
+	if platform == "mobile" {
+		urlStr += "#wechat_redirect"
+	}
+	
+	return urlStr
+}
+
+// GeneratePcAuthURL 生成PC端授权链接
+func (c *APIClient) GeneratePcAuthURL(preAuthCode string, authType int, bizAppID string) string {
+	return c.GenerateAuthURL(preAuthCode, authType, bizAppID, "pc")
+}
+
+// GenerateMobileAuthURL 生成移动端授权链接
+func (c *APIClient) GenerateMobileAuthURL(preAuthCode string, authType int, bizAppID string) string {
+	return c.GenerateAuthURL(preAuthCode, authType, bizAppID, "mobile")
 }
 
 // ClearQuota 重置API调用次数
@@ -339,12 +707,12 @@ func (c *APIClient) ClearQuota(ctx context.Context) (*APIResponse, error) {
 	}
 
 	request := ClearQuotaRequest{
-		ComponentAppID: c.Client.GetConfig().ComponentAppID,
+		ComponentAppID: c.config.ComponentAppID,
 	}
 
 	var result APIResponse
 	url := fmt.Sprintf("%s?access_token=%s", APIClearQuotaURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "POST", url, request, &result)
+	err = c.MakeRequest(ctx, "POST", url, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -364,13 +732,13 @@ func (c *APIClient) GetApiQuota(ctx context.Context, authorizerAppID string) (*G
 	}
 
 	request := GetApiQuotaRequest{
-		ComponentAppID:  c.Client.GetConfig().ComponentAppID,
+		ComponentAppID:  c.config.ComponentAppID,
 		AuthorizerAppID: authorizerAppID,
 	}
 
 	var result GetApiQuotaResponse
 	url := fmt.Sprintf("%s?access_token=%s", APIGetApiQuotaURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "POST", url, request, &result)
+	err = c.MakeRequest(ctx, "POST", url, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -395,7 +763,7 @@ func (c *APIClient) GetRidInfo(ctx context.Context, rid string) (*GetRidInfoResp
 
 	var result GetRidInfoResponse
 	url := fmt.Sprintf("%s?access_token=%s", APIGetRidInfoURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "POST", url, request, &result)
+	err = c.MakeRequest(ctx, "POST", url, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -410,12 +778,12 @@ func (c *APIClient) GetRidInfo(ctx context.Context, rid string) (*GetRidInfoResp
 // ClearComponentQuota 使用AppSecret重置第三方平台API调用次数
 func (c *APIClient) ClearComponentQuota(ctx context.Context) (*APIResponse, error) {
 	request := ClearComponentQuotaRequest{
-		ComponentAppID:     c.Client.GetConfig().ComponentAppID,
-		ComponentAppSecret: c.Client.GetConfig().ComponentAppSecret,
+		ComponentAppID:     c.config.ComponentAppID,
+		ComponentAppSecret: c.config.ComponentAppSecret,
 	}
 
 	var result APIResponse
-	err := c.Client.MakeRequest(ctx, "POST", APIClearComponentQuotaURL, request, &result)
+	err := c.MakeRequest(ctx, "POST", APIClearComponentQuotaURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -435,7 +803,7 @@ func (c *APIClient) SetAuthorizerOption(ctx context.Context, authorizerAppID, op
 	}
 
 	request := SetAuthorizerOptionRequest{
-		ComponentAppID:  c.Client.GetConfig().ComponentAppID,
+		ComponentAppID:  c.config.ComponentAppID,
 		AuthorizerAppID: authorizerAppID,
 		OptionName:      optionName,
 		OptionValue:     optionValue,
@@ -443,7 +811,7 @@ func (c *APIClient) SetAuthorizerOption(ctx context.Context, authorizerAppID, op
 
 	var result APIResponse
 	url := fmt.Sprintf("%s?component_access_token=%s", APISetAuthorizerOptionURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "POST", url, request, &result)
+	err = c.MakeRequest(ctx, "POST", url, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -463,14 +831,14 @@ func (c *APIClient) GetAuthorizerOption(ctx context.Context, authorizerAppID, op
 	}
 
 	request := GetAuthorizerOptionRequest{
-		ComponentAppID:  c.Client.GetConfig().ComponentAppID,
+		ComponentAppID:  c.config.ComponentAppID,
 		AuthorizerAppID: authorizerAppID,
 		OptionName:      optionName,
 	}
 
 	var result GetAuthorizerOptionResponse
 	url := fmt.Sprintf("%s?component_access_token=%s", APIGetAuthorizerOptionURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "POST", url, request, &result)
+	err = c.MakeRequest(ctx, "POST", url, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -491,7 +859,7 @@ func (c *APIClient) GetTemplateDraftList(ctx context.Context) (*GetTemplateDraft
 
 	var result GetTemplateDraftListResponse
 	url := fmt.Sprintf("%s?access_token=%s", APIGetTemplateDraftListURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "GET", url, nil, &result)
+	err = c.MakeRequest(ctx, "GET", url, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -517,7 +885,7 @@ func (c *APIClient) AddToTemplate(ctx context.Context, draftID int64, templateTy
 
 	var result APIResponse
 	url := fmt.Sprintf("%s?access_token=%s", APIAddToTemplateURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "POST", url, request, &result)
+	err = c.MakeRequest(ctx, "POST", url, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -538,7 +906,7 @@ func (c *APIClient) GetTemplateList(ctx context.Context) (*GetTemplateListRespon
 
 	var result GetTemplateListResponse
 	url := fmt.Sprintf("%s?access_token=%s", APIGetTemplateListURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "GET", url, nil, &result)
+	err = c.MakeRequest(ctx, "GET", url, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -563,7 +931,7 @@ func (c *APIClient) DeleteTemplate(ctx context.Context, templateID int64) (*APIR
 
 	var result APIResponse
 	url := fmt.Sprintf("%s?access_token=%s", APIDeleteTemplateURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.Client.MakeRequest(ctx, "POST", url, request, &result)
+	err = c.MakeRequest(ctx, "POST", url, request, &result)
 	if err != nil {
 		return nil, err
 	}

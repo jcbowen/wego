@@ -1,6 +1,9 @@
 package openplatform
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 // APIResponse 微信API通用响应结构
 type APIResponse struct {
@@ -131,7 +134,7 @@ type GetRidInfoRequest struct {
 // RidInfo rid信息
 type RidInfo struct {
 	Request struct {
-		InvokeTime   string `json:"invoke_time"`
+		InvokeTime  string `json:"invoke_time"`
 		CostInMs    int    `json:"cost_in_ms"`
 		RequestURL  string `json:"request_url"`
 		RequestBody string `json:"request_body"`
@@ -177,10 +180,10 @@ type GetAuthorizerOptionResponse struct {
 
 // TemplateDraft 草稿箱模板
 type TemplateDraft struct {
-	CreateTime             int64  `json:"create_time"`
-	UserVersion           string `json:"user_version"`
-	UserDesc              string `json:"user_desc"`
-	DraftID               int64  `json:"draft_id"`
+	CreateTime  int64  `json:"create_time"`
+	UserVersion string `json:"user_version"`
+	UserDesc    string `json:"user_desc"`
+	DraftID     int64  `json:"draft_id"`
 }
 
 // GetTemplateDraftListResponse 获取草稿箱列表响应
@@ -191,16 +194,16 @@ type GetTemplateDraftListResponse struct {
 
 // AddToTemplateRequest 将草稿添加到模板库请求
 type AddToTemplateRequest struct {
-	DraftID     int64  `json:"draft_id"`
-	TemplateType int    `json:"template_type"`
+	DraftID      int64 `json:"draft_id"`
+	TemplateType int   `json:"template_type"`
 }
 
 // Template 模板库模板
 type Template struct {
-	CreateTime   int64  `json:"create_time"`
-	UserVersion  string `json:"user_version"`
-	UserDesc     string `json:"user_desc"`
-	TemplateID   int64  `json:"template_id"`
+	CreateTime  int64  `json:"create_time"`
+	UserVersion string `json:"user_version"`
+	UserDesc    string `json:"user_desc"`
+	TemplateID  int64  `json:"template_id"`
 }
 
 // GetTemplateListResponse 获取模板列表响应
@@ -212,4 +215,75 @@ type GetTemplateListResponse struct {
 // DeleteTemplateRequest 删除代码模板请求
 type DeleteTemplateRequest struct {
 	TemplateID int64 `json:"template_id"`
+}
+
+// AuthorizationEvent 授权变更事件基础结构
+// 对应微信官方文档中的授权变更通知推送格式
+// https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/authorize_event.html
+// 所有授权变更事件共有的字段
+// 接收POST请求后，只需直接返回字符串success
+// 字段说明：
+// - AppId: 第三方平台appid
+// - CreateTime: 时间戳
+// - InfoType: 通知类型
+// - AuthorizerAppid: 公众号/服务号/小程序/微信小店/带货助手/视频号助手的appid
+// - AuthorizationCode: 授权码，可用于获取授权信息（仅authorized和updateauthorized事件）
+// - AuthorizationCodeExpiredTime: 授权码过期时间 单位秒（仅authorized和updateauthorized事件）
+// - PreAuthCode: 预授权码（仅authorized和updateauthorized事件）
+type AuthorizationEvent struct {
+	AppId                        string `xml:"AppId" json:"appid"`
+	CreateTime                   int64  `xml:"CreateTime" json:"create_time"`
+	InfoType                     string `xml:"InfoType" json:"info_type"`
+	AuthorizerAppid              string `xml:"AuthorizerAppid" json:"authorizer_appid"`
+	AuthorizationCode            string `xml:"AuthorizationCode,omitempty" json:"authorization_code,omitempty"`
+	AuthorizationCodeExpiredTime int64  `xml:"AuthorizationCodeExpiredTime,omitempty" json:"authorization_code_expired_time,omitempty"`
+	PreAuthCode                  string `xml:"PreAuthCode,omitempty" json:"pre_auth_code,omitempty"`
+}
+
+// AuthorizedEvent 授权成功事件
+// InfoType: authorized
+// 当公众号/服务号/小程序/微信小店/带货助手/视频号助手对第三方平台进行授权时触发
+type AuthorizedEvent struct {
+	AuthorizationEvent
+}
+
+// UnauthorizedEvent 取消授权事件
+// InfoType: unauthorized
+// 当公众号/服务号/小程序/微信小店/带货助手/视频号助手取消对第三方平台的授权时触发
+type UnauthorizedEvent struct {
+	AuthorizationEvent
+}
+
+// UpdateAuthorizedEvent 授权更新事件
+// InfoType: updateauthorized
+// 当授权方更新授权时触发。如果更新授权时，授权的权限集没有发生变化，将不会触发授权更新通知
+type UpdateAuthorizedEvent struct {
+	AuthorizationEvent
+}
+
+// EventHandler 事件处理器接口
+type EventHandler interface {
+	// HandleAuthorized 处理授权成功事件
+	HandleAuthorized(ctx context.Context, event *AuthorizedEvent) error
+
+	// HandleUnauthorized 处理取消授权事件
+	HandleUnauthorized(ctx context.Context, event *UnauthorizedEvent) error
+
+	// HandleUpdateAuthorized 处理授权更新事件
+	HandleUpdateAuthorized(ctx context.Context, event *UpdateAuthorizedEvent) error
+}
+
+// DefaultEventHandler 默认事件处理器
+type DefaultEventHandler struct{}
+
+func (h *DefaultEventHandler) HandleAuthorized(ctx context.Context, event *AuthorizedEvent) error {
+	return nil
+}
+
+func (h *DefaultEventHandler) HandleUnauthorized(ctx context.Context, event *UnauthorizedEvent) error {
+	return nil
+}
+
+func (h *DefaultEventHandler) HandleUpdateAuthorized(ctx context.Context, event *UpdateAuthorizedEvent) error {
+	return nil
 }

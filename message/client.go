@@ -4,19 +4,110 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/openplatform"
 )
 
 // MessageClient 消息客户端
 type MessageClient struct {
-	Client *openplatform.OpenPlatformClient
+	Client *openplatform.APIClient
 }
 
 // NewMessageClient 创建新的消息客户端
-func NewMessageClient(client *openplatform.OpenPlatformClient) *MessageClient {
+func NewMessageClient(client *openplatform.APIClient) *MessageClient {
 	return &MessageClient{
 		Client: client,
 	}
+}
+
+// SecureMessageProcessor 安全消息处理器（支持加解密）
+type SecureMessageProcessor struct {
+	processor   *MessageProcessor
+	cryptoCache map[string]*crypto.WXBizMsgCrypt // 按授权方AppID缓存加解密实例
+}
+
+// NewSecureMessageProcessor 创建安全消息处理器
+func NewSecureMessageProcessor() *SecureMessageProcessor {
+	return &SecureMessageProcessor{
+		processor:   NewMessageProcessor(),
+		cryptoCache: make(map[string]*crypto.WXBizMsgCrypt),
+	}
+}
+
+// ProcessSecureMessage 处理安全消息（包含加解密）
+func (p *SecureMessageProcessor) ProcessSecureMessage(
+	authorizerAppID string,
+	msgSignature string,
+	timestamp string,
+	nonce string,
+	encryptedMsg string,
+) (interface{}, error) {
+	// 获取加解密实例
+	cryptoInstance, err := p.getCryptoInstance(authorizerAppID)
+	if err != nil {
+		return nil, fmt.Errorf("获取加解密实例失败: %v", err)
+	}
+
+	// 解密消息
+	decryptedMsg, err := cryptoInstance.DecryptMsg(msgSignature, timestamp, nonce, encryptedMsg)
+	if err != nil {
+		return nil, fmt.Errorf("消息解密失败: %v", err)
+	}
+
+	// 处理消息
+	return p.processor.ProcessMessage([]byte(decryptedMsg))
+}
+
+// EncryptReply 加密回复消息
+func (p *SecureMessageProcessor) EncryptReply(
+	authorizerAppID string,
+	reply interface{},
+	timestamp string,
+	nonce string,
+) (string, error) {
+	// 获取加解密实例
+	cryptoInstance, err := p.getCryptoInstance(authorizerAppID)
+	if err != nil {
+		return "", fmt.Errorf("获取加解密实例失败: %v", err)
+	}
+
+	// 将回复转换为XML
+	replyXML, err := p.convertReplyToXML(reply)
+	if err != nil {
+		return "", fmt.Errorf("转换回复为XML失败: %v", err)
+	}
+
+	// 加密回复
+	encryptedReply, err := cryptoInstance.EncryptMsg(replyXML, timestamp, nonce)
+	if err != nil {
+		return "", fmt.Errorf("回复加密失败: %v", err)
+	}
+
+	return encryptedReply, nil
+}
+
+// getCryptoInstance 获取加解密实例
+func (p *SecureMessageProcessor) getCryptoInstance(authorizerAppID string) (*crypto.WXBizMsgCrypt, error) {
+	if cryptoInstance, exists := p.cryptoCache[authorizerAppID]; exists {
+		return cryptoInstance, nil
+	}
+
+	// 从授权方信息中获取Token和EncodingAESKey
+	// 这里需要实现获取授权方配置的逻辑
+	token := "your_token"                     // 需要从配置或数据库中获取
+	encodingAESKey := "your_encoding_aes_key" // 需要从配置或数据库中获取
+
+	cryptoInstance := crypto.NewWXBizMsgCrypt(token, encodingAESKey, authorizerAppID)
+	p.cryptoCache[authorizerAppID] = cryptoInstance
+
+	return cryptoInstance, nil
+}
+
+// convertReplyToXML 将回复转换为XML
+func (p *SecureMessageProcessor) convertReplyToXML(reply interface{}) (string, error) {
+	// 这里需要实现将各种回复类型转换为XML的逻辑
+	// 暂时返回空字符串，需要根据实际回复类型实现
+	return "", nil
 }
 
 // MessageType 消息类型常量
@@ -109,28 +200,52 @@ type EventHandler interface {
 	HandleEvent(event *EventMessage) (interface{}, error)
 }
 
+// ComponentVerifyTicketHandler 第三方平台component_verify_ticket事件处理器接口
+type ComponentVerifyTicketHandler interface {
+	HandleComponentVerifyTicket(event *ComponentVerifyTicketEvent) error
+}
+
+// AuthorizeEventHandler 第三方平台授权事件处理器接口
+type AuthorizeEventHandler interface {
+	HandleAuthorizeEvent(event interface{}) error
+}
+
 // MessageProcessor 消息处理器
 type MessageProcessor struct {
-	handlers      map[string]MessageHandler
-	eventHandlers map[string]EventHandler
+	messageHandlers               map[string]MessageHandler
+	eventHandlers                 map[string]EventHandler
+	componentVerifyTicketHandlers []ComponentVerifyTicketHandler
+	authorizeEventHandlers        []AuthorizeEventHandler
 }
 
 // NewMessageProcessor 创建消息处理器
 func NewMessageProcessor() *MessageProcessor {
 	return &MessageProcessor{
-		handlers:      make(map[string]MessageHandler),
-		eventHandlers: make(map[string]EventHandler),
+		messageHandlers:               make(map[string]MessageHandler),
+		eventHandlers:                 make(map[string]EventHandler),
+		componentVerifyTicketHandlers: make([]ComponentVerifyTicketHandler, 0),
+		authorizeEventHandlers:        make([]AuthorizeEventHandler, 0),
 	}
 }
 
 // RegisterMessageHandler 注册消息处理器
 func (p *MessageProcessor) RegisterMessageHandler(msgType string, handler MessageHandler) {
-	p.handlers[msgType] = handler
+	p.messageHandlers[msgType] = handler
 }
 
 // RegisterEventHandler 注册事件处理器
 func (p *MessageProcessor) RegisterEventHandler(eventType string, handler EventHandler) {
 	p.eventHandlers[eventType] = handler
+}
+
+// RegisterComponentVerifyTicketHandler 注册component_verify_ticket事件处理器
+func (p *MessageProcessor) RegisterComponentVerifyTicketHandler(handler ComponentVerifyTicketHandler) {
+	p.componentVerifyTicketHandlers = append(p.componentVerifyTicketHandlers, handler)
+}
+
+// RegisterAuthorizeEventHandler 注册授权事件处理器
+func (p *MessageProcessor) RegisterAuthorizeEventHandler(handler AuthorizeEventHandler) {
+	p.authorizeEventHandlers = append(p.authorizeEventHandlers, handler)
 }
 
 // ProcessMessage 处理消息
@@ -139,6 +254,19 @@ func (p *MessageProcessor) ProcessMessage(xmlData []byte) (interface{}, error) {
 	var baseMsg Message
 	if err := xml.Unmarshal(xmlData, &baseMsg); err != nil {
 		return nil, fmt.Errorf("解析XML消息失败: %v", err)
+	}
+
+	// 检查是否为第三方平台特殊事件
+	// 第三方平台事件通常有特定的Event类型
+	if baseMsg.MsgType == MessageTypeEvent {
+		var eventMsg EventMessage
+		if err := xml.Unmarshal(xmlData, &eventMsg); err == nil {
+			// 检查是否为第三方平台特定事件
+			switch eventMsg.Event {
+			case EventTypeComponentVerifyTicket, EventTypeAuthorized, EventTypeUpdateAuthorized, EventTypeUnauthorized:
+				return p.handleThirdPartyMessage(xmlData, &baseMsg)
+			}
+		}
 	}
 
 	// 根据消息类型进行具体解析
@@ -160,6 +288,105 @@ func (p *MessageProcessor) ProcessMessage(xmlData []byte) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("不支持的消息类型: %s", baseMsg.MsgType)
 	}
+}
+
+// handleThirdPartyMessage 处理第三方平台消息
+func (p *MessageProcessor) handleThirdPartyMessage(xmlData []byte, msg *Message) (interface{}, error) {
+	// 解析第三方平台事件
+	var event EventMessage
+	err := xml.Unmarshal(xmlData, &event)
+	if err != nil {
+		return nil, fmt.Errorf("解析第三方平台事件失败: %v", err)
+	}
+
+	// 根据事件类型处理
+	switch event.Event {
+	case EventTypeComponentVerifyTicket:
+		return p.handleComponentVerifyTicketEvent(xmlData)
+	case EventTypeAuthorized, EventTypeUpdateAuthorized, EventTypeUnauthorized:
+		return p.handleAuthorizeEvent(xmlData)
+	default:
+		// 普通事件，使用原有的事件处理逻辑
+		return p.processEventMessage(xmlData)
+	}
+}
+
+// handleComponentVerifyTicketEvent 处理component_verify_ticket事件
+func (p *MessageProcessor) handleComponentVerifyTicketEvent(xmlData []byte) (interface{}, error) {
+	var event ComponentVerifyTicketEvent
+	err := xml.Unmarshal(xmlData, &event)
+	if err != nil {
+		return nil, fmt.Errorf("解析component_verify_ticket事件失败: %v", err)
+	}
+
+	// 调用所有注册的处理器
+	for _, handler := range p.componentVerifyTicketHandlers {
+		err := handler.HandleComponentVerifyTicket(&event)
+		if err != nil {
+			return nil, fmt.Errorf("处理component_verify_ticket事件失败: %v", err)
+		}
+	}
+
+	// 返回成功响应
+	return "success", nil
+}
+
+// handleAuthorizeEvent 处理授权事件
+func (p *MessageProcessor) handleAuthorizeEvent(xmlData []byte) (interface{}, error) {
+	// 解析XML获取事件类型
+	var baseEvent EventMessage
+	err := xml.Unmarshal(xmlData, &baseEvent)
+	if err != nil {
+		return nil, fmt.Errorf("解析授权事件失败: %v", err)
+	}
+
+	// 根据事件类型解析具体的事件
+	switch baseEvent.Event {
+	case "authorized":
+		var event AuthorizedEvent
+		err := xml.Unmarshal(xmlData, &event)
+		if err != nil {
+			return nil, fmt.Errorf("解析授权成功事件失败: %v", err)
+		}
+		// 调用所有注册的处理器
+		for _, handler := range p.authorizeEventHandlers {
+			err := handler.HandleAuthorizeEvent(&event)
+			if err != nil {
+				return nil, fmt.Errorf("处理授权事件失败: %v", err)
+			}
+		}
+	case "unauthorized":
+		var event UnauthorizedEvent
+		err := xml.Unmarshal(xmlData, &event)
+		if err != nil {
+			return nil, fmt.Errorf("解析取消授权事件失败: %v", err)
+		}
+		// 调用所有注册的处理器
+		for _, handler := range p.authorizeEventHandlers {
+			err := handler.HandleAuthorizeEvent(&event)
+			if err != nil {
+				return nil, fmt.Errorf("处理授权事件失败: %v", err)
+			}
+		}
+	case "updateauthorized":
+		var event UpdateAuthorizedEvent
+		err := xml.Unmarshal(xmlData, &event)
+		if err != nil {
+			return nil, fmt.Errorf("解析授权更新事件失败: %v", err)
+		}
+		// 调用所有注册的处理器
+		for _, handler := range p.authorizeEventHandlers {
+			err := handler.HandleAuthorizeEvent(&event)
+			if err != nil {
+				return nil, fmt.Errorf("处理授权事件失败: %v", err)
+			}
+		}
+	default:
+		return nil, fmt.Errorf("不支持的授权事件类型: %s", baseEvent.Event)
+	}
+
+	// 返回成功响应
+	return "success", nil
 }
 
 // processEventMessage 处理事件消息
@@ -184,7 +411,7 @@ func (p *MessageProcessor) processTextMessage(xmlData []byte) (interface{}, erro
 		return nil, fmt.Errorf("解析文本消息失败: %v", err)
 	}
 
-	handler, exists := p.handlers[MessageTypeText]
+	handler, exists := p.messageHandlers[MessageTypeText]
 	if !exists {
 		return nil, fmt.Errorf("未注册的文本消息处理器")
 	}
@@ -199,7 +426,7 @@ func (p *MessageProcessor) processImageMessage(xmlData []byte) (interface{}, err
 		return nil, fmt.Errorf("解析图片消息失败: %v", err)
 	}
 
-	handler, exists := p.handlers[MessageTypeImage]
+	handler, exists := p.messageHandlers[MessageTypeImage]
 	if !exists {
 		return nil, fmt.Errorf("未注册的图片消息处理器")
 	}
@@ -214,7 +441,7 @@ func (p *MessageProcessor) processVoiceMessage(xmlData []byte) (interface{}, err
 		return nil, fmt.Errorf("解析语音消息失败: %v", err)
 	}
 
-	handler, exists := p.handlers[MessageTypeVoice]
+	handler, exists := p.messageHandlers[MessageTypeVoice]
 	if !exists {
 		return nil, fmt.Errorf("未注册的语音消息处理器")
 	}
@@ -229,7 +456,7 @@ func (p *MessageProcessor) processVideoMessage(xmlData []byte) (interface{}, err
 		return nil, fmt.Errorf("解析视频消息失败: %v", err)
 	}
 
-	handler, exists := p.handlers[MessageTypeVideo]
+	handler, exists := p.messageHandlers[MessageTypeVideo]
 	if !exists {
 		return nil, fmt.Errorf("未注册的视频消息处理器")
 	}
@@ -244,7 +471,7 @@ func (p *MessageProcessor) processLocationMessage(xmlData []byte) (interface{}, 
 		return nil, fmt.Errorf("解析位置消息失败: %v", err)
 	}
 
-	handler, exists := p.handlers[MessageTypeLocation]
+	handler, exists := p.messageHandlers[MessageTypeLocation]
 	if !exists {
 		return nil, fmt.Errorf("未注册的位置消息处理器")
 	}
@@ -259,7 +486,7 @@ func (p *MessageProcessor) processLinkMessage(xmlData []byte) (interface{}, erro
 		return nil, fmt.Errorf("解析链接消息失败: %v", err)
 	}
 
-	handler, exists := p.handlers[MessageTypeLink]
+	handler, exists := p.messageHandlers[MessageTypeLink]
 	if !exists {
 		return nil, fmt.Errorf("未注册的链接消息处理器")
 	}
@@ -300,4 +527,31 @@ type LinkMessage struct {
 	Description string `xml:"Description"`
 	URL         string `xml:"Url"`
 	MsgID       int64  `xml:"MsgId,omitempty"`
+}
+
+// SecureMessageProcessor 方法实现
+
+// RegisterMessageHandler 注册消息处理器
+func (p *SecureMessageProcessor) RegisterMessageHandler(msgType string, handler MessageHandler) {
+	p.processor.RegisterMessageHandler(msgType, handler)
+}
+
+// RegisterEventHandler 注册事件处理器
+func (p *SecureMessageProcessor) RegisterEventHandler(eventType string, handler EventHandler) {
+	p.processor.RegisterEventHandler(eventType, handler)
+}
+
+// RegisterComponentVerifyTicketHandler 注册component_verify_ticket事件处理器
+func (p *SecureMessageProcessor) RegisterComponentVerifyTicketHandler(handler ComponentVerifyTicketHandler) {
+	p.processor.RegisterComponentVerifyTicketHandler(handler)
+}
+
+// RegisterAuthorizeEventHandler 注册授权事件处理器
+func (p *SecureMessageProcessor) RegisterAuthorizeEventHandler(handler AuthorizeEventHandler) {
+	p.processor.RegisterAuthorizeEventHandler(handler)
+}
+
+// ProcessMessage 处理明文消息
+func (p *SecureMessageProcessor) ProcessMessage(xmlData []byte) (interface{}, error) {
+	return p.processor.ProcessMessage(xmlData)
 }

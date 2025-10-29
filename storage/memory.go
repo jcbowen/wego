@@ -6,11 +6,12 @@ import (
 	"time"
 )
 
-// MemoryStorage 内存存储实现（默认）
+// MemoryStorage 内存存储实现
 type MemoryStorage struct {
 	mu               sync.RWMutex
 	componentToken   *ComponentAccessToken
 	preAuthCode      *PreAuthCode
+	verifyTicket     string
 	authorizerTokens map[string]*AuthorizerAccessToken
 }
 
@@ -80,10 +81,38 @@ func (s *MemoryStorage) GetPreAuthCode(ctx context.Context) (*PreAuthCode, error
 	return code, nil
 }
 
+// DeletePreAuthCode 删除预授权码
 func (s *MemoryStorage) DeletePreAuthCode(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	s.preAuthCode = nil
+	return nil
+}
+
+// SaveVerifyTicket 保存验证票据
+func (s *MemoryStorage) SaveVerifyTicket(ctx context.Context, ticket string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.verifyTicket = ticket
+	return nil
+}
+
+// GetVerifyTicket 获取验证票据
+func (s *MemoryStorage) GetVerifyTicket(ctx context.Context) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.verifyTicket, nil
+}
+
+// DeleteVerifyTicket 删除验证票据
+func (s *MemoryStorage) DeleteVerifyTicket(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.verifyTicket = ""
 	return nil
 }
 

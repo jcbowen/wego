@@ -2,6 +2,8 @@ module github.com/jcbowen/wego
 
 go 1.23.0
 
+replace github.com/jcbowen/jcbaseGo => ../jcbaseGo
+
 require gorm.io/gorm v1.31.0
 
 require (

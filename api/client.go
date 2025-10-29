@@ -12,11 +12,11 @@ import (
 
 // APIClient API客户端
 type APIClient struct {
-	Client *openplatform.OpenPlatformClient
+	Client *openplatform.APIClient
 }
 
 // NewAPIClient 创建新的API客户端
-func NewAPIClient(client *openplatform.OpenPlatformClient) *APIClient {
+func NewAPIClient(client *openplatform.APIClient) *APIClient {
 	return &APIClient{
 		Client: client,
 	}
