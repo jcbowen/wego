@@ -10,13 +10,13 @@ import (
 	"fmt"
 )
 
-// DecodeAESKey 解码微信开放平台AES密钥（符合微信官方规范）
+// DecodeAESKey 解码微信开放平台AES密钥（符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 func DecodeAESKey(encodingAESKey string) ([]byte, error) {
 	if len(encodingAESKey) != 43 {
 		return nil, fmt.Errorf("EncodingAESKey长度必须为43位，当前长度: %d", len(encodingAESKey))
 	}
 
-	// 微信官方要求EncodingAESKey必须是43位Base64编码
+	// 微信官方要求EncodingAESKey必须是43位Base64编码，尾部填充一个字符的"="<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 	key, err := base64.StdEncoding.DecodeString(encodingAESKey + "=")
 	if err != nil {
 		return nil, fmt.Errorf("EncodingAESKey Base64解码失败: %v", err)
@@ -30,22 +30,22 @@ func DecodeAESKey(encodingAESKey string) ([]byte, error) {
 	return key, nil
 }
 
-// EncryptMsg 加密微信消息（符合微信官方规范）
+// EncryptMsg 加密微信消息（符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 func EncryptMsg(plainText, appID string, aesKey []byte) (string, error) {
-	// 生成16字节的安全随机字符串
+	// 生成16字节的安全随机字符串（符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 	randomStr, err := generateRandomString(16)
 	if err != nil {
 		return "", fmt.Errorf("生成随机字符串失败: %v", err)
 	}
 
-	// 构造待加密的明文：randomStr + networkBytesOrder(plainText length) + plainText + appID
+	// 构造待加密的明文：random(16B) + msg_len(4B) + msg + appid（符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 	text := fmt.Sprintf("%s%s%s%s",
 		randomStr,
 		intToNetworkBytesOrder(len(plainText)),
 		plainText,
 		appID)
 
-	// PKCS7填充
+	// PKCS7填充（符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 	blockSize := aes.BlockSize
 	textBytes := []byte(text)
 	padLen := blockSize - len(textBytes)%blockSize
@@ -55,7 +55,7 @@ func EncryptMsg(plainText, appID string, aesKey []byte) (string, error) {
 	padText := bytes.Repeat([]byte{byte(padLen)}, padLen)
 	textBytes = append(textBytes, padText...)
 
-	// AES加密（CBC模式，使用aesKey的前16字节作为IV）
+	// AES加密（CBC模式，使用aesKey的前16字节作为IV，符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 	block, err := aes.NewCipher(aesKey)
 	if err != nil {
 		return "", fmt.Errorf("创建AES密码器失败: %v", err)
@@ -65,19 +65,19 @@ func EncryptMsg(plainText, appID string, aesKey []byte) (string, error) {
 	mode := cipher.NewCBCEncrypter(block, aesKey[:aes.BlockSize])
 	mode.CryptBlocks(cipherText, textBytes)
 
-	// Base64编码
+	// Base64编码（符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 	return base64.StdEncoding.EncodeToString(cipherText), nil
 }
 
-// DecryptMsg 解密微信消息（符合微信官方规范）
+// DecryptMsg 解密微信消息（符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 func DecryptMsg(encryptedMsg string, aesKey []byte) (string, error) {
-	// Base64解码
+	// Base64解码（符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 	cipherText, err := base64.StdEncoding.DecodeString(encryptedMsg)
 	if err != nil {
 		return "", fmt.Errorf("Base64解码失败: %v", err)
 	}
 
-	// AES解密
+	// AES解密（CBC模式，使用aesKey的前16字节作为IV，符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 	block, err := aes.NewCipher(aesKey)
 	if err != nil {
 		return "", fmt.Errorf("创建AES密码器失败: %v", err)
@@ -91,7 +91,7 @@ func DecryptMsg(encryptedMsg string, aesKey []byte) (string, error) {
 	mode := cipher.NewCBCDecrypter(block, aesKey[:aes.BlockSize])
 	mode.CryptBlocks(plainText, cipherText)
 
-	// PKCS7去填充
+	// PKCS7去填充（符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 	if len(plainText) == 0 {
 		return "", errors.New("解密后数据为空")
 	}
@@ -102,7 +102,7 @@ func DecryptMsg(encryptedMsg string, aesKey []byte) (string, error) {
 
 	plainText = plainText[:len(plainText)-padLen]
 
-	// 解析消息结构：randomStr(16字节) + msgLen(4字节) + msg + appID
+	// 解析消息结构：random(16字节) + msg_len(4字节) + msg + appid（符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 	if len(plainText) < 20 {
 		return "", errors.New("明文长度过短")
 	}
@@ -112,7 +112,7 @@ func DecryptMsg(encryptedMsg string, aesKey []byte) (string, error) {
 		return "", errors.New("消息长度无效")
 	}
 
-	// 验证AppID（微信官方要求验证第三方平台AppID）
+	// 验证AppID（微信官方要求验证第三方平台AppID）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 	decryptedAppID := string(plainText[20+msgLen:])
 	if len(decryptedAppID) == 0 {
 		return "", errors.New("AppID缺失")

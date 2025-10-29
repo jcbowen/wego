@@ -20,6 +20,7 @@ func NewDBStorage(db *gorm.DB) (*DBStorage, error) {
 		&DBComponentToken{},
 		&DBPreAuthCode{},
 		&DBAuthorizerToken{},
+		&DBPrevEncodingAESKey{},
 	); err != nil {
 		return nil, err
 	}
@@ -57,6 +58,15 @@ type DBAuthorizerToken struct {
 	ExpiresAt              time.Time `gorm:"not null;index"`
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
+}
+
+// DBPrevEncodingAESKey 上一次EncodingAESKey数据库模型
+type DBPrevEncodingAESKey struct {
+	ID              uint      `gorm:"primaryKey"`
+	AppID           string    `gorm:"type:varchar(64);not null;uniqueIndex"`
+	PrevEncodingKey string    `gorm:"type:varchar(256);not null"`
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // SaveComponentToken 保存组件令牌到数据库
@@ -233,4 +243,37 @@ func (s *DBStorage) Ping(ctx context.Context) error {
 		return err
 	}
 	return db.Ping()
+}
+
+// SavePrevEncodingAESKey 保存上一次EncodingAESKey到数据库
+func (s *DBStorage) SavePrevEncodingAESKey(ctx context.Context, appID string, prevKey string) error {
+	// 使用upsert操作（存在则更新，不存在则插入）
+	return s.db.Where(DBPrevEncodingAESKey{AppID: appID}).
+		Assign(DBPrevEncodingAESKey{
+			PrevEncodingKey: prevKey,
+		}).
+		FirstOrCreate(&DBPrevEncodingAESKey{}, DBPrevEncodingAESKey{AppID: appID}).Error
+}
+
+// GetPrevEncodingAESKey 从数据库读取上一次EncodingAESKey
+func (s *DBStorage) GetPrevEncodingAESKey(ctx context.Context, appID string) (*PrevEncodingAESKey, error) {
+	var dbKey DBPrevEncodingAESKey
+
+	if err := s.db.Where("app_id = ?", appID).First(&dbKey).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &PrevEncodingAESKey{
+		AppID:           appID,
+		PrevEncodingAESKey: dbKey.PrevEncodingKey,
+		UpdatedAt:       time.Now(),
+	}, nil
+}
+
+// DeletePrevEncodingAESKey 删除上一次EncodingAESKey
+func (s *DBStorage) DeletePrevEncodingAESKey(ctx context.Context, appID string) error {
+	return s.db.Where("app_id = ?", appID).Delete(&DBPrevEncodingAESKey{}).Error
 }

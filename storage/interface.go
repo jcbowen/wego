@@ -35,6 +35,13 @@ type VerifyTicket struct {
 	ExpiresAt  time.Time `json:"expires_at"`  // 过期时间（创建时间+12小时）
 }
 
+// PrevEncodingAESKey 上一次的EncodingAESKey结构体
+type PrevEncodingAESKey struct {
+	AppID           string    `json:"appid"`           // 应用ID
+	PrevEncodingAESKey string `json:"prev_encoding_aes_key"` // 上一次的EncodingAESKey
+	UpdatedAt       time.Time `json:"updated_at"`       // 更新时间
+}
+
 // TokenStorage 令牌存储接口
 type TokenStorage interface {
 	// 组件令牌相关方法
@@ -58,6 +65,11 @@ type TokenStorage interface {
 	DeleteAuthorizerToken(ctx context.Context, authorizerAppID string) error
 	ClearAuthorizerTokens(ctx context.Context) error            // 清除所有授权方令牌
 	ListAuthorizerTokens(ctx context.Context) ([]string, error) // 返回所有已存储的授权方appid
+
+	// 上一次EncodingAESKey相关方法
+	SavePrevEncodingAESKey(ctx context.Context, appID string, prevKey string) error
+	GetPrevEncodingAESKey(ctx context.Context, appID string) (*PrevEncodingAESKey, error)
+	DeletePrevEncodingAESKey(ctx context.Context, appID string) error
 
 	// 存储健康检查
 	Ping(ctx context.Context) error

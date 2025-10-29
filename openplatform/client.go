@@ -54,6 +54,7 @@ type APIClient struct {
 	storage      storage.TokenStorage
 	logger       Logger
 	eventHandler EventHandler // 事件处理器
+	crypt        *crypto.WXBizMsgCrypt // 消息加解密实例
 }
 
 // NewAPIClient 创建新的API客户端（使用默认文件存储）
@@ -76,6 +77,7 @@ func NewAPIClientWithStorage(config *OpenPlatformConfig, storage storage.TokenSt
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		storage:    storage,
 		logger:     &DefaultLogger{},
+		crypt:      crypto.NewWXBizMsgCrypt(config.ComponentToken, config.EncodingAESKey, config.ComponentAppID),
 	}
 
 	return client
@@ -497,6 +499,26 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 		if err := c.GetEventHandler().HandleComponentVerifyTicket(ctx, &event); err != nil {
 			c.logger.Errorf("处理验证票据事件失败: %v", err)
 			// 根据微信官方文档要求，即使处理失败也必须返回success
+		}
+
+	case "encoding_aes_key_changed":
+		var event EncodingAESKeyChangedEvent
+		err := xml.Unmarshal(xmlData, &event)
+		if err != nil {
+			c.logger.Errorf("解析EncodingAESKey变更事件失败: %v", err)
+			break
+		}
+
+		// 保存上一次的EncodingAESKey
+		if c.crypt != nil {
+			c.crypt.SetPrevEncodingAESKey(c.config.EncodingAESKey)
+		}
+
+		// 更新配置中的EncodingAESKey
+		c.config.EncodingAESKey = event.NewEncodingAESKey
+
+		if err := c.GetEventHandler().HandleEncodingAESKeyChanged(ctx, &event); err != nil {
+			c.logger.Errorf("处理EncodingAESKey变更事件失败: %v", err)
 		}
 
 	default:

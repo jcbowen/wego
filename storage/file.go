@@ -18,6 +18,7 @@ type FileStorage struct {
 	preAuthCodeFile     string
 	verifyTicketFile    string
 	authorizerTokensDir string
+	prevEncodingAESKeysDir string // 上一次EncodingAESKey存储目录
 }
 
 // NewFileStorage 创建文件存储实例
@@ -33,10 +34,16 @@ func NewFileStorage(baseDir string) (*FileStorage, error) {
 		preAuthCodeFile:     filepath.Join(baseDir, "pre_auth_code.json"),
 		verifyTicketFile:    filepath.Join(baseDir, "verify_ticket.txt"),
 		authorizerTokensDir: filepath.Join(baseDir, "authorizer_tokens"),
+		prevEncodingAESKeysDir: filepath.Join(baseDir, "prev_encoding_aes_keys"),
 	}
 
 	// 确保授权方令牌目录存在
 	if err := os.MkdirAll(storage.authorizerTokensDir, 0755); err != nil {
+		return nil, err
+	}
+
+	// 确保上一次EncodingAESKey存储目录存在
+	if err := os.MkdirAll(storage.prevEncodingAESKeysDir, 0755); err != nil {
 		return nil, err
 	}
 
@@ -296,4 +303,45 @@ func (s *FileStorage) loadFromFile(filename string, data interface{}) error {
 
 	decoder := json.NewDecoder(file)
 	return decoder.Decode(data)
+}
+
+// SavePrevEncodingAESKey 保存上一次的EncodingAESKey到文件
+func (s *FileStorage) SavePrevEncodingAESKey(ctx context.Context, appID string, prevKey string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
+	prevKeyData := &PrevEncodingAESKey{
+		AppID:           appID,
+		PrevEncodingAESKey: prevKey,
+		UpdatedAt:       time.Now(),
+	}
+	
+	filename := filepath.Join(s.prevEncodingAESKeysDir, appID+".json")
+	return s.saveToFile(filename, prevKeyData)
+}
+
+// GetPrevEncodingAESKey 从文件读取上一次的EncodingAESKey
+func (s *FileStorage) GetPrevEncodingAESKey(ctx context.Context, appID string) (*PrevEncodingAESKey, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	
+	filename := filepath.Join(s.prevEncodingAESKeysDir, appID+".json")
+	var prevKey PrevEncodingAESKey
+	if err := s.loadFromFile(filename, &prevKey); err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	
+	return &prevKey, nil
+}
+
+// DeletePrevEncodingAESKey 删除上一次的EncodingAESKey文件
+func (s *FileStorage) DeletePrevEncodingAESKey(ctx context.Context, appID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
+	filename := filepath.Join(s.prevEncodingAESKeysDir, appID+".json")
+	return os.Remove(filename)
 }

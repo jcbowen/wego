@@ -271,6 +271,16 @@ type ComponentVerifyTicketEvent struct {
 	ComponentVerifyTicket string `xml:"ComponentVerifyTicket" json:"component_verify_ticket"`
 }
 
+// EncodingAESKeyChangedEvent EncodingAESKey变更事件
+// InfoType: encoding_aes_key_changed
+// 当第三方平台在微信开放平台后台修改EncodingAESKey时，微信服务器会推送此事件
+// 根据微信官方规范<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Message_encryption_and_decryption.html" index="1">1</mcreference>，
+// 需要保存上一次的EncodingAESKey以确保平滑过渡
+type EncodingAESKeyChangedEvent struct {
+	AuthorizationEvent
+	NewEncodingAESKey string `xml:"NewEncodingAESKey" json:"new_encoding_aes_key"`
+}
+
 // 授权变更事件类型常量
 // 对应微信官方文档中的InfoType字段说明
 // https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/authorize_event.html
@@ -308,6 +318,12 @@ type EventHandler interface {
 	// 根据微信官方文档<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/component_verify_ticket.html" index="0">0</mcreference>，
 	// 接收POST请求后只需直接返回字符串"success"
 	HandleComponentVerifyTicket(ctx context.Context, event *ComponentVerifyTicketEvent) error
+
+	// HandleEncodingAESKeyChanged 处理EncodingAESKey变更事件
+	// 当第三方平台在微信开放平台后台修改EncodingAESKey时，微信服务器会推送此事件
+	// 根据微信官方规范<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Message_encryption_and_decryption.html" index="1">1</mcreference>，
+	// 需要保存上一次的EncodingAESKey以确保平滑过渡
+	HandleEncodingAESKeyChanged(ctx context.Context, event *EncodingAESKeyChangedEvent) error
 }
 
 // DefaultEventHandler 默认事件处理器
@@ -329,5 +345,9 @@ func (h *DefaultEventHandler) HandleComponentVerifyTicket(ctx context.Context, e
 	// 根据微信官方文档<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/component_verify_ticket.html" index="0">0</mcreference>，
 	// 接收POST请求后只需直接返回字符串"success"
 	// 这里可以添加票据存储逻辑，但即使处理失败也必须返回success
+	return nil
+}
+
+func (h *DefaultEventHandler) HandleEncodingAESKeyChanged(ctx context.Context, event *EncodingAESKeyChangedEvent) error {
 	return nil
 }

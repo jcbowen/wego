@@ -13,12 +13,14 @@ type MemoryStorage struct {
 	preAuthCode      *PreAuthCode
 	verifyTicket     *VerifyTicket
 	authorizerTokens map[string]*AuthorizerAccessToken
+	prevEncodingAESKeys map[string]*PrevEncodingAESKey // 上一次的EncodingAESKey存储
 }
 
 // NewMemoryStorage 创建内存存储实例
 func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
 		authorizerTokens: make(map[string]*AuthorizerAccessToken),
+		prevEncodingAESKeys: make(map[string]*PrevEncodingAESKey),
 	}
 }
 
@@ -186,5 +188,38 @@ func (s *MemoryStorage) ListAuthorizerTokens(ctx context.Context) ([]string, err
 }
 
 func (s *MemoryStorage) Ping(ctx context.Context) error {
+	return nil
+}
+
+// SavePrevEncodingAESKey 保存上一次的EncodingAESKey
+func (s *MemoryStorage) SavePrevEncodingAESKey(ctx context.Context, appID string, prevKey string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
+	s.prevEncodingAESKeys[appID] = &PrevEncodingAESKey{
+		AppID:           appID,
+		PrevEncodingAESKey: prevKey,
+		UpdatedAt:       time.Now(),
+	}
+	return nil
+}
+
+// GetPrevEncodingAESKey 获取上一次的EncodingAESKey
+func (s *MemoryStorage) GetPrevEncodingAESKey(ctx context.Context, appID string) (*PrevEncodingAESKey, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	
+	if prevKey, exists := s.prevEncodingAESKeys[appID]; exists && prevKey != nil {
+		return prevKey, nil
+	}
+	return nil, nil
+}
+
+// DeletePrevEncodingAESKey 删除上一次的EncodingAESKey
+func (s *MemoryStorage) DeletePrevEncodingAESKey(ctx context.Context, appID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
+	delete(s.prevEncodingAESKeys, appID)
 	return nil
 }
