@@ -117,12 +117,12 @@ func (c *APIClient) GetLogger() Logger {
 	return c.logger
 }
 
-// SetComponentToken 设置组件令牌
+// SetComponentToken 设置开放平台令牌
 func (c *APIClient) SetComponentToken(token *storage.ComponentAccessToken) error {
 	return c.storage.SaveComponentToken(context.Background(), token)
 }
 
-// GetComponentToken 获取组件令牌
+// GetComponentToken 获取开放平台令牌
 func (c *APIClient) GetComponentToken(ctx context.Context) (*storage.ComponentAccessToken, error) {
 	return c.storage.GetComponentToken(ctx)
 }
@@ -390,7 +390,7 @@ func (c *APIClient) GetComponentAccessToken(ctx context.Context, verifyTicket st
 
 	// 保存到存储
 	if err := c.SetComponentToken(token); err != nil {
-		c.logger.Warnf("保存组件令牌失败: %v", err)
+		c.logger.Warnf("保存开放平台令牌失败: %v", err)
 	}
 
 	return token, nil
