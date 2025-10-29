@@ -125,12 +125,12 @@ func (s *FileStorage) DeletePreAuthCode(ctx context.Context) error {
 }
 
 // SaveVerifyTicket 保存验证票据到文件
-func (s *FileStorage) SaveVerifyTicket(ctx context.Context, ticket string) error {
+func (s *FileStorage) SaveComponentVerifyTicket(ctx context.Context, ticket string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// 创建票据结构，记录创建时间和过期时间
-	verifyTicket := &VerifyTicket{
+	verifyTicket := &ComponentVerifyTicket{
 		Ticket:    ticket,
 		CreatedAt: time.Now(),
 		ExpiresAt: time.Now().Add(12 * time.Hour), // 12小时有效期
@@ -140,11 +140,11 @@ func (s *FileStorage) SaveVerifyTicket(ctx context.Context, ticket string) error
 }
 
 // GetVerifyTicket 从文件读取验证票据
-func (s *FileStorage) GetVerifyTicket(ctx context.Context) (*VerifyTicket, error) {
+func (s *FileStorage) GetComponentVerifyTicket(ctx context.Context) (*ComponentVerifyTicket, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var verifyTicket VerifyTicket
+	var verifyTicket ComponentVerifyTicket
 	if err := s.loadFromFile(s.componentVerifyTicketFile, &verifyTicket); err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -161,7 +161,7 @@ func (s *FileStorage) GetVerifyTicket(ctx context.Context) (*VerifyTicket, error
 }
 
 // DeleteVerifyTicket 删除验证票据文件
-func (s *FileStorage) DeleteVerifyTicket(ctx context.Context) error {
+func (s *FileStorage) DeleteComponentVerifyTicket(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

@@ -21,6 +21,7 @@ func NewDBStorage(db *gorm.DB) (*DBStorage, error) {
 		&DBPreAuthCode{},
 		&DBAuthorizerToken{},
 		&DBPrevEncodingAESKey{},
+		&DBComponentVerifyTicket{},
 	); err != nil {
 		return nil, err
 	}
@@ -67,6 +68,14 @@ type DBPrevEncodingAESKey struct {
 	PrevEncodingKey string    `gorm:"type:varchar(256);not null"`
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+}
+
+// DBComponentVerifyTicket 验证票据数据库模型
+type DBComponentVerifyTicket struct {
+	ID        uint      `gorm:"primaryKey"`
+	Ticket    string    `gorm:"type:varchar(512);not null"` // 票据内容
+	CreatedAt time.Time `gorm:"not null"`                   // 创建时间
+	ExpiresAt time.Time `gorm:"not null;index"`            // 过期时间（创建时间+12小时）
 }
 
 // SaveComponentToken 保存组件令牌到数据库
@@ -276,4 +285,65 @@ func (s *DBStorage) GetPrevEncodingAESKey(ctx context.Context, appID string) (*P
 // DeletePrevEncodingAESKey 删除上一次EncodingAESKey
 func (s *DBStorage) DeletePrevEncodingAESKey(ctx context.Context, appID string) error {
 	return s.db.Where("app_id = ?", appID).Delete(&DBPrevEncodingAESKey{}).Error
+}
+
+// SaveComponentVerifyTicket 保存验证票据到数据库
+// @param ctx context.Context 上下文
+// @param ticket string 票据内容
+// @return error 错误信息
+func (s *DBStorage) SaveComponentVerifyTicket(ctx context.Context, ticket string) error {
+	// 票据有效期为12小时
+	expiresAt := time.Now().Add(12 * time.Hour)
+	dbTicket := &DBComponentVerifyTicket{
+		Ticket:    ticket,
+		CreatedAt: time.Now(),
+		ExpiresAt: expiresAt,
+	}
+
+	// 使用事务确保数据一致性
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		// 先删除旧的票据
+		if err := tx.Where("1 = 1").Delete(&DBComponentVerifyTicket{}).Error; err != nil {
+			return err
+		}
+
+		// 保存新的票据
+		return tx.Create(dbTicket).Error
+	})
+}
+
+// GetComponentVerifyTicket 从数据库读取验证票据
+// @param ctx context.Context 上下文
+// @return *ComponentVerifyTicket 票据结构，包含创建时间
+// @return error 错误信息
+func (s *DBStorage) GetComponentVerifyTicket(ctx context.Context) (*ComponentVerifyTicket, error) {
+	var dbTicket DBComponentVerifyTicket
+
+	// 获取最新的票据记录
+	if err := s.db.Order("created_at DESC").First(&dbTicket).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	// 检查是否过期
+	if time.Now().After(dbTicket.ExpiresAt) {
+		// 自动删除过期票据
+		s.db.Delete(&dbTicket)
+		return nil, nil
+	}
+
+	return &ComponentVerifyTicket{
+		Ticket:    dbTicket.Ticket,
+		CreatedAt: dbTicket.CreatedAt,
+		ExpiresAt: dbTicket.ExpiresAt,
+	}, nil
+}
+
+// DeleteComponentVerifyTicket 删除验证票据
+// @param ctx context.Context 上下文
+// @return error 错误信息
+func (s *DBStorage) DeleteComponentVerifyTicket(ctx context.Context) error {
+	return s.db.Where("1 = 1").Delete(&DBComponentVerifyTicket{}).Error
 }

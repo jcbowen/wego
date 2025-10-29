@@ -335,7 +335,7 @@ func (c *APIClient) GetComponentAccessToken(ctx context.Context, verifyTicket st
 
 	// 如果verifyTicket为空，从存储中获取验证票据
 	if verifyTicket == "" {
-		verifyTicketObj, err := c.storage.GetVerifyTicket(ctx)
+		verifyTicketObj, err := c.storage.GetComponentVerifyTicket(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("获取验证票据失败: %v", err)
 		}
@@ -544,7 +544,7 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 		}
 
 		// 存储验证票据
-		if err := c.storage.SaveVerifyTicket(ctx, event.ComponentVerifyTicket); err != nil {
+		if err := c.storage.SaveComponentVerifyTicket(ctx, event.ComponentVerifyTicket); err != nil {
 			c.logger.Errorf("存储验证票据失败: %v", err)
 			// 根据微信官方文档要求，即使存储失败也必须返回success
 		}

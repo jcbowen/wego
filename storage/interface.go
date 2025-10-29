@@ -28,18 +28,18 @@ type AuthorizerAccessToken struct {
 	AuthorizerRefreshToken string    `json:"authorizer_refresh_token"`
 }
 
-// VerifyTicket 验证票据结构
-type VerifyTicket struct {
-	Ticket     string    `json:"ticket"`      // 票据内容
-	CreatedAt  time.Time `json:"created_at"`  // 创建时间
-	ExpiresAt  time.Time `json:"expires_at"`  // 过期时间（创建时间+12小时）
+// ComponentVerifyTicket 验证票据结构
+type ComponentVerifyTicket struct {
+	Ticket    string    `json:"ticket"`     // 票据内容
+	CreatedAt time.Time `json:"created_at"` // 创建时间
+	ExpiresAt time.Time `json:"expires_at"` // 过期时间（创建时间+12小时）
 }
 
 // PrevEncodingAESKey 上一次的EncodingAESKey结构体
 type PrevEncodingAESKey struct {
-	AppID           string    `json:"appid"`           // 应用ID
-	PrevEncodingAESKey string `json:"prev_encoding_aes_key"` // 上一次的EncodingAESKey
-	UpdatedAt       time.Time `json:"updated_at"`       // 更新时间
+	AppID              string    `json:"appid"`                 // 应用ID
+	PrevEncodingAESKey string    `json:"prev_encoding_aes_key"` // 上一次的EncodingAESKey
+	UpdatedAt          time.Time `json:"updated_at"`            // 更新时间
 }
 
 // TokenStorage 令牌存储接口
@@ -55,9 +55,9 @@ type TokenStorage interface {
 	DeletePreAuthCode(ctx context.Context) error
 
 	// 验证票据相关方法
-	SaveVerifyTicket(ctx context.Context, ticket string) error
-	GetVerifyTicket(ctx context.Context) (*VerifyTicket, error)  // 返回票据结构，包含创建时间
-	DeleteVerifyTicket(ctx context.Context) error
+	SaveComponentVerifyTicket(ctx context.Context, ticket string) error
+	GetComponentVerifyTicket(ctx context.Context) (*ComponentVerifyTicket, error) // 返回票据结构，包含创建时间
+	DeleteComponentVerifyTicket(ctx context.Context) error
 
 	// 授权方令牌相关方法
 	SaveAuthorizerToken(ctx context.Context, authorizerAppID string, token *AuthorizerAccessToken) error

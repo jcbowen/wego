@@ -8,18 +8,18 @@ import (
 
 // MemoryStorage 内存存储实现
 type MemoryStorage struct {
-	mu               sync.RWMutex
-	componentToken   *ComponentAccessToken
-	preAuthCode      *PreAuthCode
-	verifyTicket     *VerifyTicket
-	authorizerTokens map[string]*AuthorizerAccessToken
+	mu                  sync.RWMutex
+	componentToken      *ComponentAccessToken
+	preAuthCode         *PreAuthCode
+	verifyTicket        *ComponentVerifyTicket
+	authorizerTokens    map[string]*AuthorizerAccessToken
 	prevEncodingAESKeys map[string]*PrevEncodingAESKey // 上一次的EncodingAESKey存储
 }
 
 // NewMemoryStorage 创建内存存储实例
 func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
-		authorizerTokens: make(map[string]*AuthorizerAccessToken),
+		authorizerTokens:    make(map[string]*AuthorizerAccessToken),
 		prevEncodingAESKeys: make(map[string]*PrevEncodingAESKey),
 	}
 }
@@ -93,12 +93,12 @@ func (s *MemoryStorage) DeletePreAuthCode(ctx context.Context) error {
 }
 
 // SaveVerifyTicket 保存验证票据
-func (s *MemoryStorage) SaveVerifyTicket(ctx context.Context, ticket string) error {
+func (s *MemoryStorage) SaveComponentVerifyTicket(ctx context.Context, ticket string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// 创建票据结构，记录创建时间和过期时间
-	s.verifyTicket = &VerifyTicket{
+	s.verifyTicket = &ComponentVerifyTicket{
 		Ticket:    ticket,
 		CreatedAt: time.Now(),
 		ExpiresAt: time.Now().Add(12 * time.Hour), // 12小时有效期
@@ -107,7 +107,7 @@ func (s *MemoryStorage) SaveVerifyTicket(ctx context.Context, ticket string) err
 }
 
 // GetVerifyTicket 获取验证票据
-func (s *MemoryStorage) GetVerifyTicket(ctx context.Context) (*VerifyTicket, error) {
+func (s *MemoryStorage) GetComponentVerifyTicket(ctx context.Context) (*ComponentVerifyTicket, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -128,7 +128,7 @@ func (s *MemoryStorage) GetVerifyTicket(ctx context.Context) (*VerifyTicket, err
 }
 
 // DeleteVerifyTicket 删除验证票据
-func (s *MemoryStorage) DeleteVerifyTicket(ctx context.Context) error {
+func (s *MemoryStorage) DeleteComponentVerifyTicket(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -195,11 +195,11 @@ func (s *MemoryStorage) Ping(ctx context.Context) error {
 func (s *MemoryStorage) SavePrevEncodingAESKey(ctx context.Context, appID string, prevKey string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.prevEncodingAESKeys[appID] = &PrevEncodingAESKey{
-		AppID:           appID,
+		AppID:              appID,
 		PrevEncodingAESKey: prevKey,
-		UpdatedAt:       time.Now(),
+		UpdatedAt:          time.Now(),
 	}
 	return nil
 }
@@ -208,7 +208,7 @@ func (s *MemoryStorage) SavePrevEncodingAESKey(ctx context.Context, appID string
 func (s *MemoryStorage) GetPrevEncodingAESKey(ctx context.Context, appID string) (*PrevEncodingAESKey, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	if prevKey, exists := s.prevEncodingAESKeys[appID]; exists && prevKey != nil {
 		return prevKey, nil
 	}
@@ -219,7 +219,7 @@ func (s *MemoryStorage) GetPrevEncodingAESKey(ctx context.Context, appID string)
 func (s *MemoryStorage) DeletePrevEncodingAESKey(ctx context.Context, appID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	delete(s.prevEncodingAESKeys, appID)
 	return nil
 }
