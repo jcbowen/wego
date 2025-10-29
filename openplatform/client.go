@@ -426,10 +426,62 @@ func (c *APIClient) GetPreAuthCodeFromAPI(ctx context.Context) (*PreAuthCodeResp
 	return &result, nil
 }
 
-// HandleAuthorizationEvent 处理授权变更事件
+// HandleAuthorizationEvent 处理微信开放平台授权事件
+// 支持明文和加密两种消息格式
 // 根据微信官方文档<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/authorize_event.html" index="0">0</mcreference>，
 // 接收POST请求后只需直接返回字符串"success"
-func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte) (string, error) {
+func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, msgSignature, timestamp, nonce, encryptType string) (string, error) {
+	// 首先检测是否为加密消息
+	var encryptedMsg struct {
+		XMLName    xml.Name `xml:"xml"`
+		AppId      string   `xml:"AppId"`
+		Encrypt    string   `xml:"Encrypt"`
+		CreateTime int64    `xml:"CreateTime"`
+	}
+
+	// 记录接收到的参数用于调试
+	c.logger.Debugf("处理授权事件，参数 - timestamp: %s, nonce: %s, encrypt_type: %s, msg_signature: %s",
+		timestamp, nonce, encryptType, msgSignature)
+
+	// 判断消息类型：根据encrypt_type参数或XML内容检测
+	isEncrypted := encryptType == "aes" && msgSignature != ""
+
+	// 如果URL参数表明是加密消息，或者XML内容包含Encrypt字段，则进行解密
+	if isEncrypted {
+		c.logger.Debugf("URL参数表明是加密消息，开始解密处理")
+
+		// 尝试解析XML获取加密内容
+		if err := xml.Unmarshal(xmlData, &encryptedMsg); err != nil {
+			c.logger.Errorf("解析加密消息XML失败: %v", err)
+			return "success", nil // 即使解析失败也返回success
+		}
+
+		if encryptedMsg.Encrypt == "" {
+			c.logger.Warnf("URL参数表明是加密消息，但XML中未找到Encrypt字段")
+			return "success", nil
+		}
+
+		c.logger.Debugf("检测到加密消息，开始解密处理，AppId: %s", encryptedMsg.AppId)
+
+		// 解密消息
+		decryptedData, err := c.DecryptMessage(encryptedMsg.Encrypt, msgSignature, timestamp, nonce)
+		if err != nil {
+			c.logger.Errorf("解密授权事件消息失败: %v", err)
+			return "success", nil // 即使解密失败也返回success
+		}
+
+		c.logger.Debugf("解密成功，解密后内容: %s", string(decryptedData))
+
+		// 使用解密后的数据继续处理
+		xmlData = decryptedData
+	} else {
+		// 明文消息：检查XML是否包含Encrypt字段（可能是误传参数）
+		if err := xml.Unmarshal(xmlData, &encryptedMsg); err == nil && encryptedMsg.Encrypt != "" {
+			c.logger.Warnf("XML包含Encrypt字段但URL参数未表明是加密消息，可能参数传递有误")
+			// 继续按明文处理，但记录警告
+		}
+	}
+
 	// 解析XML获取基础事件信息
 	var baseEvent AuthorizationEvent
 	err := xml.Unmarshal(xmlData, &baseEvent)
