@@ -85,7 +85,7 @@ func (p *SecureMessageProcessor) ProcessSecureMessage(
 	}
 
 	// 加密回复（使用相同的timestamp和nonce）
-	encryptedReply, err := cryptoInstance.EncryptMsg(replyXML, timestamp, nonce)
+	encryptedReply, _, err := cryptoInstance.EncryptMsg(replyXML, timestamp, nonce)
 	if err != nil {
 		return nil, fmt.Errorf("回复加密失败: %v", err)
 	}
@@ -113,11 +113,12 @@ func (p *SecureMessageProcessor) EncryptReply(
 	}
 
 	// 加密回复
-	encryptedReply, err := cryptoInstance.EncryptMsg(replyXML, timestamp, nonce)
+	encryptedReply, _, err := cryptoInstance.EncryptMsg(replyXML, timestamp, nonce)
 	if err != nil {
 		return "", fmt.Errorf("回复加密失败: %v", err)
 	}
 
+	// 返回加密后的回复（EncryptReply方法只返回加密后的消息）
 	return encryptedReply, nil
 }
 
