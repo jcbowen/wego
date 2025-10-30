@@ -806,14 +806,16 @@ func (c *APIClient) GenerateAuthURL(preAuthCode string, authType int, bizAppID s
 		baseURL = "https://mp.weixin.qq.com/cgi-bin/componentloginpage"
 	}
 
+	// 如果authType不在可选范围内，则取默认值6
+	if authType < 1 || authType > 8 || authType == 7 {
+		authType = 6
+	}
+
 	params := url.Values{
 		"component_appid": {c.config.ComponentAppID},
 		"pre_auth_code":   {preAuthCode},
 		"redirect_uri":    {c.config.RedirectURI},
-	}
-
-	if authType > 0 {
-		params.Set("auth_type", fmt.Sprintf("%d", authType))
+		"auth_type":       {fmt.Sprintf("%d", authType)},
 	}
 
 	if bizAppID != "" {
