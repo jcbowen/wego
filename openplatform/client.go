@@ -800,7 +800,7 @@ func (c *APIClient) GenerateAuthURL(preAuthCode string, authType int, bizAppID s
 
 	if platform == "mobile" {
 		// 移动端授权页面URL
-		baseURL = "https://open.weixin.qq.com/connect/oauth2/authorize"
+		baseURL = "https://open.weixin.qq.com/wxaopen/safe/bindcomponent"
 	} else {
 		// PC端授权页面URL
 		baseURL = "https://mp.weixin.qq.com/cgi-bin/componentloginpage"
@@ -820,10 +820,10 @@ func (c *APIClient) GenerateAuthURL(preAuthCode string, authType int, bizAppID s
 		params.Set("biz_appid", bizAppID)
 	}
 
-	// 移动端授权链接需要添加response_type和scope参数
+	// 移动端授权链接需要添加action和no_scan参数
 	if platform == "mobile" {
-		params.Set("response_type", "code")
-		params.Set("scope", "snsapi_base")
+		params.Set("action", "bindcomponent")
+		params.Set("no_scan", "1")
 	}
 
 	urlStr := fmt.Sprintf("%s?%s", baseURL, params.Encode())
