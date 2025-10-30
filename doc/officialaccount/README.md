@@ -32,32 +32,27 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/jcbowen/wego/officialaccount"
+	"github.com/jcbowen/wego"
 )
 
 func main() {
 	// 1. 创建配置
-	config := &officialaccount.MPConfig{
+	config := &wego.MPConfig{
 		AppID:     "your_app_id",
 		AppSecret: "your_app_secret",
 		Token:     "your_token",
 		AESKey:    "your_aes_key",
 	}
 
-	// 验证配置
-	if err := config.Validate(); err != nil {
-		log.Fatalf("配置验证失败: %v", err)
-	}
-
-	// 2. 创建客户端
-	client := officialaccount.NewMPClient(config)
+	// 2. 创建WeGo客户端
+	client := wego.NewWeGo(config)
 
 	// 3. 使用各种功能客户端
 	ctx := context.Background()
 
 	// 基础接口
-	apiClient := officialaccount.NewMPAPIClient(client)
-	ips, err := apiClient.GetApiDomainIp(ctx)
+	officialAccountClient := client.OfficialAccountAPI()
+	ips, err := officialAccountClient.GetApiDomainIp(ctx)
 	if err != nil {
 		log.Printf("获取API服务器IP失败: %v", err)
 	} else {
@@ -65,9 +60,9 @@ func main() {
 	}
 
 	// 自定义菜单
-	menuClient := officialaccount.NewMenuClient(client)
-	menu := &officialaccount.Menu{
-		Button: []officialaccount.Button{
+	menuClient := client.OfficialAccountMenu()
+	menu := &wego.Menu{
+		Button: []wego.Button{
 			{
 				Type: "click",
 				Name: "今日歌曲",
@@ -89,29 +84,24 @@ func main() {
 ### 配置
 
 ```go
-config := &officialaccount.MPConfig{
+config := &wego.MPConfig{
 	AppID:     "wx1234567890abcdef",  // 公众号AppID
 	AppSecret: "your_app_secret",     // 公众号AppSecret
 	Token:     "your_token",          // 消息校验Token
 	AESKey:    "your_aes_key",       // 消息加解密Key（可选）
-}
-
-// 验证配置
-if err := config.Validate(); err != nil {
-	// 处理错误
 }
 ```
 
 ### 客户端初始化
 
 ```go
-// 创建基础客户端
-client := officialaccount.NewMPClient(config)
+// 创建WeGo客户端
+client := wego.NewWeGo(config)
 
-// 如果需要使用存储（推荐）
-storage := core.NewMemoryStorage() // 内存存储
-// storage := core.NewRedisStorage("redis://localhost:6379") // Redis存储
-client.SetStorage(storage)
+// 如果需要使用自定义存储（推荐）
+storage := wego.NewMemoryStorage() // 内存存储
+// storage, _ := wego.NewDBStorage(db) // 数据库存储
+clientWithStorage := wego.NewWeGoWithStorage(storage, config)
 ```
 
 ### 各功能模块使用
@@ -119,7 +109,8 @@ client.SetStorage(storage)
 #### 1. 基础接口
 
 ```go
-apiClient := officialaccount.NewMPAPIClient(client)
+// 获取基础接口客户端
+apiClient := client.OfficialAccountAPI()
 
 // 获取API服务器IP
 ips, err := apiClient.GetApiDomainIp(ctx)
@@ -134,11 +125,12 @@ checkResult, err := apiClient.CallbackCheck(ctx, "action", "check_operator")
 #### 2. 自定义菜单
 
 ```go
-menuClient := officialaccount.NewMenuClient(client)
+// 获取菜单客户端
+menuClient := client.OfficialAccountMenu()
 
 // 创建菜单
-menu := &officialaccount.Menu{
-	Button: []officialaccount.Button{
+menu := &wego.Menu{
+	Button: []wego.Button{
 		{
 			Type: "click",
 			Name: "菜单1",
@@ -158,13 +150,14 @@ deleteResp, err := menuClient.DeleteMenu(ctx)
 #### 3. 模板消息
 
 ```go
-templateClient := officialaccount.NewTemplateClient(client)
+// 获取模板消息客户端
+templateClient := client.OfficialAccountTemplate()
 
 // 发送模板消息
-msg := &officialaccount.SendTemplateMsgRequest{
+msg := &wego.SendTemplateMsgRequest{
 	Touser:     "user_openid",
 	TemplateID: "template_id",
-	Data: map[string]officialaccount.TemplateData{
+	Data: map[string]wego.TemplateData{
 		"first": {
 			Value: "您好，您有新的订单",
 			Color: "#173177",
@@ -183,10 +176,11 @@ setResp, err := templateClient.SetIndustry(ctx, "1", "2")
 #### 4. 客服消息
 
 ```go
-customClient := officialaccount.NewCustomClient(client)
+// 获取客服消息客户端
+customClient := client.OfficialAccountCustom()
 
 // 发送文本消息
-textMsg := &officialaccount.TextMessage{
+textMsg := &wego.TextMessage{
 	MsgType: "text",
 	Text: struct {
 		Content string `json:"content"`

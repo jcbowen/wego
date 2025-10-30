@@ -46,7 +46,7 @@ import (
 
 func main() {
     // 配置微信开放平台参数
-    config := &wego.WeGoConfig{
+    config := &wego.OpenPlatformConfig{
         ComponentAppID:     "your_component_app_id",
         ComponentAppSecret: "your_component_app_secret",
         ComponentToken:     "your_component_token",
@@ -58,9 +58,9 @@ func main() {
     wegoClient := wego.NewWeGo(config)
 
     // 使用各个功能模块
-    apiClient := wegoClient.API()
-    authClient := wegoClient.Auth()
-    messageClient := wegoClient.Message()
+    openPlatformAPI := wegoClient.OpenPlatformAPI()
+    openPlatformAuth := wegoClient.OpenPlatformAuth()
+    openPlatformMessage := wegoClient.OpenPlatformMessage()
     cryptoClient := wegoClient.Crypto()
     storageClient := wegoClient.Storage()
 
@@ -98,14 +98,12 @@ WeGo提供了完整的消息处理器，支持：
 ```
 wego/
 ├── core/           # 核心配置和客户端
-├── api/            # API相关功能
-├── auth/           # 授权相关功能
-├── message/        # 消息处理功能
 ├── crypto/         # 加密解密功能
+├── message/        # 消息处理功能
+├── officialaccount/ # 公众号开发功能
+├── openplatform/   # 开放平台功能
 ├── storage/        # 存储抽象层
 ├── types/          # 类型定义
-├── openplatform/   # 开放平台功能
-├── officialaccount/ # 公众号开发功能
 └── doc/           # 技术文档
 ```
 
@@ -113,21 +111,28 @@ wego/
 
 ### Core 模块
 核心配置和客户端实现，包含：
-- `WeGoConfig` - 配置结构体
+- `OpenPlatformConfig` - 开放平台配置结构体
 - `WegoClient` - 主客户端
 - 令牌管理和HTTP客户端
 
-### API 模块
-微信开放平台API封装，包含：
+### OpenPlatform 模块
+微信开放平台功能，包含：
+- `APIClient` - 开放平台API客户端
+- `AuthClient` - 授权管理客户端
 - API地址常量定义
 - API响应结构体
 - 授权信息数据结构
+- 事件处理器接口
 
-### Auth 模块
-授权管理功能，包含：
-- `AuthorizerClient` - 授权方客户端
-- 客服消息发送
-- 自定义菜单管理
+### OfficialAccount 模块
+微信公众号开发功能，包含：
+- `MPClient` - 公众号主客户端
+- `MPAPIClient` - 公众号API客户端
+- `MenuClient` - 菜单管理客户端
+- `MessageClient` - 消息处理客户端
+- `TemplateClient` - 模板消息客户端
+- `CustomClient` - 客服消息客户端
+- `MaterialClient` - 素材管理客户端
 
 ### Message 模块
 消息处理功能，包含：

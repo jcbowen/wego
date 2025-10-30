@@ -17,14 +17,12 @@ WeGo是一个模块化的微信开发封装库，专门为微信开放平台第�
 ```
 wego/
 ├── core/           # 核心配置和客户端
-├── api/            # API相关功能
-├── auth/           # 授权相关功能
-├── message/        # 消息处理功能
 ├── crypto/         # 加密解密功能
+├── message/        # 消息处理功能
+├── officialaccount/ # 公众号开发功能
+├── openplatform/   # 开放平台功能
 ├── storage/        # 存储抽象层
 ├── types/          # 类型定义
-├── openplatform/   # 开放平台功能
-├── officialaccount/ # 公众号开发功能
 └── doc/           # 技术文档
 ```
 
@@ -173,22 +171,28 @@ func main() {
 - `WegoClient` - 主客户端
 - 令牌管理和HTTP客户端
 
-### API 模块
+### OpenPlatform 模块
 
-微信开放平台API封装，包含：
+微信开放平台功能，包含：
 
+- `APIClient` - 开放平台API客户端
+- `AuthClient` - 授权管理客户端
 - API地址常量定义
 - API响应结构体
 - 授权信息数据结构
+- 事件处理器接口
 
-### Auth 模块
+### OfficialAccount 模块
 
-授权管理功能，包含：
+微信公众号开发功能，包含：
 
-- `AuthorizerClient` - 授权方客户端
-- 代调用API接口
-- 用户信息管理
-- 媒体文件上传下载
+- `MPClient` - 公众号主客户端
+- `MPAPIClient` - 公众号API客户端
+- `MenuClient` - 菜单管理客户端
+- `MessageClient` - 消息处理客户端
+- `TemplateClient` - 模板消息客户端
+- `CustomClient` - 客服消息客户端
+- `MaterialClient` - 素材管理客户端
 
 ### Message 模块
 
@@ -213,12 +217,14 @@ func main() {
 - `TokenStorage` 接口
 - `MemoryStorage` 内存存储实现
 - `FileStorage` 文件存储实现（默认存储）
+- `DBStorage` 数据库存储实现
 - 支持自定义存储后端
 
 **默认存储策略**：
 - 默认存储为文件存储
 - 文件存储使用`wego_storage`目录保存Token数据
 - 如果文件存储创建失败，会自动回退到内存存储并记录警告日志
+- 可通过`NewWeGoWithStorage`方法指定自定义存储
 
 ## 示例
 

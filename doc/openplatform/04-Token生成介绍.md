@@ -47,21 +47,35 @@
 ```go
 // TokenStorage Token存储接口
 type TokenStorage interface {
-    // ComponentAccessToken相关
+    // 组件令牌相关方法
     SaveComponentToken(ctx context.Context, token *ComponentAccessToken) error
     GetComponentToken(ctx context.Context) (*ComponentAccessToken, error)
+    DeleteComponentToken(ctx context.Context) error
     
-    // AuthorizerAccessToken相关
-    SaveAuthorizerToken(ctx context.Context, authorizerAppID string, token *AuthorizerAccessToken) error
-    GetAuthorizerToken(ctx context.Context, authorizerAppID string) (*AuthorizerAccessToken, error)
-    
-    // PreAuthCode相关
+    // 预授权码相关方法
     SavePreAuthCode(ctx context.Context, code *PreAuthCode) error
     GetPreAuthCode(ctx context.Context) (*PreAuthCode, error)
+    DeletePreAuthCode(ctx context.Context) error
     
-    // VerifyTicket相关
-    SaveVerifyTicket(ctx context.Context, ticket string) error
-    GetVerifyTicket(ctx context.Context) (*VerifyTicket, error)
+    // 验证票据相关方法
+    SaveComponentVerifyTicket(ctx context.Context, ticket string) error
+    GetComponentVerifyTicket(ctx context.Context) (*ComponentVerifyTicket, error)
+    DeleteComponentVerifyTicket(ctx context.Context) error
+    
+    // 授权方令牌相关方法
+    SaveAuthorizerToken(ctx context.Context, authorizerAppID string, token *AuthorizerAccessToken) error
+    GetAuthorizerToken(ctx context.Context, authorizerAppID string) (*AuthorizerAccessToken, error)
+    DeleteAuthorizerToken(ctx context.Context, authorizerAppID string) error
+    ClearAuthorizerTokens(ctx context.Context) error            // 清除所有授权方令牌
+    ListAuthorizerTokens(ctx context.Context) ([]string, error) // 返回所有已存储的授权方appid
+    
+    // 上一次EncodingAESKey相关方法
+    SavePrevEncodingAESKey(ctx context.Context, appID string, prevKey string) error
+    GetPrevEncodingAESKey(ctx context.Context, appID string) (*PrevEncodingAESKey, error)
+    DeletePrevEncodingAESKey(ctx context.Context, appID string) error
+    
+    // 存储健康检查
+    Ping(ctx context.Context) error
 }
 
 // ComponentAccessToken 第三方平台Token结构体
@@ -87,11 +101,18 @@ type PreAuthCode struct {
     ExpiresAt   time.Time `json:"expires_at"`
 }
 
-// VerifyTicket 验证票据结构体
-type VerifyTicket struct {
+// ComponentVerifyTicket 验证票据结构体
+type ComponentVerifyTicket struct {
     Ticket    string    `json:"ticket"`
     CreatedAt time.Time `json:"created_at"`
     ExpiresAt time.Time `json:"expires_at"`
+}
+
+// PrevEncodingAESKey 上一次的EncodingAESKey结构体
+type PrevEncodingAESKey struct {
+    AppID              string    `json:"appid"`
+    PrevEncodingAESKey string    `json:"prev_encoding_aes_key"`
+    UpdatedAt          time.Time `json:"updated_at"`
 }
 ```
 
@@ -216,15 +237,15 @@ func main() {
     }
     
     // 创建WeGo客户端
-    client := wego.NewOpenPlatform(config)
+    client := wego.NewWeGo(config)
     
     // 创建带超时的上下文
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
     
     // 获取ComponentAccessToken（自动管理）
-    apiClient := client.API()
-    componentToken, err := apiClient.GetComponentAccessToken(ctx, "verify_ticket_here")
+    openPlatformClient := client.OpenPlatformAPI()
+    componentToken, err := openPlatformClient.GetComponentToken(ctx)
     if err != nil {
         log.Printf("获取ComponentAccessToken失败: %v\n", err)
         return
@@ -234,8 +255,7 @@ func main() {
     
     // 使用授权方AppID获取AuthorizerAccessToken
     authorizerAppID := "授权方AppID"
-    authClient := client.Auth()
-    authorizerToken, err := authClient.GetAuthorizerAccessToken(ctx, authorizerAppID)
+    authorizerToken, err := openPlatformClient.GetAuthorizerAccessToken(ctx, authorizerAppID)
     if err != nil {
         log.Printf("获取AuthorizerAccessToken失败: %v\n", err)
         return
@@ -253,7 +273,7 @@ func main() {
 // 使用Token调用API的示例
 func callAPIWithToken(ctx context.Context, client *wego.WeGo, authorizerAppID string) error {
     // 获取授权方客户端
-    authorizerClient := client.Auth(authorizerAppID)
+    openPlatformClient := client.OpenPlatformAPI()
     
     // 调用获取用户列表API
     // 注意：实际实现中可能需要根据具体的API接口进行调整
@@ -265,12 +285,11 @@ func callAPIWithToken(ctx context.Context, client *wego.WeGo, authorizerAppID st
         Content: "这是一条测试消息",
     }
     
-    err := authorizerClient.SendCustomMessage(ctx, message)
-    if err != nil {
-        return fmt.Errorf("发送客服消息失败: %v", err)
-    }
+    // 注意：实际实现中需要根据具体的API接口调用方式
+    // 这里仅作为示例展示调用模式
+    fmt.Printf("准备发送客服消息给用户: %s\n", message.ToUser)
     
-    fmt.Println("客服消息发送成功")
+    fmt.Println("客服消息发送成功（示例）")
     return nil
 }
 ```
@@ -288,6 +307,10 @@ import (
 // DatabaseStorage 数据库存储实现
 type DatabaseStorage struct {
     db *sql.DB
+}
+
+func NewDatabaseStorage(db *sql.DB) (*DatabaseStorage, error) {
+    return &DatabaseStorage{db: db}, nil
 }
 
 func (s *DatabaseStorage) SaveComponentToken(ctx context.Context, token *wego.ComponentAccessToken) error {
