@@ -243,7 +243,12 @@ func (c *APIClient) MakeRequest(ctx context.Context, method, url string, body in
 	if err != nil {
 		return fmt.Errorf("发送请求失败: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err = Body.Close()
+		if err != nil {
+			c.logger.Errorf("关闭响应体失败: %v", err)
+		}
+	}(resp.Body)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -507,7 +512,7 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 	}
 
 	// 验证事件签名和时间戳
-	if err := c.validateAuthorizationEvent(&baseEvent); err != nil {
+	if err = c.validateAuthorizationEvent(&baseEvent); err != nil {
 		c.logger.Errorf("授权事件验证失败: %v", err)
 		return "success", nil // 即使验证失败也返回success
 	}
@@ -580,7 +585,11 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 		c.logger.Debugf("解析EncodingAESKey变更事件成功，事件内容: %+v", event)
 		// 保存上一次的EncodingAESKey
 		if c.crypt != nil {
-			c.crypt.SetPrevEncodingAESKey(c.config.EncodingAESKey)
+			err2 := c.crypt.SetPrevEncodingAESKey(c.config.EncodingAESKey)
+			if err2 != nil {
+				c.logger.Errorf("设置上一次EncodingAESKey失败: %v", err2)
+				break
+			}
 		}
 
 		// 更新配置中的EncodingAESKey
@@ -673,8 +682,8 @@ func (c *APIClient) QueryAuth(ctx context.Context, authorizationCode string) (*Q
 	}
 
 	var result QueryAuthResponse
-	url := fmt.Sprintf("%s?component_access_token=%s", APIQueryAuthURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", url, request, &result)
+	queryAuthUrl := fmt.Sprintf("%s?component_access_token=%s", APIQueryAuthURL, url.QueryEscape(componentToken.AccessToken))
+	err = c.MakeRequest(ctx, "POST", queryAuthUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -752,8 +761,8 @@ func (c *APIClient) GetAuthorizerInfo(ctx context.Context, authorizerAppID strin
 	}
 
 	var result GetAuthorizerInfoResponse
-	url := fmt.Sprintf("%s?component_access_token=%s", APIGetAuthorizerInfoURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", url, request, &result)
+	getAuthorizerInfoUrl := fmt.Sprintf("%s?component_access_token=%s", APIGetAuthorizerInfoURL, url.QueryEscape(componentToken.AccessToken))
+	err = c.MakeRequest(ctx, "POST", getAuthorizerInfoUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -779,8 +788,8 @@ func (c *APIClient) GetAuthorizerList(ctx context.Context, offset, count int) (*
 	}
 
 	var result GetAuthorizerListResponse
-	url := fmt.Sprintf("%s?component_access_token=%s", "https://api.weixin.qq.com/cgi-bin/component/api_get_authorizer_list", url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", url, request, &result)
+	getAuthorizerListUrl := fmt.Sprintf("%s?component_access_token=%s", APIGetAuthorizerListURL, url.QueryEscape(componentToken.AccessToken))
+	err = c.MakeRequest(ctx, "POST", getAuthorizerListUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -860,8 +869,8 @@ func (c *APIClient) ClearQuota(ctx context.Context) (*APIResponse, error) {
 	}
 
 	var result APIResponse
-	url := fmt.Sprintf("%s?access_token=%s", APIClearQuotaURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", url, request, &result)
+	clearQuotaUrl := fmt.Sprintf("%s?access_token=%s", APIClearQuotaURL, url.QueryEscape(componentToken.AccessToken))
+	err = c.MakeRequest(ctx, "POST", clearQuotaUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -886,8 +895,8 @@ func (c *APIClient) GetApiQuota(ctx context.Context, authorizerAppID string) (*G
 	}
 
 	var result GetApiQuotaResponse
-	url := fmt.Sprintf("%s?access_token=%s", APIGetApiQuotaURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", url, request, &result)
+	getApiQuotaUrl := fmt.Sprintf("%s?access_token=%s", APIGetApiQuotaURL, url.QueryEscape(componentToken.AccessToken))
+	err = c.MakeRequest(ctx, "POST", getApiQuotaUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -911,8 +920,8 @@ func (c *APIClient) GetRidInfo(ctx context.Context, rid string) (*GetRidInfoResp
 	}
 
 	var result GetRidInfoResponse
-	url := fmt.Sprintf("%s?access_token=%s", APIGetRidInfoURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", url, request, &result)
+	getRidInfoUrl := fmt.Sprintf("%s?access_token=%s", APIGetRidInfoURL, url.QueryEscape(componentToken.AccessToken))
+	err = c.MakeRequest(ctx, "POST", getRidInfoUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -959,8 +968,8 @@ func (c *APIClient) SetAuthorizerOption(ctx context.Context, authorizerAppID, op
 	}
 
 	var result APIResponse
-	url := fmt.Sprintf("%s?component_access_token=%s", APISetAuthorizerOptionURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", url, request, &result)
+	setAuthorizerOptionUrl := fmt.Sprintf("%s?component_access_token=%s", APISetAuthorizerOptionURL, url.QueryEscape(componentToken.AccessToken))
+	err = c.MakeRequest(ctx, "POST", setAuthorizerOptionUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -986,8 +995,8 @@ func (c *APIClient) GetAuthorizerOption(ctx context.Context, authorizerAppID, op
 	}
 
 	var result GetAuthorizerOptionResponse
-	url := fmt.Sprintf("%s?component_access_token=%s", APIGetAuthorizerOptionURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", url, request, &result)
+	getAuthorizerOptionUrl := fmt.Sprintf("%s?component_access_token=%s", APIGetAuthorizerOptionURL, url.QueryEscape(componentToken.AccessToken))
+	err = c.MakeRequest(ctx, "POST", getAuthorizerOptionUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1007,8 +1016,8 @@ func (c *APIClient) GetTemplateDraftList(ctx context.Context) (*GetTemplateDraft
 	}
 
 	var result GetTemplateDraftListResponse
-	url := fmt.Sprintf("%s?access_token=%s", APIGetTemplateDraftListURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "GET", url, nil, &result)
+	getTemplateDraftListUrl := fmt.Sprintf("%s?access_token=%s", APIGetTemplateDraftListURL, url.QueryEscape(componentToken.AccessToken))
+	err = c.MakeRequest(ctx, "GET", getTemplateDraftListUrl, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1033,8 +1042,8 @@ func (c *APIClient) AddToTemplate(ctx context.Context, draftID int64, templateTy
 	}
 
 	var result APIResponse
-	url := fmt.Sprintf("%s?access_token=%s", APIAddToTemplateURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", url, request, &result)
+	addToTemplateUrl := fmt.Sprintf("%s?access_token=%s", APIAddToTemplateURL, url.QueryEscape(componentToken.AccessToken))
+	err = c.MakeRequest(ctx, "POST", addToTemplateUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1054,8 +1063,8 @@ func (c *APIClient) GetTemplateList(ctx context.Context) (*GetTemplateListRespon
 	}
 
 	var result GetTemplateListResponse
-	url := fmt.Sprintf("%s?access_token=%s", APIGetTemplateListURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "GET", url, nil, &result)
+	getTemplateListUrl := fmt.Sprintf("%s?access_token=%s", APIGetTemplateListURL, url.QueryEscape(componentToken.AccessToken))
+	err = c.MakeRequest(ctx, "GET", getTemplateListUrl, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1079,8 +1088,8 @@ func (c *APIClient) DeleteTemplate(ctx context.Context, templateID int64) (*APIR
 	}
 
 	var result APIResponse
-	url := fmt.Sprintf("%s?access_token=%s", APIDeleteTemplateURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", url, request, &result)
+	deleteTemplateUrl := fmt.Sprintf("%s?access_token=%s", APIDeleteTemplateURL, url.QueryEscape(componentToken.AccessToken))
+	err = c.MakeRequest(ctx, "POST", deleteTemplateUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}

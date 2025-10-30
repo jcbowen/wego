@@ -7,6 +7,7 @@ const (
 	APIQueryAuthURL            = "https://api.weixin.qq.com/cgi-bin/component/api_query_auth"
 	APIAuthorizerTokenURL      = "https://api.weixin.qq.com/cgi-bin/component/api_authorizer_token"
 	APIGetAuthorizerInfoURL    = "https://api.weixin.qq.com/cgi-bin/component/api_get_authorizer_info"
+	APIGetAuthorizerListURL    = "https://api.weixin.qq.com/cgi-bin/component/api_get_authorizer_list"
 	APIGetAuthorizerOptionURL  = "https://api.weixin.qq.com/cgi-bin/component/api_get_authorizer_option"
 	APISetAuthorizerOptionURL  = "https://api.weixin.qq.com/cgi-bin/component/api_set_authorizer_option"
 	APIStartPushTicketURL      = "https://api.weixin.qq.com/cgi-bin/component/api_start_push_ticket"
