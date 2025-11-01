@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/storage"
 )
@@ -21,39 +22,12 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// Logger 日志接口
-type Logger interface {
-	Debugf(format string, args ...interface{})
-	Infof(format string, args ...interface{})
-	Warnf(format string, args ...interface{})
-	Errorf(format string, args ...interface{})
-}
-
-// DefaultLogger 默认日志实现
-type DefaultLogger struct{}
-
-func (l *DefaultLogger) Debugf(format string, args ...interface{}) {
-	fmt.Printf("[DEBUG] "+format+"\n", args...)
-}
-
-func (l *DefaultLogger) Infof(format string, args ...interface{}) {
-	fmt.Printf("[INFO] "+format+"\n", args...)
-}
-
-func (l *DefaultLogger) Warnf(format string, args ...interface{}) {
-	fmt.Printf("[WARN] "+format+"\n", args...)
-}
-
-func (l *DefaultLogger) Errorf(format string, args ...interface{}) {
-	fmt.Printf("[ERROR] "+format+"\n", args...)
-}
-
 // APIClient API客户端
 type APIClient struct {
 	config       *OpenPlatformConfig
 	httpClient   HTTPClient
 	storage      storage.TokenStorage
-	logger       Logger
+	logger       core.LoggerInterface
 	eventHandler EventHandler          // 事件处理器
 	crypt        *crypto.WXBizMsgCrypt // 消息加解密实例
 }
@@ -64,8 +38,8 @@ func NewAPIClient(config *OpenPlatformConfig) *APIClient {
 	fileStorage, err := storage.NewFileStorage("wego_storage")
 	if err != nil {
 		// 如果文件存储创建失败，回退到内存存储并输出日志
-		logger := &DefaultLogger{}
-		logger.Warnf("文件存储创建失败，回退到内存存储: %v", err)
+		logger := &core.DefaultLogger{}
+		logger.Warn(fmt.Sprintf("文件存储创建失败，回退到内存存储: %v", err))
 		return NewAPIClientWithStorage(config, storage.NewMemoryStorage())
 	}
 	return NewAPIClientWithStorage(config, fileStorage)
@@ -77,7 +51,7 @@ func NewAPIClientWithStorage(config *OpenPlatformConfig, storage storage.TokenSt
 		config:     config,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		storage:    storage,
-		logger:     &DefaultLogger{},
+		logger:     &core.DefaultLogger{},
 		crypt:      crypto.NewWXBizMsgCrypt(config.ComponentToken, config.EncodingAESKey, config.ComponentAppID),
 	}
 
@@ -85,7 +59,7 @@ func NewAPIClientWithStorage(config *OpenPlatformConfig, storage storage.TokenSt
 }
 
 // SetLogger 设置自定义日志器
-func (c *APIClient) SetLogger(logger Logger) {
+func (c *APIClient) SetLogger(logger core.LoggerInterface) {
 	c.logger = logger
 }
 
@@ -113,7 +87,7 @@ func (c *APIClient) GetConfig() *OpenPlatformConfig {
 }
 
 // GetLogger 获取日志器
-func (c *APIClient) GetLogger() Logger {
+func (c *APIClient) GetLogger() core.LoggerInterface {
 	return c.logger
 }
 
@@ -246,7 +220,7 @@ func (c *APIClient) MakeRequest(ctx context.Context, method, url string, body in
 	defer func(Body io.ReadCloser) {
 		err = Body.Close()
 		if err != nil {
-			c.logger.Errorf("关闭响应体失败: %v", err)
+			c.logger.Error(fmt.Sprintf("关闭响应体失败: %v", err))
 		}
 	}(resp.Body)
 
@@ -395,7 +369,7 @@ func (c *APIClient) GetComponentAccessToken(ctx context.Context, verifyTicket st
 
 	// 保存到存储
 	if err := c.SetComponentToken(token); err != nil {
-		c.logger.Warnf("保存开放平台令牌失败: %v", err)
+		c.logger.Warn(fmt.Sprintf("保存开放平台令牌失败: %v", err))
 	}
 
 	return token, nil
@@ -441,7 +415,7 @@ func (c *APIClient) GetPreAuthCodeFromAPI(ctx context.Context) (*PreAuthCodeResp
 
 	// 保存到存储
 	if err := c.SetPreAuthCode(ctx, preAuthCode); err != nil {
-		c.logger.Warnf("保存预授权码失败: %v", err)
+		c.logger.Warn(fmt.Sprintf("保存预授权码失败: %v", err))
 	}
 
 	return &result, nil
@@ -461,44 +435,44 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 	}
 
 	// 记录接收到的参数用于调试
-	c.logger.Debugf("处理授权事件，参数 - timestamp: %s, nonce: %s, encrypt_type: %s, msg_signature: %s",
-		timestamp, nonce, encryptType, msgSignature)
+	c.logger.Debug(fmt.Sprintf("处理授权事件，参数 - timestamp: %s, nonce: %s, encrypt_type: %s, msg_signature: %s",
+		timestamp, nonce, encryptType, msgSignature))
 
 	// 判断消息类型：根据encrypt_type参数或XML内容检测
 	isEncrypted := encryptType == "aes" && msgSignature != ""
 
 	// 如果URL参数表明是加密消息，或者XML内容包含Encrypt字段，则进行解密
 	if isEncrypted {
-		c.logger.Debugf("URL参数表明是加密消息，开始解密处理")
+		c.logger.Debug("URL参数表明是加密消息，开始解密处理")
 
 		// 尝试解析XML获取加密内容
 		if err := xml.Unmarshal(xmlData, &encryptedMsg); err != nil {
-			c.logger.Errorf("解析加密消息XML失败: %v", err)
+			c.logger.Error(fmt.Sprintf("解析加密消息XML失败: %v", err))
 			return "success", nil // 即使解析失败也返回success
 		}
 
 		if encryptedMsg.Encrypt == "" {
-			c.logger.Warnf("URL参数表明是加密消息，但XML中未找到Encrypt字段")
+			c.logger.Warn("URL参数表明是加密消息，但XML中未找到Encrypt字段")
 			return "success", nil
 		}
 
-		c.logger.Debugf("检测到加密消息，开始解密处理，AppId: %s", encryptedMsg.AppId)
+		c.logger.Debug(fmt.Sprintf("检测到加密消息，开始解密处理，AppId: %s", encryptedMsg.AppId))
 
 		// 解密消息
 		decryptedData, err := c.DecryptMessage(encryptedMsg.Encrypt, msgSignature, timestamp, nonce)
 		if err != nil {
-			c.logger.Errorf("解密授权事件消息失败: %v", err)
+			c.logger.Error(fmt.Sprintf("解密授权事件消息失败: %v", err))
 			return "success", nil // 即使解密失败也返回success
 		}
 
-		c.logger.Debugf("解密成功，解密后内容: %s", string(decryptedData))
+		c.logger.Debug(fmt.Sprintf("解密成功，解密后内容: %s", string(decryptedData)))
 
 		// 使用解密后的数据继续处理
 		xmlData = decryptedData
 	} else {
 		// 明文消息：检查XML是否包含Encrypt字段（可能是误传参数）
 		if err := xml.Unmarshal(xmlData, &encryptedMsg); err == nil && encryptedMsg.Encrypt != "" {
-			c.logger.Warnf("XML包含Encrypt字段但URL参数未表明是加密消息，可能参数传递有误")
+			c.logger.Warn("XML包含Encrypt字段但URL参数未表明是加密消息，可能参数传递有误")
 			// 继续按明文处理，但记录警告
 		}
 	}
@@ -507,13 +481,13 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 	var baseEvent AuthorizationEvent
 	err := xml.Unmarshal(xmlData, &baseEvent)
 	if err != nil {
-		c.logger.Errorf("解析授权事件XML失败: %v", err)
+		c.logger.Error(fmt.Sprintf("解析授权事件XML失败: %v", err))
 		return "success", nil // 即使解析失败也返回success
 	}
 
 	// 验证事件签名和时间戳
 	if err = c.validateAuthorizationEvent(&baseEvent); err != nil {
-		c.logger.Errorf("授权事件验证失败: %v", err)
+		c.logger.Error(fmt.Sprintf("授权事件验证失败: %v", err))
 		return "success", nil // 即使验证失败也返回success
 	}
 
@@ -523,55 +497,55 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 		var event AuthorizedEvent
 		err = xml.Unmarshal(xmlData, &event)
 		if err != nil {
-			c.logger.Errorf("解析授权成功事件失败: %v", err)
+			c.logger.Error(fmt.Sprintf("解析授权成功事件失败: %v", err))
 			break
 		}
-		c.logger.Debugf("解析授权成功事件成功，事件内容: %+v", event)
+		c.logger.Debug(fmt.Sprintf("解析授权成功事件成功，事件内容: %+v", event))
 		if err := c.GetEventHandler().HandleAuthorized(ctx, &event); err != nil {
-			c.logger.Errorf("处理授权成功事件失败: %v", err)
+			c.logger.Error(fmt.Sprintf("处理授权成功事件失败: %v", err))
 		}
 
 	case "unauthorized":
 		var event UnauthorizedEvent
 		err = xml.Unmarshal(xmlData, &event)
 		if err != nil {
-			c.logger.Errorf("解析取消授权事件失败: %v", err)
+			c.logger.Error(fmt.Sprintf("解析取消授权事件失败: %v", err))
 			break
 		}
-		c.logger.Debugf("解析取消授权事件成功，事件内容: %+v", event)
+		c.logger.Debug(fmt.Sprintf("解析取消授权事件成功，事件内容: %+v", event))
 		if err := c.GetEventHandler().HandleUnauthorized(ctx, &event); err != nil {
-			c.logger.Errorf("处理取消授权事件失败: %v", err)
+			c.logger.Error(fmt.Sprintf("处理取消授权事件失败: %v", err))
 		}
 
 	case "updateauthorized":
 		var event UpdateAuthorizedEvent
 		err := xml.Unmarshal(xmlData, &event)
 		if err != nil {
-			c.logger.Errorf("解析授权更新事件失败: %v", err)
+			c.logger.Error(fmt.Sprintf("解析授权更新事件失败: %v", err))
 			break
 		}
-		c.logger.Debugf("解析授权更新事件成功，事件内容: %+v", event)
+		c.logger.Debug(fmt.Sprintf("解析授权更新事件成功，事件内容: %+v", event))
 		if err = c.GetEventHandler().HandleUpdateAuthorized(ctx, &event); err != nil {
-			c.logger.Errorf("处理授权更新事件失败: %v", err)
+			c.logger.Error(fmt.Sprintf("处理授权更新事件失败: %v", err))
 		}
 
 	case "component_verify_ticket":
 		var event ComponentVerifyTicketEvent
 		err := xml.Unmarshal(xmlData, &event)
 		if err != nil {
-			c.logger.Errorf("解析验证票据事件失败: %v", err)
+			c.logger.Error(fmt.Sprintf("解析验证票据事件失败: %v", err))
 			// 根据微信官方文档要求，即使解析失败也必须返回success
 			break
 		}
-		c.logger.Debugf("解析验证票据事件成功，事件内容: %+v", event)
+		c.logger.Debug(fmt.Sprintf("解析验证票据事件成功，事件内容: %+v", event))
 		// 存储验证票据
 		if err := c.storage.SaveComponentVerifyTicket(ctx, event.ComponentVerifyTicket); err != nil {
-			c.logger.Errorf("存储验证票据失败: %v", err)
+			c.logger.Error(fmt.Sprintf("存储验证票据失败: %v", err))
 			// 根据微信官方文档要求，即使存储失败也必须返回success
 		}
 
 		if err := c.GetEventHandler().HandleComponentVerifyTicket(ctx, &event); err != nil {
-			c.logger.Errorf("处理验证票据事件失败: %v", err)
+			c.logger.Error(fmt.Sprintf("处理验证票据事件失败: %v", err))
 			// 根据微信官方文档要求，即使处理失败也必须返回success
 		}
 
@@ -579,15 +553,15 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 		var event EncodingAESKeyChangedEvent
 		err := xml.Unmarshal(xmlData, &event)
 		if err != nil {
-			c.logger.Errorf("解析EncodingAESKey变更事件失败: %v", err)
+			c.logger.Error(fmt.Sprintf("解析EncodingAESKey变更事件失败: %v", err))
 			break
 		}
-		c.logger.Debugf("解析EncodingAESKey变更事件成功，事件内容: %+v", event)
+		c.logger.Debug(fmt.Sprintf("解析EncodingAESKey变更事件成功，事件内容: %+v", event))
 		// 保存上一次的EncodingAESKey
 		if c.crypt != nil {
 			err2 := c.crypt.SetPrevEncodingAESKey(c.config.EncodingAESKey)
 			if err2 != nil {
-				c.logger.Errorf("设置上一次EncodingAESKey失败: %v", err2)
+				c.logger.Error(fmt.Sprintf("设置上一次EncodingAESKey失败: %v", err2))
 				break
 			}
 		}
@@ -596,11 +570,11 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 		c.config.EncodingAESKey = event.NewEncodingAESKey
 
 		if err := c.GetEventHandler().HandleEncodingAESKeyChanged(ctx, &event); err != nil {
-			c.logger.Errorf("处理EncodingAESKey变更事件失败: %v", err)
+			c.logger.Error(fmt.Sprintf("处理EncodingAESKey变更事件失败: %v", err))
 		}
 
 	default:
-		c.logger.Warnf("收到未知的授权事件类型: %s", baseEvent.InfoType)
+		c.logger.Warn(fmt.Sprintf("收到未知的授权事件类型: %s", baseEvent.InfoType))
 	}
 
 	// 根据微信官方文档要求，必须返回"success"字符串
@@ -619,7 +593,7 @@ func (c *APIClient) validateAuthorizationEvent(event *AuthorizationEvent) error 
 
 	// 处理CreateTime为0的情况（某些微信回调可能不包含CreateTime字段）
 	if event.CreateTime == 0 {
-		c.logger.Warnf("授权事件CreateTime为0，跳过时间戳验证")
+		c.logger.Warn("授权事件CreateTime为0，跳过时间戳验证")
 		return nil
 	}
 
@@ -699,7 +673,7 @@ func (c *APIClient) QueryAuth(ctx context.Context, authorizationCode string) (*Q
 		result.AuthorizationInfo.AuthorizerRefreshToken,
 		result.AuthorizationInfo.ExpiresIn,
 	); err != nil {
-		c.logger.Warnf("缓存授权方token失败: %v", err)
+		c.logger.Warn(fmt.Sprintf("缓存授权方token失败: %v", err))
 	}
 
 	return &result, nil
@@ -742,7 +716,7 @@ func (c *APIClient) RefreshAuthorizerToken(ctx context.Context, authorizerAppID,
 		result.AuthorizerRefreshToken,
 		result.ExpiresIn,
 	); err != nil {
-		c.logger.Warnf("更新授权方token失败: %v", err)
+		c.logger.Warn(fmt.Sprintf("更新授权方token失败: %v", err))
 	}
 
 	return &result.AuthorizationInfo, nil

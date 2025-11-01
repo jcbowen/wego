@@ -18,7 +18,7 @@ type MPClient struct {
 	config     *MPConfig
 	httpClient core.HTTPClient
 	storage    storage.TokenStorage
-	logger     core.Logger
+	logger     core.LoggerInterface
 
 	stableTokenClient *StableTokenClient // 稳定版access_token客户端
 }
@@ -30,7 +30,7 @@ func NewMPClient(config *MPConfig) *MPClient {
 	if err != nil {
 		// 如果文件存储创建失败，回退到内存存储并输出日志
 		logger := &core.DefaultLogger{}
-		logger.Warnf("文件存储创建失败，回退到内存存储: %v", err)
+		logger.Warn("文件存储创建失败，回退到内存存储: " + err.Error())
 		return NewMPClientWithStorage(config, storage.NewMemoryStorage())
 	}
 	return NewMPClientWithStorage(config, fileStorage)
@@ -56,7 +56,7 @@ func (c *MPClient) GetStableTokenClient() *StableTokenClient {
 }
 
 // SetLogger 设置自定义日志器
-func (c *MPClient) SetLogger(logger core.Logger) {
+func (c *MPClient) SetLogger(logger core.LoggerInterface) {
 	c.logger = logger
 }
 
@@ -193,7 +193,7 @@ func (c *MPClient) GetConfig() *MPConfig {
 }
 
 // GetLogger 获取日志器
-func (c *MPClient) GetLogger() core.Logger {
+func (c *MPClient) GetLogger() core.LoggerInterface {
 	return c.logger
 }
 
