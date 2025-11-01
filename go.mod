@@ -2,9 +2,12 @@ module github.com/jcbowen/wego
 
 go 1.23.0
 
-replace github.com/jcbowen/jcbaseGo => ../jcbaseGo
+// replace github.com/jcbowen/jcbaseGo => ../jcbaseGo
 
-require gorm.io/gorm v1.31.0
+require (
+	github.com/jcbowen/jcbaseGo v0.0.0-00010101000000-000000000000
+	gorm.io/gorm v1.31.0
+)
 
 require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
