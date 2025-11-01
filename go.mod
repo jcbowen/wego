@@ -5,7 +5,7 @@ go 1.23.0
 // replace github.com/jcbowen/jcbaseGo => ../jcbaseGo
 
 require (
-	github.com/jcbowen/jcbaseGo v0.0.0-00010101000000-000000000000
+	github.com/jcbowen/jcbaseGo v0.13.1
 	gorm.io/gorm v1.31.0
 )
 
