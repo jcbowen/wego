@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jcbowen/jcbaseGo/component/debugger"
 	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/storage"
 )
@@ -18,7 +19,7 @@ type MPClient struct {
 	config     *MPConfig
 	httpClient core.HTTPClient
 	storage    storage.TokenStorage
-	logger     core.LoggerInterface
+	logger     debugger.LoggerInterface
 
 	stableTokenClient *StableTokenClient // 稳定版access_token客户端
 }
@@ -29,7 +30,7 @@ func NewMPClient(config *MPConfig) *MPClient {
 	fileStorage, err := storage.NewFileStorage("wego_storage")
 	if err != nil {
 		// 如果文件存储创建失败，回退到内存存储并输出日志
-		logger := &core.DefaultLogger{}
+		logger := &debugger.DefaultLogger{}
 		logger.Warn("文件存储创建失败，回退到内存存储: " + err.Error())
 		return NewMPClientWithStorage(config, storage.NewMemoryStorage())
 	}
@@ -42,7 +43,7 @@ func NewMPClientWithStorage(config *MPConfig, storage storage.TokenStorage) *MPC
 		config:     config,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		storage:    storage,
-		logger:     &core.DefaultLogger{},
+		logger:     &debugger.DefaultLogger{},
 	}
 
 	client.stableTokenClient = NewStableTokenClient(client)
@@ -56,7 +57,7 @@ func (c *MPClient) GetStableTokenClient() *StableTokenClient {
 }
 
 // SetLogger 设置自定义日志器
-func (c *MPClient) SetLogger(logger core.LoggerInterface) {
+func (c *MPClient) SetLogger(logger debugger.LoggerInterface) {
 	c.logger = logger
 }
 
@@ -193,7 +194,7 @@ func (c *MPClient) GetConfig() *MPConfig {
 }
 
 // GetLogger 获取日志器
-func (c *MPClient) GetLogger() core.LoggerInterface {
+func (c *MPClient) GetLogger() debugger.LoggerInterface {
 	return c.logger
 }
 

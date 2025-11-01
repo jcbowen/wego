@@ -12,7 +12,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/jcbowen/wego/core"
+	"github.com/jcbowen/jcbaseGo/component/debugger"
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/storage"
 )
@@ -27,7 +27,7 @@ type APIClient struct {
 	config       *OpenPlatformConfig
 	httpClient   HTTPClient
 	storage      storage.TokenStorage
-	logger       core.LoggerInterface
+	logger       debugger.LoggerInterface
 	eventHandler EventHandler          // 事件处理器
 	crypt        *crypto.WXBizMsgCrypt // 消息加解密实例
 }
@@ -38,7 +38,7 @@ func NewAPIClient(config *OpenPlatformConfig) *APIClient {
 	fileStorage, err := storage.NewFileStorage("wego_storage")
 	if err != nil {
 		// 如果文件存储创建失败，回退到内存存储并输出日志
-		logger := &core.DefaultLogger{}
+		logger := &debugger.DefaultLogger{}
 		logger.Warn(fmt.Sprintf("文件存储创建失败，回退到内存存储: %v", err))
 		return NewAPIClientWithStorage(config, storage.NewMemoryStorage())
 	}
@@ -51,7 +51,7 @@ func NewAPIClientWithStorage(config *OpenPlatformConfig, storage storage.TokenSt
 		config:     config,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		storage:    storage,
-		logger:     &core.DefaultLogger{},
+		logger:     &debugger.DefaultLogger{},
 		crypt:      crypto.NewWXBizMsgCrypt(config.ComponentToken, config.EncodingAESKey, config.ComponentAppID),
 	}
 
@@ -59,7 +59,7 @@ func NewAPIClientWithStorage(config *OpenPlatformConfig, storage storage.TokenSt
 }
 
 // SetLogger 设置自定义日志器
-func (c *APIClient) SetLogger(logger core.LoggerInterface) {
+func (c *APIClient) SetLogger(logger debugger.LoggerInterface) {
 	c.logger = logger
 }
 
@@ -87,7 +87,7 @@ func (c *APIClient) GetConfig() *OpenPlatformConfig {
 }
 
 // GetLogger 获取日志器
-func (c *APIClient) GetLogger() core.LoggerInterface {
+func (c *APIClient) GetLogger() debugger.LoggerInterface {
 	return c.logger
 }
 
