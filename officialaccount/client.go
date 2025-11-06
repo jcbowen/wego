@@ -27,7 +27,7 @@ type MPClient struct {
 // NewMPClient 创建新的微信公众号客户端（使用默认文件存储）
 func NewMPClient(config *MPConfig) *MPClient {
 	// 使用当前工作目录下的 wego_storage 文件夹作为默认存储路径
-	fileStorage, err := storage.NewFileStorage("wego_storage")
+	fileStorage, err := storage.NewFileStorage("./runtime/wego_storage")
 	if err != nil {
 		// 如果文件存储创建失败，回退到内存存储并输出日志
 		logger := &debugger.DefaultLogger{}
