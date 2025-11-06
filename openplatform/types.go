@@ -51,6 +51,7 @@ type AuthorizerInfo struct {
 	RegisterType    int              `json:"register_type"`
 	AccountStatus   int              `json:"account_status"`
 	BasicConfig     *BasicConfigInfo `json:"basic_config,omitempty"`
+	ChannelsInfo    *ChannelsInfo    `json:"channels_info,omitempty"`
 }
 
 // ServiceTypeInfo 账号类型
@@ -60,6 +61,11 @@ type ServiceTypeInfo struct {
 
 // VerifyTypeInfo 认证类型
 type VerifyTypeInfo struct {
+	ID int `json:"id"`
+}
+
+// ChannelsInfo 视频号账号类型；如果该授权账号为视频号则返回该字段
+type ChannelsInfo struct {
 	ID int `json:"id"`
 }
 
