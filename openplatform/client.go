@@ -13,19 +13,15 @@ import (
 	"time"
 
 	"github.com/jcbowen/jcbaseGo/component/debugger"
+	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/storage"
 )
 
-// HTTPClient HTTP客户端接口
-type HTTPClient interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
 // APIClient API客户端
 type APIClient struct {
 	config       *OpenPlatformConfig
-	httpClient   HTTPClient
+	httpClient   core.HTTPClient
 	storage      storage.TokenStorage
 	logger       debugger.LoggerInterface
 	eventHandler EventHandler          // 事件处理器
@@ -70,7 +66,7 @@ func NewAPIClientWithStorage(config *OpenPlatformConfig, storage storage.TokenSt
 			case debugger.LoggerInterface:
 				// 设置自定义日志器
 				client.SetLogger(v)
-			case HTTPClient:
+			case core.HTTPClient:
 				// 设置自定义HTTP客户端
 				client.SetHTTPClient(v)
 			case EventHandler:
@@ -92,7 +88,7 @@ func (c *APIClient) SetLogger(logger debugger.LoggerInterface) {
 }
 
 // SetHTTPClient 设置自定义HTTP客户端
-func (c *APIClient) SetHTTPClient(client HTTPClient) {
+func (c *APIClient) SetHTTPClient(client core.HTTPClient) {
 	c.httpClient = client
 }
 
