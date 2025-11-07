@@ -52,7 +52,7 @@ func (c *StableTokenClient) getStableAccessTokenWithMode(ctx context.Context, mo
 
 	// 调用API获取稳定版access_token
 	var result StableAccessTokenResponse
-	err := c.client.MakeRequest(ctx, "POST", APIStableAccessTokenURL, request, &result)
+	err := c.client.req.Make(ctx, "POST", APIStableAccessTokenURL, request, &result)
 	if err != nil {
 		return nil, fmt.Errorf("获取稳定版access_token失败: %v", err)
 	}
@@ -94,7 +94,7 @@ func (c *StableTokenClient) IsStableAccessTokenValid(ctx context.Context, token 
 	if token == "" {
 		return false, nil
 	}
-	
+
 	// 这里可以添加更复杂的验证逻辑
 	// 例如检查token格式、调用微信API验证等
 	return true, nil
@@ -135,5 +135,5 @@ func (c *StableTokenClient) MakeRequestWithStableToken(ctx context.Context, meth
 	fullURL := fmt.Sprintf("%s?access_token=%s", url, token)
 
 	// 发送请求
-	return c.client.MakeRequest(ctx, method, fullURL, body, result)
+	return c.client.req.Make(ctx, method, fullURL, body, result)
 }

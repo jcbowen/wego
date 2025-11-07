@@ -9,7 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	
+
 	"github.com/jcbowen/wego/core"
 )
 
@@ -33,8 +33,8 @@ type UploadImageResponse struct {
 
 // DeleteMassMsgRequest 删除群发消息请求
 type DeleteMassMsgRequest struct {
-	MsgID     int64 `json:"msg_id"`
-	ArticleIdx int  `json:"article_idx,omitempty"`
+	MsgID      int64 `json:"msg_id"`
+	ArticleIdx int   `json:"article_idx,omitempty"`
 }
 
 // DeleteMassMsgResponse 删除群发消息响应
@@ -57,7 +57,7 @@ type MassMsgGetRequest struct {
 // MassMsgGetResponse 获取群发消息发送状态响应
 type MassMsgGetResponse struct {
 	core.APIResponse
-	MsgID     int64 `json:"msg_id"`
+	MsgID     int64  `json:"msg_id"`
 	MsgStatus string `json:"msg_status"`
 }
 
@@ -182,7 +182,7 @@ func (c *MessageClient) UploadImage(ctx context.Context, filename string, imageD
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	// 发送请求
-	resp, err := c.Client.MakeRequestRaw(req)
+	resp, err := c.Client.req.MakeRaw(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP请求失败: %v", err)
 	}
@@ -214,13 +214,13 @@ func (c *MessageClient) DeleteMassMsg(ctx context.Context, msgID int64, articleI
 	}
 
 	request := DeleteMassMsgRequest{
-		MsgID:     msgID,
+		MsgID:      msgID,
 		ArticleIdx: articleIdx,
 	}
 
 	var result DeleteMassMsgResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIDeleteMassMsgURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +241,7 @@ func (c *MessageClient) GetSpeed(ctx context.Context) (*GetSpeedResponse, error)
 
 	var result GetSpeedResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetSpeedURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ func (c *MessageClient) MassMsgGet(ctx context.Context, msgID int64) (*MassMsgGe
 
 	var result MassMsgGetResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIMassMsgGetURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +293,7 @@ func (c *MessageClient) MassSend(ctx context.Context, touser []string, msgType s
 
 	var result MassSendResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIMassSendURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +320,7 @@ func (c *MessageClient) Preview(ctx context.Context, touser, msgType string, con
 
 	var result PreviewResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIPreviewURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +347,7 @@ func (c *MessageClient) SendAll(ctx context.Context, filter Filter, msgType stri
 
 	var result SendAllResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APISendAllURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +372,7 @@ func (c *MessageClient) SetSpeed(ctx context.Context, speed int) (*SetSpeedRespo
 
 	var result SetSpeedResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APISetSpeedURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +397,7 @@ func (c *MessageClient) UploadNewsMsg(ctx context.Context, articles []Article) (
 
 	var result UploadNewsMsgResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIUploadNewsMsgURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -412,29 +412,29 @@ func (c *MessageClient) UploadNewsMsg(ctx context.Context, articles []Article) (
 // GetCurrentAutoreplyInfoResponse 获取当前自动回复信息响应
 type GetCurrentAutoreplyInfoResponse struct {
 	core.APIResponse
-	IsAddFriendReplyOpen   int `json:"is_add_friend_reply_open"`   // 关注后自动回复是否开启，0代表未开启，1代表开启
-	IsAutoreplyOpen        int `json:"is_autoreply_open"`          // 消息自动回复是否开启，0代表未开启，1代表开启
-	AddFriendReplyInfo     struct {
-		Type    string `json:"type"`     // 自动回复类型
-		Content string `json:"content"`  // 对于文本类型，content是文本内容，对于图文、图片、语音、视频，是mediaID
+	IsAddFriendReplyOpen int `json:"is_add_friend_reply_open"` // 关注后自动回复是否开启，0代表未开启，1代表开启
+	IsAutoreplyOpen      int `json:"is_autoreply_open"`        // 消息自动回复是否开启，0代表未开启，1代表开启
+	AddFriendReplyInfo   struct {
+		Type    string `json:"type"`    // 自动回复类型
+		Content string `json:"content"` // 对于文本类型，content是文本内容，对于图文、图片、语音、视频，是mediaID
 	} `json:"add_friend_reply_info"` // 关注后自动回复的信息
 	MessageDefaultReplyInfo struct {
-		Type    string `json:"type"`     // 自动回复类型
-		Content string `json:"content"`  // 对于文本类型，content是文本内容，对于图文、图片、语音、视频，是mediaID
+		Type    string `json:"type"`    // 自动回复类型
+		Content string `json:"content"` // 对于文本类型，content是文本内容，对于图文、图片、语音、视频，是mediaID
 	} `json:"message_default_reply_info"` // 消息自动回复的信息
 	KeywordAutoreplyInfo struct {
 		List []struct {
-			RuleName        string `json:"rule_name"`        // 规则名称
-			CreateTime      int64  `json:"create_time"`      // 创建时间
-			ReplyMode       string `json:"reply_mode"`       // 回复模式，reply_all代表全部回复，random_one代表随机回复一条
+			RuleName        string `json:"rule_name"`   // 规则名称
+			CreateTime      int64  `json:"create_time"` // 创建时间
+			ReplyMode       string `json:"reply_mode"`  // 回复模式，reply_all代表全部回复，random_one代表随机回复一条
 			KeywordListInfo []struct {
 				Type      string `json:"type"`       // 匹配模式，contain代表消息中含有该关键词即可，equal表示消息内容必须和关键词相同
 				MatchMode string `json:"match_mode"` // 匹配模式，contain代表消息中含有该关键词即可，equal表示消息内容必须和关键词相同
 				Content   string `json:"content"`    // 关键词内容
 			} `json:"keyword_list_info"` // 关键词列表
 			ReplyListInfo []struct {
-				Type    string `json:"type"`     // 回复类型
-				Content string `json:"content"`  // 回复内容，对于文本类型，content是文本内容，对于图文、图片、语音、视频，是mediaID
+				Type     string `json:"type"`    // 回复类型
+				Content  string `json:"content"` // 回复内容，对于文本类型，content是文本内容，对于图文、图片、语音、视频，是mediaID
 				NewsInfo struct {
 					List []struct {
 						Title      string `json:"title"`       // 图文消息标题
@@ -463,7 +463,7 @@ func (c *MessageClient) GetCurrentAutoreplyInfo(ctx context.Context) (*GetCurren
 
 	var result GetCurrentAutoreplyInfoResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetCurrentAutoreplyInfoURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}

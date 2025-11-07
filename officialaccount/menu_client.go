@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	
+
 	"github.com/jcbowen/wego/core"
 )
 
@@ -22,14 +22,14 @@ func NewMenuClient(client *MPClient) *MenuClient {
 
 // Button 菜单按钮
 type Button struct {
-	Type      string    `json:"type,omitempty"`
-	Name      string    `json:"name"`
-	Key       string    `json:"key,omitempty"`
-	URL       string    `json:"url,omitempty"`
-	MediaID   string    `json:"media_id,omitempty"`
-	AppID     string    `json:"appid,omitempty"`
-	PagePath  string    `json:"pagepath,omitempty"`
-	SubButton []Button  `json:"sub_button,omitempty"`
+	Type      string   `json:"type,omitempty"`
+	Name      string   `json:"name"`
+	Key       string   `json:"key,omitempty"`
+	URL       string   `json:"url,omitempty"`
+	MediaID   string   `json:"media_id,omitempty"`
+	AppID     string   `json:"appid,omitempty"`
+	PagePath  string   `json:"pagepath,omitempty"`
+	SubButton []Button `json:"sub_button,omitempty"`
 }
 
 // Menu 菜单结构
@@ -39,9 +39,9 @@ type Menu struct {
 
 // ConditionalMenu 个性化菜单
 type ConditionalMenu struct {
-	Button    []Button `json:"button"`
+	Button    []Button  `json:"button"`
 	MatchRule MatchRule `json:"matchrule"`
-	MenuID    string   `json:"menuid,omitempty"`
+	MenuID    string    `json:"menuid,omitempty"`
 }
 
 // MatchRule 匹配规则
@@ -72,7 +72,7 @@ type GetCurrentMenuResponse struct {
 // GetMenuResponse 获取菜单响应
 type GetMenuResponse struct {
 	core.APIResponse
-	Menu Menu `json:"menu"`
+	Menu            Menu              `json:"menu"`
 	ConditionalMenu []ConditionalMenu `json:"conditionalmenu"`
 }
 
@@ -112,7 +112,7 @@ func (c *MenuClient) CreateMenu(ctx context.Context, menu *Menu) (*CreateMenuRes
 
 	var result CreateMenuResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APICreateMenuURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, menu, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, menu, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (c *MenuClient) GetCurrentSelfmenuInfo(ctx context.Context) (*GetCurrentMen
 
 	var result GetCurrentMenuResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetCurrentMenuURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (c *MenuClient) GetMenu(ctx context.Context) (*GetMenuResponse, error) {
 
 	var result GetMenuResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetMenuURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func (c *MenuClient) DeleteMenu(ctx context.Context) (*DeleteMenuResponse, error
 
 	var result DeleteMenuResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIDeleteMenuURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (c *MenuClient) AddConditionalMenu(ctx context.Context, menu *ConditionalMe
 
 	var result AddConditionalMenuResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIAddConditionalMenuURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, menu, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, menu, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func (c *MenuClient) DeleteConditionalMenu(ctx context.Context, menuID string) (
 
 	var result DeleteConditionalMenuResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s&menuid=%s", APIDeleteConditionalMenuURL, url.QueryEscape(accessToken), url.QueryEscape(menuID))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +242,7 @@ func (c *MenuClient) TryMatchMenu(ctx context.Context, userID string) (*TryMatch
 
 	var result TryMatchMenuResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APITryMatchMenuURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}

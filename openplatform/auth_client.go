@@ -115,7 +115,7 @@ func (c *AuthorizerClient) SendCustomMessage(ctx context.Context, toUser string,
 	}
 
 	var result APIResponse
-	err = c.authClient.client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.authClient.client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func (c *AuthorizerClient) CreateMenu(ctx context.Context, menu *Menu) error {
 	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APICreateMenuURL, url.QueryEscape(accessToken))
 
 	var result APIResponse
-	err = c.authClient.client.MakeRequest(ctx, "POST", apiURL, menu, &result)
+	err = c.authClient.client.req.Make(ctx, "POST", apiURL, menu, &result)
 	if err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func (c *AuthorizerClient) GetMenu(ctx context.Context) (*Menu, error) {
 		Menu Menu `json:"menu"`
 	}
 
-	err = c.authClient.client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.authClient.client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +219,7 @@ func (c *AuthorizerClient) DeleteMenu(ctx context.Context) error {
 	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APIDeleteMenuURL, url.QueryEscape(accessToken))
 
 	var result APIResponse
-	err = c.authClient.client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.authClient.client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return err
 	}
@@ -556,7 +556,7 @@ func (c *AuthorizerClient) GetUserInfo(ctx context.Context, openID string) (*Use
 		url.QueryEscape(accessToken), url.QueryEscape(openID))
 
 	var result UserInfo
-	err = c.authClient.client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.authClient.client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -592,7 +592,7 @@ func (c *AuthorizerClient) GetUserList(ctx context.Context, nextOpenID string) (
 	}
 
 	var result UserList
-	err = c.authClient.client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.authClient.client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -653,7 +653,7 @@ func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *Te
 		MsgID int64 `json:"msgid"`
 	}
 
-	err = c.authClient.client.MakeRequest(ctx, "POST", apiURL, template, &result)
+	err = c.authClient.client.req.Make(ctx, "POST", apiURL, template, &result)
 	if err != nil {
 		return err
 	}
@@ -726,7 +726,7 @@ func (c *AuthorizerClient) UploadMedia(ctx context.Context, mediaType, filename 
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	// 发送请求
-	resp, err := c.authClient.client.MakeRequestRaw(req)
+	resp, err := c.authClient.client.req.MakeRaw(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP请求失败: %v", err)
 	}
@@ -775,7 +775,7 @@ func (c *AuthorizerClient) GetMedia(ctx context.Context, mediaID string) ([]byte
 	}
 
 	// 发送请求
-	resp, err := c.authClient.client.MakeRequestRaw(req)
+	resp, err := c.authClient.client.req.MakeRaw(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP请求失败: %v", err)
 	}
@@ -900,7 +900,7 @@ func (oc *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthT
 	}
 
 	var oauthToken OAuthToken
-	err = oc.authorizerClient.authClient.client.MakeRequest(ctx, "POST", apiURL, params, &oauthToken)
+	err = oc.authorizerClient.authClient.client.req.Make(ctx, "POST", apiURL, params, &oauthToken)
 	if err != nil {
 		return nil, err
 	}
@@ -982,7 +982,7 @@ func (jm *JSSDKManager) getJSAPITicket(ctx context.Context, accessToken string) 
 		ExpiresIn int    `json:"expires_in"`
 	}
 
-	err := jm.authorizerClient.authClient.client.MakeRequest(ctx, "GET", apiURL, params, &result)
+	err := jm.authorizerClient.authClient.client.req.Make(ctx, "GET", apiURL, params, &result)
 	if err != nil {
 		return "", err
 	}
@@ -1018,11 +1018,11 @@ func (jm *JSSDKManager) generateSignature(url, ticket string, jsAPIList []string
 // generateNonceStr 生成随机字符串
 func generateNonceStr() string {
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	bytes := make([]byte, 16)
-	for i := range bytes {
-		bytes[i] = letters[rand.Intn(len(letters))]
+	bts := make([]byte, 16)
+	for i := range bts {
+		bts[i] = letters[rand.Intn(len(letters))]
 	}
-	return string(bytes)
+	return string(bts)
 }
 
 // QRCodeRequest 二维码请求
@@ -1066,7 +1066,7 @@ func (c *AuthorizerClient) CreateQRCode(ctx context.Context, qrCode *QRCodeReque
 	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/qrcode/create?access_token=%s", url.QueryEscape(accessToken))
 
 	var result QRCodeResponse
-	err = c.authClient.client.MakeRequest(ctx, "POST", apiURL, qrCode, &result)
+	err = c.authClient.client.req.Make(ctx, "POST", apiURL, qrCode, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1134,7 +1134,7 @@ func (mpc *MiniProgramClient) GetWXACode(ctx context.Context, request *WXACodeRe
 	apiURL := fmt.Sprintf("https://api.weixin.qq.com/wxa/getwxacode?access_token=%s", url.QueryEscape(accessToken))
 
 	var result WXACodeResponse
-	err = mpc.authorizerClient.authClient.client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = mpc.authorizerClient.authClient.client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1181,7 +1181,7 @@ func (oc *OAuthClient) GetUserInfo(ctx context.Context, accessToken, openID stri
 	}
 
 	var userInfo OAuthUserInfo
-	err := oc.authorizerClient.authClient.client.MakeRequest(ctx, "GET", apiURL, params, &userInfo)
+	err := oc.authorizerClient.authClient.client.req.Make(ctx, "GET", apiURL, params, &userInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -1222,7 +1222,7 @@ func (oc *OAuthClient) RefreshToken(ctx context.Context, refreshToken string) (*
 	}
 
 	var oauthToken OAuthToken
-	err = oc.authorizerClient.authClient.client.MakeRequest(ctx, "POST", apiURL, params, &oauthToken)
+	err = oc.authorizerClient.authClient.client.req.Make(ctx, "POST", apiURL, params, &oauthToken)
 	if err != nil {
 		return nil, err
 	}

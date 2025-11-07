@@ -17,6 +17,7 @@ type MPClient struct {
 	httpClient core.HTTPClient
 	storage    storage.TokenStorage
 	logger     debugger.LoggerInterface
+	req        *core.Request
 
 	stableTokenClient *StableTokenClient // 稳定版access_token客户端
 }
@@ -43,6 +44,7 @@ func NewMPClientWithStorage(config *MPConfig, storage storage.TokenStorage) *MPC
 		logger:     &debugger.DefaultLogger{},
 	}
 
+	client.req = core.NewRequest(client.httpClient, client.logger)
 	client.stableTokenClient = NewStableTokenClient(client)
 
 	return client

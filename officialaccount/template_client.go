@@ -20,33 +20,6 @@ func NewTemplateClient(client *MPClient) *TemplateClient {
 	}
 }
 
-// SendTemplateMsgRequest 发送模板消息请求
-type SendTemplateMsgRequest struct {
-	Touser      string                  `json:"touser"`
-	TemplateID  string                  `json:"template_id"`
-	URL         string                  `json:"url,omitempty"`
-	MiniProgram MiniProgramInfo         `json:"miniprogram,omitempty"`
-	Data        map[string]TemplateData `json:"data"`
-}
-
-// MiniProgramInfo 小程序信息
-type MiniProgramInfo struct {
-	AppID    string `json:"appid"`
-	PagePath string `json:"pagepath"`
-}
-
-// TemplateData 模板消息数据
-type TemplateData struct {
-	Value string `json:"value"`
-	Color string `json:"color,omitempty"`
-}
-
-// SendTemplateMsgResponse 发送模板消息响应
-type SendTemplateMsgResponse struct {
-	core.APIResponse
-	MsgID int64 `json:"msgid"`
-}
-
 // AddTemplateRequest 选用模板请求
 type AddTemplateRequest struct {
 	TemplateIDShort string `json:"template_id_short"`
@@ -138,18 +111,12 @@ func (c *TemplateClient) SendTemplateMessage(ctx context.Context, request *SendT
 		return nil, err
 	}
 
-	var result SendTemplateMsgResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIMessageTemplateSendURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	var result *SendTemplateMsgResponse
+	result, err = NewTemplate(c.Client.req).SendTemplateMessage(ctx, request, accessToken)
 	if err != nil {
 		return nil, err
 	}
-
-	if !result.IsSuccess() {
-		return nil, &result.APIResponse
-	}
-
-	return &result, nil
+	return result, nil
 }
 
 // AddTemplate 选用模板
@@ -165,7 +132,7 @@ func (c *TemplateClient) AddTemplate(ctx context.Context, templateIDShort string
 
 	var result AddTemplateResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateApiAddTemplateURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +160,7 @@ func (c *TemplateClient) QueryBlockTmplMsg(ctx context.Context, beginDate, endDa
 
 	var result QueryBlockTmplMsgResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateGetIndustryURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +185,7 @@ func (c *TemplateClient) DeleteTemplate(ctx context.Context, templateID string) 
 
 	var result DeleteTemplateResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateDelPrivateTemplateURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +206,7 @@ func (c *TemplateClient) GetAllTemplates(ctx context.Context) (*GetAllTemplatesR
 
 	var result GetAllTemplatesResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateGetAllPrivateTemplateURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +227,7 @@ func (c *TemplateClient) GetIndustry(ctx context.Context) (*GetIndustryResponse,
 
 	var result GetIndustryResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateGetIndustryURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +253,7 @@ func (c *TemplateClient) SetIndustry(ctx context.Context, industryID1, industryI
 
 	var result SetIndustryResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateApiSetIndustryURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}

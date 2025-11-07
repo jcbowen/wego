@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	
+
 	"github.com/jcbowen/wego/core"
 )
 
@@ -34,10 +34,10 @@ type GetCategoryResponse struct {
 
 // PubTemplateTitleInfo 公共模板标题信息
 type PubTemplateTitleInfo struct {
-	TID       int    `json:"tid"`
-	Title     string `json:"title"`
-	Type      int    `json:"type"`
-	CategoryID int   `json:"categoryId"`
+	TID        int    `json:"tid"`
+	Title      string `json:"title"`
+	Type       int    `json:"type"`
+	CategoryID int    `json:"categoryId"`
 }
 
 // GetPubNewTemplateTitlesResponse 获取公共模板标题列表响应
@@ -107,12 +107,12 @@ type SubscribeMsgData struct {
 
 // SendNewSubscribeMsgRequest 发送订阅消息请求
 type SendNewSubscribeMsgRequest struct {
-	Touser      string              `json:"touser"`
-	TemplateID  string              `json:"template_id"`
-	Page        string              `json:"page,omitempty"`
+	Touser      string                      `json:"touser"`
+	TemplateID  string                      `json:"template_id"`
+	Page        string                      `json:"page,omitempty"`
 	Data        map[string]SubscribeMsgData `json:"data"`
-	Miniprogram *MiniProgramInfo    `json:"miniprogram_state,omitempty"`
-	Lang        string              `json:"lang,omitempty"`
+	Miniprogram *MiniProgramInfo            `json:"miniprogram_state,omitempty"`
+	Lang        string                      `json:"lang,omitempty"`
 }
 
 // SendNewSubscribeMsgResponse 发送订阅消息响应
@@ -132,7 +132,7 @@ func (c *SubscribeClient) GetCategory(ctx context.Context) (*GetCategoryResponse
 
 	var result GetCategoryResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetCategoryURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -155,9 +155,9 @@ func (c *SubscribeClient) GetPubNewTemplateTitles(ctx context.Context, categoryI
 	}
 
 	var result GetPubNewTemplateTitlesResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s&ids=%d&start=%d&limit=%d", 
+	apiURL := fmt.Sprintf("%s?access_token=%s&ids=%d&start=%d&limit=%d",
 		APIGetPubNewTemplateTitlesURL, url.QueryEscape(accessToken), categoryID, start, limit)
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -180,9 +180,9 @@ func (c *SubscribeClient) GetPubNewTemplateKeywords(ctx context.Context, tid int
 	}
 
 	var result GetPubNewTemplateKeywordsResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s&tid=%d", 
+	apiURL := fmt.Sprintf("%s?access_token=%s&tid=%d",
 		APIGetPubNewTemplateKeywordsURL, url.QueryEscape(accessToken), tid)
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func (c *SubscribeClient) GetWxaPubNewTemplate(ctx context.Context) (*GetWxaPubN
 
 	var result GetWxaPubNewTemplateResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetWxaPubNewTemplateURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +236,7 @@ func (c *SubscribeClient) AddWxaNewTemplate(ctx context.Context, tid int, kidLis
 
 	var result AddWxaNewTemplateResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIAddWxaNewTemplateURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +264,7 @@ func (c *SubscribeClient) DelWxaNewTemplate(ctx context.Context, priTmplID strin
 
 	var result DelWxaNewTemplateResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIDelWxaNewTemplateURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +288,7 @@ func (c *SubscribeClient) SendNewSubscribeMsg(ctx context.Context, request *Send
 
 	var result SendNewSubscribeMsgResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APISendNewSubscribeMsgURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -313,11 +313,11 @@ type TemplateSubscribeData struct {
 // 注意：一次性订阅消息只能发送给已经授权订阅的用户
 // 用户授权订阅的URL格式：https://mp.weixin.qq.com/mp/subscribemsg?action=get_confirm&appid=APPID&scene=SCENE&template_id=TEMPLATE_ID&redirect_url=REDIRECT_URL&reserved=RESERVED#wechat_redirect
 type TemplateSubscribeRequest struct {
-	Touser     string                            `json:"touser"`
-	TemplateID string                            `json:"template_id"`
-	URL        string                            `json:"url,omitempty"`
-	Scene      string                            `json:"scene"`
-	Title      string                            `json:"title"`
+	Touser     string                           `json:"touser"`
+	TemplateID string                           `json:"template_id"`
+	URL        string                           `json:"url,omitempty"`
+	Scene      string                           `json:"scene"`
+	Title      string                           `json:"title"`
 	Data       map[string]TemplateSubscribeData `json:"data"`
 }
 
@@ -339,7 +339,7 @@ func (c *SubscribeClient) TemplateSubscribe(ctx context.Context, request *Templa
 
 	var result TemplateSubscribeResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateSubscribeURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}

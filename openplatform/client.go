@@ -23,6 +23,7 @@ type APIClient struct {
 	logger       debugger.LoggerInterface
 	eventHandler EventHandler          // 事件处理器
 	crypt        *crypto.WXBizMsgCrypt // 消息加解密实例
+	req          *core.Request
 }
 
 // NewAPIClient 创建新的API客户端（使用默认文件存储）
@@ -75,6 +76,8 @@ func NewAPIClientWithStorage(config *OpenPlatformConfig, storage storage.TokenSt
 			}
 		}
 	}
+
+	client.req = core.NewRequest(client.httpClient, client.logger)
 
 	return client
 }

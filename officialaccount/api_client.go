@@ -22,15 +22,15 @@ func NewMPAPIClient(client *MPClient) *MPAPIClient {
 
 // CallbackCheckRequest 网络通信检测请求
 type CallbackCheckRequest struct {
-	Action         string `json:"action"`
-	CheckOperator  string `json:"check_operator"`
+	Action        string `json:"action"`
+	CheckOperator string `json:"check_operator"`
 }
 
 // CallbackCheckResponse 网络通信检测响应
 type CallbackCheckResponse struct {
 	core.APIResponse
-	DNS    []string `json:"dns"`
-	Ping   []string `json:"ping"`
+	DNS  []string `json:"dns"`
+	Ping []string `json:"ping"`
 }
 
 // GetApiDomainIpResponse 获取微信API服务器IP响应
@@ -59,7 +59,7 @@ func (c *MPAPIClient) CallbackCheck(ctx context.Context, action, checkOperator s
 
 	var result CallbackCheckResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APICallbackCheckURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (c *MPAPIClient) GetApiDomainIp(ctx context.Context) (*GetApiDomainIpRespon
 
 	var result GetApiDomainIpResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetApiDomainIpURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (c *MPAPIClient) GetCallbackIp(ctx context.Context) (*GetCallbackIpResponse
 
 	var result GetCallbackIpResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetCallbackIpURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
