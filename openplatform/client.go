@@ -85,6 +85,10 @@ func NewAPIClientWithStorage(config *Config, storage storage.TokenStorage, opt .
 // SetLogger 设置自定义日志器
 func (c *APIClient) SetLogger(logger debugger.LoggerInterface) {
 	c.logger = logger
+	// 同时更新请求对象中的日志器
+	if c.req != nil {
+		c.req = core.NewRequest(c.httpClient, logger)
+	}
 }
 
 // SetHTTPClient 设置自定义HTTP客户端
