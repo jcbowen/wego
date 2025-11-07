@@ -15,11 +15,11 @@ import (
 
 // MessageClient 消息管理客户端
 type MessageClient struct {
-	Client *MPClient
+	Client *Client
 }
 
 // NewMessageClient 创建新的消息管理客户端
-func NewMessageClient(client *MPClient) *MessageClient {
+func NewMessageClient(client *Client) *MessageClient {
 	return &MessageClient{
 		Client: client,
 	}

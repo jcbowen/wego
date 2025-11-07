@@ -10,11 +10,11 @@ import (
 
 // MenuClient 自定义菜单客户端
 type MenuClient struct {
-	Client *MPClient
+	Client *Client
 }
 
 // NewMenuClient 创建新的自定义菜单客户端
-func NewMenuClient(client *MPClient) *MenuClient {
+func NewMenuClient(client *Client) *MenuClient {
 	return &MenuClient{
 		Client: client,
 	}

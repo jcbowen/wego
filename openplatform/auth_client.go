@@ -605,7 +605,7 @@ func (c *AuthorizerClient) GetUserList(ctx context.Context, nextOpenID string) (
 }
 
 // SendTemplateMessage 发送模板消息
-func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *officialaccount.SendTemplateMsgRequest) (*officialaccount.SendTemplateMsgResponse, error) {
+func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *officialaccount.TemplateMessageRequest) (*officialaccount.SendTemplateMessageResponse, error) {
 	if c.authorizerAppID == "" {
 		return nil, fmt.Errorf("授权方AppID不能为空")
 	}

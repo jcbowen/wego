@@ -10,11 +10,11 @@ import (
 
 // SubscribeClient 订阅通知客户端
 type SubscribeClient struct {
-	Client *MPClient
+	Client *Client
 }
 
 // NewSubscribeClient 创建新的订阅通知客户端
-func NewSubscribeClient(client *MPClient) *SubscribeClient {
+func NewSubscribeClient(client *Client) *SubscribeClient {
 	return &SubscribeClient{
 		Client: client,
 	}
@@ -111,7 +111,7 @@ type SendNewSubscribeMsgRequest struct {
 	TemplateID  string                      `json:"template_id"`
 	Page        string                      `json:"page,omitempty"`
 	Data        map[string]SubscribeMsgData `json:"data"`
-	Miniprogram *MiniProgramInfo            `json:"miniprogram_state,omitempty"`
+	Miniprogram *TemplateMessageMiniProgram `json:"miniprogram_state,omitempty"`
 	Lang        string                      `json:"lang,omitempty"`
 }
 

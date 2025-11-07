@@ -4,8 +4,8 @@ import (
 	"fmt"
 )
 
-// MPConfig 微信公众号配置结构体
-type MPConfig struct {
+// Config 微信公众号配置结构体
+type Config struct {
 	AppID     string `json:"app_id" ini:"app_id"`         // 公众号appid
 	AppSecret string `json:"app_secret" ini:"app_secret"` // 公众号appsecret
 	Token     string `json:"token" ini:"token"`           // 消息校验Token
@@ -23,7 +23,7 @@ const (
 )
 
 // Validate 验证配置的有效性
-func (c *MPConfig) Validate() error {
+func (c *Config) Validate() error {
 	if c.AppID == "" {
 		return fmt.Errorf("AppID不能为空")
 	}

@@ -8,14 +8,14 @@ import (
 	"github.com/jcbowen/wego/core"
 )
 
-// MPAPIClient 微信公众号API客户端
-type MPAPIClient struct {
-	Client *MPClient
+// APIClient 微信公众号API客户端
+type APIClient struct {
+	Client *Client
 }
 
 // NewMPAPIClient 创建新的微信公众号API客户端
-func NewMPAPIClient(client *MPClient) *MPAPIClient {
-	return &MPAPIClient{
+func NewMPAPIClient(client *Client) *APIClient {
+	return &APIClient{
 		Client: client,
 	}
 }
@@ -46,7 +46,7 @@ type GetCallbackIpResponse struct {
 }
 
 // CallbackCheck 网络通信检测
-func (c *MPAPIClient) CallbackCheck(ctx context.Context, action, checkOperator string) (*CallbackCheckResponse, error) {
+func (c *APIClient) CallbackCheck(ctx context.Context, action, checkOperator string) (*CallbackCheckResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func (c *MPAPIClient) CallbackCheck(ctx context.Context, action, checkOperator s
 }
 
 // GetApiDomainIp 获取微信API服务器IP
-func (c *MPAPIClient) GetApiDomainIp(ctx context.Context) (*GetApiDomainIpResponse, error) {
+func (c *APIClient) GetApiDomainIp(ctx context.Context) (*GetApiDomainIpResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (c *MPAPIClient) GetApiDomainIp(ctx context.Context) (*GetApiDomainIpRespon
 }
 
 // GetCallbackIp 获取微信推送服务器IP
-func (c *MPAPIClient) GetCallbackIp(ctx context.Context) (*GetCallbackIpResponse, error) {
+func (c *APIClient) GetCallbackIp(ctx context.Context) (*GetCallbackIpResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err

@@ -16,11 +16,11 @@ import (
 
 // MaterialClient 素材管理客户端
 type MaterialClient struct {
-	Client *MPClient
+	Client *Client
 }
 
 // NewMaterialClient 创建新的素材管理客户端
-func NewMaterialClient(client *MPClient) *MaterialClient {
+func NewMaterialClient(client *Client) *MaterialClient {
 	return &MaterialClient{
 		Client: client,
 	}

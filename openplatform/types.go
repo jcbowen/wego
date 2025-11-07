@@ -2,24 +2,9 @@ package openplatform
 
 import (
 	"context"
-	"fmt"
+
+	"github.com/jcbowen/wego/core"
 )
-
-// APIResponse 微信API通用响应结构
-type APIResponse struct {
-	ErrCode int    `json:"errcode"`
-	ErrMsg  string `json:"errmsg"`
-}
-
-// Error 实现error接口
-func (r *APIResponse) Error() string {
-	return fmt.Sprintf("微信API错误[%d]: %s", r.ErrCode, r.ErrMsg)
-}
-
-// IsSuccess 检查API响应是否成功
-func (r *APIResponse) IsSuccess() bool {
-	return r.ErrCode == 0
-}
 
 // AuthorizationInfo 授权信息
 type AuthorizationInfo struct {
@@ -139,7 +124,7 @@ type QuotaItem struct {
 
 // GetApiQuotaResponse 查询API调用额度响应
 type GetApiQuotaResponse struct {
-	APIResponse
+	core.APIResponse
 	Quota []QuotaItem `json:"quota"`
 }
 
@@ -162,7 +147,7 @@ type RidInfo struct {
 
 // GetRidInfoResponse 查询rid信息响应
 type GetRidInfoResponse struct {
-	APIResponse
+	core.APIResponse
 	RidInfo RidInfo `json:"rid_info"`
 }
 
@@ -189,7 +174,7 @@ type GetAuthorizerOptionRequest struct {
 
 // GetAuthorizerOptionResponse 获取授权方选项信息响应
 type GetAuthorizerOptionResponse struct {
-	APIResponse
+	core.APIResponse
 	AuthorizerAppID string `json:"authorizer_appid"`
 	OptionName      string `json:"option_name"`
 	OptionValue     string `json:"option_value"`
@@ -205,7 +190,7 @@ type TemplateDraft struct {
 
 // GetTemplateDraftListResponse 获取草稿箱列表响应
 type GetTemplateDraftListResponse struct {
-	APIResponse
+	core.APIResponse
 	DraftList []TemplateDraft `json:"draft_list"`
 }
 
@@ -225,7 +210,7 @@ type Template struct {
 
 // GetTemplateListResponse 获取模板列表响应
 type GetTemplateListResponse struct {
-	APIResponse
+	core.APIResponse
 	TemplateList []Template `json:"template_list"`
 }
 

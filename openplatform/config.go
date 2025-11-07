@@ -4,8 +4,8 @@ import (
 	"fmt"
 )
 
-// OpenPlatformConfig 微信开放平台配置结构体
-type OpenPlatformConfig struct {
+// Config 微信开放平台配置结构体
+type Config struct {
 	ComponentAppID     string `json:"component_app_id" ini:"component_app_id"`         // 第三方平台appid
 	ComponentAppSecret string `json:"component_app_secret" ini:"component_app_secret"` // 第三方平台appsecret
 	ComponentToken     string `json:"component_token" ini:"component_token"`           // 消息校验Token
@@ -14,7 +14,7 @@ type OpenPlatformConfig struct {
 }
 
 // Validate 验证配置的有效性
-func (c *OpenPlatformConfig) Validate() error {
+func (c *Config) Validate() error {
 	if c.ComponentAppID == "" {
 		return fmt.Errorf("ComponentAppID不能为空")
 	}

@@ -17,7 +17,7 @@ import (
 
 // APIClient API客户端
 type APIClient struct {
-	config       *OpenPlatformConfig
+	config       *Config
 	httpClient   core.HTTPClient
 	storage      storage.TokenStorage
 	logger       debugger.LoggerInterface
@@ -27,14 +27,14 @@ type APIClient struct {
 }
 
 // NewAPIClient 创建新的API客户端（使用默认文件存储）
-// @param config *OpenPlatformConfig 开放平台配置信息
+// @param config *Config 开放平台配置信息
 // @param opt ...any 可选参数，支持以下类型：
 //   - debugger.LoggerInterface: 自定义日志器
 //   - HTTPClient: 自定义HTTP客户端
 //   - EventHandler: 自定义事件处理器
 //
 // @return *APIClient API客户端实例
-func NewAPIClient(config *OpenPlatformConfig, opt ...any) (apiClient *APIClient) {
+func NewAPIClient(config *Config, opt ...any) (apiClient *APIClient) {
 	// 使用当前工作目录下的 ./runtime/wego_storage 文件夹作为默认存储路径
 	fileStorage, err := storage.NewFileStorage("./runtime/wego_storage")
 	if err != nil {
@@ -48,7 +48,7 @@ func NewAPIClient(config *OpenPlatformConfig, opt ...any) (apiClient *APIClient)
 }
 
 // NewAPIClientWithStorage 创建新的API客户端（使用自定义存储）
-func NewAPIClientWithStorage(config *OpenPlatformConfig, storage storage.TokenStorage, opt ...any) *APIClient {
+func NewAPIClientWithStorage(config *Config, storage storage.TokenStorage, opt ...any) *APIClient {
 	client := &APIClient{
 		config:     config,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
@@ -106,7 +106,7 @@ func (c *APIClient) GetEventHandler() EventHandler {
 }
 
 // GetConfig 获取配置信息
-func (c *APIClient) GetConfig() *OpenPlatformConfig {
+func (c *APIClient) GetConfig() *Config {
 	return c.config
 }
 

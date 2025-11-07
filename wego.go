@@ -1,6 +1,9 @@
 package wego
 
 import (
+	"log"
+
+	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/message"
 	"github.com/jcbowen/wego/officialaccount"
@@ -15,7 +18,7 @@ type WeGo struct {
 	OpenPlatformClient *openplatform.APIClient
 
 	// 公众号客户端
-	OfficialAccountClient *officialaccount.MPClient
+	OfficialAccountClient *officialaccount.Client
 }
 
 // NewWeGo 创建新的WeGo实例，支持多种客户端配置
@@ -25,17 +28,18 @@ func NewWeGo(configs ...any) *WeGo {
 
 	for _, config := range configs {
 		switch cfg := config.(type) {
-		case *openplatform.OpenPlatformConfig:
+		case *openplatform.Config:
 			// 如果还没有初始化过开放平台客户端，则初始化
 			if wego.OpenPlatformClient == nil {
 				wego.OpenPlatformClient = openplatform.NewAPIClient(cfg)
 			}
-		case *officialaccount.MPConfig:
+		case *officialaccount.Config:
 			// 如果还没有初始化过公众号客户端，则初始化
 			if wego.OfficialAccountClient == nil {
 				wego.OfficialAccountClient = officialaccount.NewMPClient(cfg)
 			}
 		default:
+			log.Printf("警告：不支持的配置类型 %T", cfg)
 			// 忽略不支持的配置类型
 			continue
 		}
@@ -51,12 +55,12 @@ func NewWeGoWithStorage(storage storage.TokenStorage, configs ...any) *WeGo {
 
 	for _, config := range configs {
 		switch cfg := config.(type) {
-		case *openplatform.OpenPlatformConfig:
+		case *openplatform.Config:
 			// 如果还没有初始化过开放平台客户端，则初始化
 			if wego.OpenPlatformClient == nil {
 				wego.OpenPlatformClient = openplatform.NewAPIClientWithStorage(cfg, storage)
 			}
-		case *officialaccount.MPConfig:
+		case *officialaccount.Config:
 			// 如果还没有初始化过公众号客户端，则初始化
 			if wego.OfficialAccountClient == nil {
 				wego.OfficialAccountClient = officialaccount.NewMPClientWithStorage(cfg, storage)
@@ -87,7 +91,7 @@ func (w *WeGo) OpenPlatformMessage() *message.MessageClient {
 }
 
 // OfficialAccountAPI 返回公众号API相关功能
-func (w *WeGo) OfficialAccountAPI() *officialaccount.MPAPIClient {
+func (w *WeGo) OfficialAccountAPI() *officialaccount.APIClient {
 	if w.OfficialAccountClient == nil {
 		panic("未初始化公众号客户端")
 	}
@@ -174,11 +178,9 @@ var (
 
 // 导出常用结构体类型
 type (
-	// 开放平台相关类型
-	OpenPlatformConfig    = openplatform.OpenPlatformConfig
-	APIResponse           = openplatform.APIResponse
-	AuthorizationInfo     = openplatform.AuthorizationInfo
-	AuthorizerInfo        = openplatform.AuthorizerInfo
+	APIResponse = core.APIResponse
+
+	// 存储相关类型
 	TokenStorage          = storage.TokenStorage
 	MemoryStorage         = storage.MemoryStorage
 	DBStorage             = storage.DBStorage
@@ -187,30 +189,34 @@ type (
 	PreAuthCode           = storage.PreAuthCode
 	AuthorizerAccessToken = storage.AuthorizerAccessToken
 
+	// 开放平台相关类型
+	OpenPlatformConfig            = openplatform.Config
+	OpenPlatformAuthorizationInfo = openplatform.AuthorizationInfo
+	OpenPlatformAuthorizerInfo    = openplatform.AuthorizerInfo
+
 	// 微信公众号开发相关类型
-	MPConfig       = officialaccount.MPConfig
-	MPClient       = officialaccount.MPClient
-	MPAPIClient    = officialaccount.MPAPIClient
-	MenuClient     = officialaccount.MenuClient
-	MessageClient  = officialaccount.MessageClient
-	TemplateClient = officialaccount.TemplateClient
-	CustomClient   = officialaccount.CustomClient
-	MaterialClient = officialaccount.MaterialClient
+	OfficialAccountConfig         = officialaccount.Config
+	OfficialAccountClient         = officialaccount.Client
+	OfficialAccountAPIClient      = officialaccount.APIClient
+	OfficialAccountMenuClient     = officialaccount.MenuClient
+	OfficialAccountMessageClient  = officialaccount.MessageClient
+	OfficialAccountTemplateClient = officialaccount.TemplateClient
+	OfficialAccountCustomClient   = officialaccount.CustomClient
+	OfficialAccountMaterialClient = officialaccount.MaterialClient
 
 	// 微信公众号数据结构体
-	Menu                   = officialaccount.Menu
-	Button                 = officialaccount.Button
-	SendTemplateMsgRequest = officialaccount.SendTemplateMsgRequest
-	TemplateData           = officialaccount.TemplateData
-	MPTextMessage          = officialaccount.TextMessage
-	MPImageMessage         = officialaccount.ImageMessage
-	VoiceMessage           = officialaccount.VoiceMessage
-	VideoMessage           = officialaccount.VideoMessage
-	MusicMessage           = officialaccount.MusicMessage
-	NewsMessage            = officialaccount.NewsMessage
-	MPNewsMessage          = officialaccount.MPNewsMessage
-	WXCardMessage          = officialaccount.WXCardMessage
-	MiniProgramPageMessage = officialaccount.MiniProgramPageMessage
-	NewsArticle            = officialaccount.NewsArticle
-	UserInfo               = types.OAuthUserInfoResponse
+	OfficialAccountMenu                   = officialaccount.Menu
+	OfficialAccountButton                 = officialaccount.Button
+	OfficialAccountTemplateMessageRequest = officialaccount.TemplateMessageRequest
+	OfficialAccountTemplateMessageData    = officialaccount.TemplateMessageData
+	OfficialAccountMessageText            = officialaccount.MessageText
+	OfficialAccountMessageImage           = officialaccount.MessageImage
+	OfficialAccountMessageVoice           = officialaccount.MessageVoice
+	OfficialAccountMessageVideo           = officialaccount.MessageVideo
+	OfficialAccountMusicMessage           = officialaccount.MessageMusic
+	OfficialAccountNewsMessage            = officialaccount.MessageNews
+	OfficialAccountWXCardMessage          = officialaccount.MessageWXCard
+	OfficialAccountMiniProgramPageMessage = officialaccount.MessageMiniProgramPage
+	OfficialAccountNewsArticle            = officialaccount.NewsArticle
+	UserInfo                              = types.OAuthUserInfoResponse
 )

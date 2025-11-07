@@ -11,9 +11,9 @@ import (
 	"github.com/jcbowen/wego/storage"
 )
 
-// MPClient 微信公众号客户端
-type MPClient struct {
-	config     *MPConfig
+// Client 微信公众号客户端
+type Client struct {
+	config     *Config
 	httpClient core.HTTPClient
 	storage    storage.TokenStorage
 	logger     debugger.LoggerInterface
@@ -23,7 +23,7 @@ type MPClient struct {
 }
 
 // NewMPClient 创建新的微信公众号客户端（使用默认文件存储）
-func NewMPClient(config *MPConfig) *MPClient {
+func NewMPClient(config *Config) *Client {
 	// 使用当前工作目录下的 wego_storage 文件夹作为默认存储路径
 	fileStorage, err := storage.NewFileStorage("./runtime/wego_storage")
 	if err != nil {
@@ -36,8 +36,8 @@ func NewMPClient(config *MPConfig) *MPClient {
 }
 
 // NewMPClientWithStorage 创建新的微信公众号客户端（使用自定义存储）
-func NewMPClientWithStorage(config *MPConfig, storage storage.TokenStorage) *MPClient {
-	client := &MPClient{
+func NewMPClientWithStorage(config *Config, storage storage.TokenStorage) *Client {
+	client := &Client{
 		config:     config,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		storage:    storage,
@@ -51,22 +51,22 @@ func NewMPClientWithStorage(config *MPConfig, storage storage.TokenStorage) *MPC
 }
 
 // GetStableTokenClient 获取稳定版access_token客户端
-func (c *MPClient) GetStableTokenClient() *StableTokenClient {
+func (c *Client) GetStableTokenClient() *StableTokenClient {
 	return c.stableTokenClient
 }
 
 // SetLogger 设置自定义日志器
-func (c *MPClient) SetLogger(logger debugger.LoggerInterface) {
+func (c *Client) SetLogger(logger debugger.LoggerInterface) {
 	c.logger = logger
 }
 
 // SetHTTPClient 设置自定义HTTP客户端
-func (c *MPClient) SetHTTPClient(client core.HTTPClient) {
+func (c *Client) SetHTTPClient(client core.HTTPClient) {
 	c.httpClient = client
 }
 
 // GetAccessToken 获取公众号access_token
-func (c *MPClient) GetAccessToken(ctx context.Context) (string, error) {
+func (c *Client) GetAccessToken(ctx context.Context) (string, error) {
 	// 从存储中获取token
 	token, err := c.storage.GetAuthorizerToken(ctx, c.config.AppID)
 	if err != nil {
@@ -82,22 +82,22 @@ func (c *MPClient) GetAccessToken(ctx context.Context) (string, error) {
 }
 
 // GetStableAccessToken 获取稳定版access_token
-func (c *MPClient) GetStableAccessToken(ctx context.Context) (string, error) {
+func (c *Client) GetStableAccessToken(ctx context.Context) (string, error) {
 	return c.stableTokenClient.GetStableAccessTokenWithAutoRefresh(ctx)
 }
 
 // GetStableAccessTokenInfo 获取稳定版access_token详细信息
-func (c *MPClient) GetStableAccessTokenInfo(ctx context.Context, mode StableAccessTokenMode) (*StableAccessTokenInfo, error) {
+func (c *Client) GetStableAccessTokenInfo(ctx context.Context, mode StableAccessTokenMode) (*StableAccessTokenInfo, error) {
 	return c.stableTokenClient.GetStableAccessToken(ctx, mode)
 }
 
 // MakeRequestWithStableToken 使用稳定版access_token发送请求
-func (c *MPClient) MakeRequestWithStableToken(ctx context.Context, method, url string, body interface{}, result interface{}) error {
+func (c *Client) MakeRequestWithStableToken(ctx context.Context, method, url string, body interface{}, result interface{}) error {
 	return c.stableTokenClient.MakeRequestWithStableToken(ctx, method, url, body, result)
 }
 
 // refreshAccessToken 刷新access_token
-func (c *MPClient) refreshAccessToken(ctx context.Context) (string, error) {
+func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
 	// 双重检查：再次从存储中获取
 	token, err := c.storage.GetAuthorizerToken(ctx, c.config.AppID)
 	if err != nil {
@@ -143,12 +143,12 @@ func (c *MPClient) refreshAccessToken(ctx context.Context) (string, error) {
 }
 
 // GetConfig 获取配置信息
-func (c *MPClient) GetConfig() *MPConfig {
+func (c *Client) GetConfig() *Config {
 	return c.config
 }
 
 // GetLogger 获取日志器
-func (c *MPClient) GetLogger() debugger.LoggerInterface {
+func (c *Client) GetLogger() debugger.LoggerInterface {
 	return c.logger
 }
 
@@ -158,7 +158,7 @@ func (c *MPClient) GetLogger() debugger.LoggerInterface {
 // 注意事项：每个帐号每月共10次清零操作机会，清零生效一次即用掉一次机会
 // 请求方式：POST https://api.weixin.qq.com/cgi-bin/clear_quota?access_token=ACCESS_TOKEN
 // 请求体：{"appid":"APPID"}
-func (c *MPClient) ClearQuota(ctx context.Context) error {
+func (c *Client) ClearQuota(ctx context.Context) error {
 	// 获取access_token
 	accessToken, err := c.GetAccessToken(ctx)
 	if err != nil {

@@ -10,11 +10,11 @@ import (
 
 // CustomClient 客服消息客户端
 type CustomClient struct {
-	Client *MPClient
+	Client *Client
 }
 
 // NewCustomClient 创建新的客服消息客户端
-func NewCustomClient(client *MPClient) *CustomClient {
+func NewCustomClient(client *Client) *CustomClient {
 	return &CustomClient{
 		Client: client,
 	}
@@ -25,44 +25,44 @@ type CustomMessage interface {
 	GetMsgType() string
 }
 
-// TextMessage 文本消息
-type TextMessage struct {
+// MessageText 文本消息
+type MessageText struct {
 	MsgType string `json:"msgtype"`
 	Text    struct {
 		Content string `json:"content"`
 	} `json:"text"`
 }
 
-func (m *TextMessage) GetMsgType() string {
+func (m *MessageText) GetMsgType() string {
 	return "text"
 }
 
-// ImageMessage 图片消息
-type ImageMessage struct {
+// MessageImage 图片消息
+type MessageImage struct {
 	MsgType string `json:"msgtype"`
 	Image   struct {
 		MediaID string `json:"media_id"`
 	} `json:"image"`
 }
 
-func (m *ImageMessage) GetMsgType() string {
+func (m *MessageImage) GetMsgType() string {
 	return "image"
 }
 
-// VoiceMessage 语音消息
-type VoiceMessage struct {
+// MessageVoice 语音消息
+type MessageVoice struct {
 	MsgType string `json:"msgtype"`
 	Voice   struct {
 		MediaID string `json:"media_id"`
 	} `json:"voice"`
 }
 
-func (m *VoiceMessage) GetMsgType() string {
+func (m *MessageVoice) GetMsgType() string {
 	return "voice"
 }
 
-// VideoMessage 视频消息
-type VideoMessage struct {
+// MessageVideo 视频消息
+type MessageVideo struct {
 	MsgType string `json:"msgtype"`
 	Video   struct {
 		MediaID      string `json:"media_id"`
@@ -72,12 +72,12 @@ type VideoMessage struct {
 	} `json:"video"`
 }
 
-func (m *VideoMessage) GetMsgType() string {
+func (m *MessageVideo) GetMsgType() string {
 	return "video"
 }
 
-// MusicMessage 音乐消息
-type MusicMessage struct {
+// MessageMusic 音乐消息
+type MessageMusic struct {
 	MsgType string `json:"msgtype"`
 	Music   struct {
 		Title        string `json:"title"`
@@ -88,19 +88,19 @@ type MusicMessage struct {
 	} `json:"music"`
 }
 
-func (m *MusicMessage) GetMsgType() string {
+func (m *MessageMusic) GetMsgType() string {
 	return "music"
 }
 
-// NewsMessage 图文消息
-type NewsMessage struct {
+// MessageNews 图文消息
+type MessageNews struct {
 	MsgType string `json:"msgtype"`
 	News    struct {
 		Articles []CustomArticle `json:"articles"`
 	} `json:"news"`
 }
 
-func (m *NewsMessage) GetMsgType() string {
+func (m *MessageNews) GetMsgType() string {
 	return "news"
 }
 
@@ -124,20 +124,20 @@ func (m *MPNewsMessage) GetMsgType() string {
 	return "mpnews"
 }
 
-// WXCardMessage 卡券消息
-type WXCardMessage struct {
+// MessageWXCard 卡券消息
+type MessageWXCard struct {
 	MsgType string `json:"msgtype"`
 	WXCard  struct {
 		CardID string `json:"card_id"`
 	} `json:"wxcard"`
 }
 
-func (m *WXCardMessage) GetMsgType() string {
+func (m *MessageWXCard) GetMsgType() string {
 	return "wxcard"
 }
 
-// MiniProgramPageMessage 小程序卡片消息
-type MiniProgramPageMessage struct {
+// MessageMiniProgramPage 小程序卡片消息
+type MessageMiniProgramPage struct {
 	MsgType         string `json:"msgtype"`
 	MiniProgramPage struct {
 		Title        string `json:"title"`
@@ -147,7 +147,7 @@ type MiniProgramPageMessage struct {
 	} `json:"miniprogrampage"`
 }
 
-func (m *MiniProgramPageMessage) GetMsgType() string {
+func (m *MessageMiniProgramPage) GetMsgType() string {
 	return "miniprogrampage"
 }
 
@@ -155,15 +155,15 @@ func (m *MiniProgramPageMessage) GetMsgType() string {
 type SendCustomMessageRequest struct {
 	Touser          string                  `json:"touser"`
 	MsgType         string                  `json:"msgtype"`
-	Text            *TextMessage            `json:"text,omitempty"`
-	Image           *ImageMessage           `json:"image,omitempty"`
-	Voice           *VoiceMessage           `json:"voice,omitempty"`
-	Video           *VideoMessage           `json:"video,omitempty"`
-	Music           *MusicMessage           `json:"music,omitempty"`
-	News            *NewsMessage            `json:"news,omitempty"`
+	Text            *MessageText            `json:"text,omitempty"`
+	Image           *MessageImage           `json:"image,omitempty"`
+	Voice           *MessageVoice           `json:"voice,omitempty"`
+	Video           *MessageVideo           `json:"video,omitempty"`
+	Music           *MessageMusic           `json:"music,omitempty"`
+	News            *MessageNews            `json:"news,omitempty"`
 	MPNews          *MPNewsMessage          `json:"mpnews,omitempty"`
-	WXCard          *WXCardMessage          `json:"wxcard,omitempty"`
-	MiniProgramPage *MiniProgramPageMessage `json:"miniprogrampage,omitempty"`
+	WXCard          *MessageWXCard          `json:"wxcard,omitempty"`
+	MiniProgramPage *MessageMiniProgramPage `json:"miniprogrampage,omitempty"`
 }
 
 // SendCustomMessageResponse 发送客服消息响应
@@ -342,23 +342,23 @@ func (c *CustomClient) SendCustomMessage(ctx context.Context, touser string, mes
 
 	// 根据消息类型设置对应的消息字段
 	switch msg := message.(type) {
-	case *TextMessage:
+	case *MessageText:
 		request.Text = msg
-	case *ImageMessage:
+	case *MessageImage:
 		request.Image = msg
-	case *VoiceMessage:
+	case *MessageVoice:
 		request.Voice = msg
-	case *VideoMessage:
+	case *MessageVideo:
 		request.Video = msg
-	case *MusicMessage:
+	case *MessageMusic:
 		request.Music = msg
-	case *NewsMessage:
+	case *MessageNews:
 		request.News = msg
 	case *MPNewsMessage:
 		request.MPNews = msg
-	case *WXCardMessage:
+	case *MessageWXCard:
 		request.WXCard = msg
-	case *MiniProgramPageMessage:
+	case *MessageMiniProgramPage:
 		request.MiniProgramPage = msg
 	default:
 		return nil, fmt.Errorf("unsupported message type: %s", message.GetMsgType())

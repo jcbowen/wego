@@ -10,11 +10,11 @@ import (
 
 // TemplateClient 模板消息客户端
 type TemplateClient struct {
-	Client *MPClient
+	Client *Client
 }
 
 // NewTemplateClient 创建新的模板消息客户端
-func NewTemplateClient(client *MPClient) *TemplateClient {
+func NewTemplateClient(client *Client) *TemplateClient {
 	return &TemplateClient{
 		Client: client,
 	}
@@ -105,13 +105,13 @@ type SetIndustryResponse struct {
 }
 
 // SendTemplateMessage 发送模板消息
-func (c *TemplateClient) SendTemplateMessage(ctx context.Context, request *SendTemplateMsgRequest) (*SendTemplateMsgResponse, error) {
+func (c *TemplateClient) SendTemplateMessage(ctx context.Context, request *TemplateMessageRequest) (*SendTemplateMessageResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var result *SendTemplateMsgResponse
+	var result *SendTemplateMessageResponse
 	result, err = NewTemplate(c.Client.req).SendTemplateMessage(ctx, request, accessToken)
 	if err != nil {
 		return nil, err

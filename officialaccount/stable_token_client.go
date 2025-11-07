@@ -8,11 +8,11 @@ import (
 
 // StableTokenClient 稳定版access_token客户端
 type StableTokenClient struct {
-	client *MPClient
+	client *Client
 }
 
 // NewStableTokenClient 创建稳定版access_token客户端
-func NewStableTokenClient(client *MPClient) *StableTokenClient {
+func NewStableTokenClient(client *Client) *StableTokenClient {
 	return &StableTokenClient{
 		client: client,
 	}
