@@ -3,6 +3,7 @@ package wego
 import (
 	"log"
 
+	"github.com/jcbowen/jcbaseGo/component/debugger"
 	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/message"
@@ -72,6 +73,16 @@ func NewWeGoWithStorage(storage storage.TokenStorage, configs ...any) *WeGo {
 	}
 
 	return wego
+}
+
+// SetLogger 设置日志记录器
+func (w *WeGo) SetLogger(logger debugger.LoggerInterface) {
+	if w.OpenPlatformClient != nil {
+		w.OpenPlatformClient.SetLogger(logger)
+	}
+	if w.OfficialAccountClient != nil {
+		w.OfficialAccountClient.SetLogger(logger)
+	}
 }
 
 // OpenPlatformAuth 返回开放平台授权相关功能
