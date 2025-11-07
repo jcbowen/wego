@@ -23,16 +23,27 @@ func (r *APIResponse) IsSuccess() bool {
 
 // AuthorizationInfo 授权信息
 type AuthorizationInfo struct {
-	AuthorizerAppID        string              `json:"authorizer_appid"`
-	AuthorizerAccessToken  string              `json:"authorizer_access_token"`
-	ExpiresIn              int                 `json:"expires_in"` // authorizer_access_token的有效期
-	AuthorizerRefreshToken string              `json:"authorizer_refresh_token"`
-	FuncInfo               []FuncScopeCategory `json:"func_info"`
+	AuthorizerAppID        string     `json:"authorizer_appid"`
+	AuthorizerAccessToken  string     `json:"authorizer_access_token"`
+	ExpiresIn              int        `json:"expires_in"` // authorizer_access_token的有效期
+	AuthorizerRefreshToken string     `json:"authorizer_refresh_token"`
+	FuncInfo               []FuncInfo `json:"func_info"`
 }
 
 // FuncScopeCategory 授权给开发者的权限集
 type FuncScopeCategory struct {
-	FuncScopeCategoryID int `json:"funcscope_category"`
+	Id int `json:"id"`
+}
+
+type FuncInfo struct {
+	FuncScopeCategory FuncScopeCategory `json:"funcscope_category"`
+	ConfirmInfo       ConfirmInfo       `json:"confirm_info,omitempty"`
+}
+
+type ConfirmInfo struct {
+	NeedConfirm    int `json:"need_confirm"`
+	AlreadyConfirm int `json:"already_confirm"`
+	CanConfirm     int `json:"can_confirm"`
 }
 
 // AuthorizerInfo 授权方信息
