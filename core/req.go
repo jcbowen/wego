@@ -7,15 +7,19 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/jcbowen/jcbaseGo/component/debugger"
 )
 
 type Request struct {
 	httpClient HTTPClient
+	logger     debugger.LoggerInterface
 }
 
-func NewRequest(httpClient HTTPClient) *Request {
+func NewRequest(httpClient HTTPClient, logger debugger.LoggerInterface) *Request {
 	return &Request{
 		httpClient: httpClient,
+		logger:     logger,
 	}
 }
 
@@ -37,18 +41,40 @@ func (request *Request) Make(ctx context.Context, method, url string, body inter
 
 	req.Header.Set("Content-Type", "application/json")
 
+	request.logger.Debug(map[string]interface{}{
+		"request_method": req.Method,
+		"url":            req.URL,
+		"headers":        req.Header,
+		"body":           string(reqBody),
+	}, map[string]interface{}{
+		"client": "OpenPlatform",
+		"method": "MakeRequest",
+		"source": "request.body",
+	})
+
 	resp, err := request.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("发送请求失败: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err = Body.Close()
+		if err != nil {
+			request.logger.Error(fmt.Sprintf("关闭响应体失败: %v", err))
+		}
+	}(resp.Body)
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("读取响应体失败: %v", err)
 	}
 
-	if err := json.Unmarshal(respBody, result); err != nil {
+	request.logger.Debug(string(respBody), map[string]interface{}{
+		"client": "OpenPlatform",
+		"method": "MakeRequest",
+		"source": "response.body",
+	})
+
+	if err = json.Unmarshal(respBody, result); err != nil {
 		return fmt.Errorf("解析响应失败: %v", err)
 	}
 
