@@ -1,11 +1,8 @@
 package officialaccount
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -119,7 +116,7 @@ func (c *MPClient) refreshAccessToken(ctx context.Context) (string, error) {
 		ExpiresIn   int    `json:"expires_in"`
 	}
 
-	err = c.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return "", err
 	}
@@ -141,51 +138,6 @@ func (c *MPClient) refreshAccessToken(ctx context.Context) (string, error) {
 	}
 
 	return result.AccessToken, nil
-}
-
-// MakeRequest 发送HTTP请求的通用方法
-func (c *MPClient) MakeRequest(ctx context.Context, method, url string, body interface{}, result interface{}) error {
-	var reqBody []byte
-	if body != nil {
-		var err error
-		reqBody, err = json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("序列化请求体失败: %v", err)
-		}
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(reqBody))
-	if err != nil {
-		return fmt.Errorf("创建请求失败: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("发送请求失败: %v", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("读取响应体失败: %v", err)
-	}
-
-	if err := json.Unmarshal(respBody, result); err != nil {
-		return fmt.Errorf("解析响应失败: %v", err)
-	}
-
-	return nil
-}
-
-// MakeRequestRaw 发送原始HTTP请求，返回响应对象
-func (c *MPClient) MakeRequestRaw(req *http.Request) (*http.Response, error) {
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("发送请求失败: %v", err)
-	}
-	return resp, nil
 }
 
 // GetConfig 获取配置信息
@@ -220,7 +172,7 @@ func (c *MPClient) ClearQuota(ctx context.Context) error {
 	}
 
 	var response ClearQuotaResponse
-	err = c.MakeRequest(ctx, "POST", url, request, &response)
+	err = core.NewRequest(c.httpClient).Make(ctx, "POST", url, request, &response)
 	if err != nil {
 		return fmt.Errorf("清空API调用次数失败: %v", err)
 	}

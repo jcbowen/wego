@@ -1,12 +1,9 @@
 package openplatform
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
 	"net/url"
@@ -219,73 +216,6 @@ func (c *APIClient) refreshAuthorizerAccessToken(ctx context.Context, authorizer
 	return "", fmt.Errorf("无法获取授权方access_token：缺少refresh_token")
 }
 
-// MakeRequest 发送HTTP请求的通用方法
-func (c *APIClient) MakeRequest(ctx context.Context, method, url string, body interface{}, result interface{}) error {
-	var reqBody []byte
-	if body != nil {
-		var err error
-		reqBody, err = json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("序列化请求体失败: %v", err)
-		}
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(reqBody))
-	if err != nil {
-		return fmt.Errorf("创建请求失败: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	c.logger.Debug(map[string]interface{}{
-		"request_method": req.Method,
-		"url":            req.URL,
-		"headers":        req.Header,
-		"body":           string(reqBody),
-	}, map[string]interface{}{
-		"client": "OpenPlatform",
-		"method": "MakeRequest",
-		"source": "request.body",
-	})
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("发送请求失败: %v", err)
-	}
-	defer func(Body io.ReadCloser) {
-		err = Body.Close()
-		if err != nil {
-			c.logger.Error(fmt.Sprintf("关闭响应体失败: %v", err))
-		}
-	}(resp.Body)
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("读取响应体失败: %v", err)
-	}
-
-	c.logger.Debug(string(respBody), map[string]interface{}{
-		"client": "OpenPlatform",
-		"method": "MakeRequest",
-		"source": "response.body",
-	})
-
-	if err = json.Unmarshal(respBody, result); err != nil {
-		return fmt.Errorf("解析响应失败: %v", err)
-	}
-
-	return nil
-}
-
-// MakeRequestRaw 发送原始HTTP请求，返回响应对象
-func (c *APIClient) MakeRequestRaw(req *http.Request) (*http.Response, error) {
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("发送请求失败: %v", err)
-	}
-	return resp, nil
-}
-
 // ComponentTokenRequest 获取component_access_token请求参数
 type ComponentTokenRequest struct {
 	ComponentAppID        string `json:"component_appid"`
@@ -393,7 +323,7 @@ func (c *APIClient) GetComponentAccessToken(ctx context.Context, verifyTicket st
 		ExpiresIn            int    `json:"expires_in"`
 	}
 
-	err := c.MakeRequest(ctx, "POST", APIComponentTokenURL, request, &result)
+	err := core.NewRequest(c.httpClient).Make(ctx, "POST", APIComponentTokenURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -438,7 +368,7 @@ func (c *APIClient) GetPreAuthCodeFromAPI(ctx context.Context) (*PreAuthCodeResp
 
 	var result PreAuthCodeResponse
 	apiURL := fmt.Sprintf("%s?component_access_token=%s", APIPreAuthCodeURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -698,7 +628,7 @@ func (c *APIClient) QueryAuth(ctx context.Context, authorizationCode string) (*Q
 
 	var result QueryAuthResponse
 	queryAuthUrl := fmt.Sprintf("%s?component_access_token=%s", APIQueryAuthURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", queryAuthUrl, request, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "POST", queryAuthUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -741,7 +671,7 @@ func (c *APIClient) RefreshAuthorizerToken(ctx context.Context, authorizerAppID,
 	apiURL := fmt.Sprintf("%s?component_access_token=%s", APIAuthorizerTokenURL,
 		url.QueryEscape(componentToken.AccessToken))
 
-	err = c.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -777,7 +707,7 @@ func (c *APIClient) GetAuthorizerInfo(ctx context.Context, authorizerAppID strin
 
 	var result GetAuthorizerInfoResponse
 	getAuthorizerInfoUrl := fmt.Sprintf("%s?component_access_token=%s", APIGetAuthorizerInfoURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", getAuthorizerInfoUrl, request, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "POST", getAuthorizerInfoUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -804,7 +734,7 @@ func (c *APIClient) GetAuthorizerList(ctx context.Context, offset, count int) (*
 
 	var result GetAuthorizerListResponse
 	getAuthorizerListUrl := fmt.Sprintf("%s?component_access_token=%s", APIGetAuthorizerListURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", getAuthorizerListUrl, request, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "POST", getAuthorizerListUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -950,7 +880,7 @@ func (c *APIClient) ClearQuota(ctx context.Context) (*APIResponse, error) {
 
 	var result APIResponse
 	clearQuotaUrl := fmt.Sprintf("%s?access_token=%s", APIClearQuotaURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", clearQuotaUrl, request, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "POST", clearQuotaUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -976,7 +906,7 @@ func (c *APIClient) GetApiQuota(ctx context.Context, authorizerAppID string) (*G
 
 	var result GetApiQuotaResponse
 	getApiQuotaUrl := fmt.Sprintf("%s?access_token=%s", APIGetApiQuotaURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", getApiQuotaUrl, request, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "POST", getApiQuotaUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1001,7 +931,7 @@ func (c *APIClient) GetRidInfo(ctx context.Context, rid string) (*GetRidInfoResp
 
 	var result GetRidInfoResponse
 	getRidInfoUrl := fmt.Sprintf("%s?access_token=%s", APIGetRidInfoURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", getRidInfoUrl, request, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "POST", getRidInfoUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1021,7 +951,7 @@ func (c *APIClient) ClearComponentQuota(ctx context.Context) (*APIResponse, erro
 	}
 
 	var result APIResponse
-	err := c.MakeRequest(ctx, "POST", APIClearComponentQuotaURL, request, &result)
+	err := core.NewRequest(c.httpClient).Make(ctx, "POST", APIClearComponentQuotaURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1049,7 +979,7 @@ func (c *APIClient) SetAuthorizerOption(ctx context.Context, authorizerAppID, op
 
 	var result APIResponse
 	setAuthorizerOptionUrl := fmt.Sprintf("%s?component_access_token=%s", APISetAuthorizerOptionURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", setAuthorizerOptionUrl, request, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "POST", setAuthorizerOptionUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1076,7 +1006,7 @@ func (c *APIClient) GetAuthorizerOption(ctx context.Context, authorizerAppID, op
 
 	var result GetAuthorizerOptionResponse
 	getAuthorizerOptionUrl := fmt.Sprintf("%s?component_access_token=%s", APIGetAuthorizerOptionURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", getAuthorizerOptionUrl, request, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "POST", getAuthorizerOptionUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1097,7 +1027,7 @@ func (c *APIClient) GetTemplateDraftList(ctx context.Context) (*GetTemplateDraft
 
 	var result GetTemplateDraftListResponse
 	getTemplateDraftListUrl := fmt.Sprintf("%s?access_token=%s", APIWxaGetTemplateDraftListURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "GET", getTemplateDraftListUrl, nil, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "GET", getTemplateDraftListUrl, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1123,7 +1053,7 @@ func (c *APIClient) AddToTemplate(ctx context.Context, draftID int64, templateTy
 
 	var result APIResponse
 	addToTemplateUrl := fmt.Sprintf("%s?access_token=%s", APIWxaAddToTemplateURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", addToTemplateUrl, request, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "POST", addToTemplateUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1144,7 +1074,7 @@ func (c *APIClient) GetTemplateList(ctx context.Context) (*GetTemplateListRespon
 
 	var result GetTemplateListResponse
 	getTemplateListUrl := fmt.Sprintf("%s?access_token=%s", APIWxaGetTemplateListURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "GET", getTemplateListUrl, nil, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "GET", getTemplateListUrl, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -1169,7 +1099,7 @@ func (c *APIClient) DeleteTemplate(ctx context.Context, templateID int64) (*APIR
 
 	var result APIResponse
 	deleteTemplateUrl := fmt.Sprintf("%s?access_token=%s", APIWxaDeleteTemplateURL, url.QueryEscape(componentToken.AccessToken))
-	err = c.MakeRequest(ctx, "POST", deleteTemplateUrl, request, &result)
+	err = core.NewRequest(c.httpClient).Make(ctx, "POST", deleteTemplateUrl, request, &result)
 	if err != nil {
 		return nil, err
 	}
