@@ -25,7 +25,7 @@ func (r *APIResponse) IsSuccess() bool {
 type AuthorizationInfo struct {
 	AuthorizerAppID        string              `json:"authorizer_appid"`
 	AuthorizerAccessToken  string              `json:"authorizer_access_token"`
-	ExpiresIn              int                 `json:"expires_in"`
+	ExpiresIn              int                 `json:"expires_in"` // authorizer_access_token的有效期
 	AuthorizerRefreshToken string              `json:"authorizer_refresh_token"`
 	FuncInfo               []FuncScopeCategory `json:"func_info"`
 }
