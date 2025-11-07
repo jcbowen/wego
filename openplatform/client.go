@@ -241,6 +241,17 @@ func (c *APIClient) MakeRequest(ctx context.Context, method, url string, body in
 
 	req.Header.Set("Content-Type", "application/json")
 
+	c.logger.Debug(map[string]interface{}{
+		"request_method": req.Method,
+		"url":            req.URL,
+		"headers":        req.Header,
+		"body":           string(reqBody),
+	}, map[string]interface{}{
+		"client": "OpenPlatform",
+		"method": "MakeRequest",
+		"source": "request.body",
+	})
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("发送请求失败: %v", err)
@@ -260,6 +271,7 @@ func (c *APIClient) MakeRequest(ctx context.Context, method, url string, body in
 	c.logger.Debug(string(respBody), map[string]interface{}{
 		"client": "OpenPlatform",
 		"method": "MakeRequest",
+		"source": "response.body",
 	})
 
 	if err = json.Unmarshal(respBody, result); err != nil {
@@ -349,7 +361,7 @@ type GetAuthorizerListResponse struct {
 	TotalCount int `json:"total_count"`
 	List       []struct {
 		AuthorizerAppID string `json:"authorizer_appid"`
-		RefreshToken    string `json:"refresh_token"` // 通过接口已经获取不到了，只能重新授权
+		RefreshToken    string `json:"refresh_token,omitempty"` // 虽然文档写了，但是实际上获取不到
 		AuthTime        int64  `json:"auth_time"`
 	} `json:"list"`
 }
@@ -811,27 +823,20 @@ func (c *APIClient) GetAuthorizerList(ctx context.Context, offset, count int) (*
 // GetAllAuthorizers 获取所有授权方列表，自动处理分页
 // 该方法会循环调用GetAuthorizerList，直到获取所有授权方数据
 // 返回所有授权方信息的切片和可能的错误
-func (c *APIClient) GetAllAuthorizers(ctx context.Context) ([]struct {
+func (c *APIClient) GetAllAuthorizers(ctx context.Context) (allAuthorizers []struct {
 	AuthorizerAppID string `json:"authorizer_appid"`
-	RefreshToken    string `json:"refresh_token"` // 通过接口已经获取不到了，只能重新授权
+	RefreshToken    string `json:"refresh_token,omitempty"` // 虽然文档写了，但是实际上获取不到
 	AuthTime        int64  `json:"auth_time"`
-}, error) {
+}, err error) {
 	const (
 		pageSize = 500 // 每页获取的数量，微信API最大支持500
 		maxRetry = 3   // 最大重试次数
 	)
 
-	var allAuthorizers []struct {
-		AuthorizerAppID string `json:"authorizer_appid"`
-		RefreshToken    string `json:"refresh_token"`
-		AuthTime        int64  `json:"auth_time"`
-	}
-
 	offset := 0
 
 	for {
 		var response *GetAuthorizerListResponse
-		var err error
 
 		// 重试机制
 		for retry := 0; retry < maxRetry; retry++ {
