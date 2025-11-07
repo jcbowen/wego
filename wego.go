@@ -16,15 +16,15 @@ import (
 // WeGo 微信开发封装库主结构体
 type WeGo struct {
 	// 开放平台客户端
-	OpenPlatformClient *openplatform.APIClient
+	OpenPlatformClient *openplatform.Client
 
 	// 公众号客户端
 	OfficialAccountClient *officialaccount.Client
 }
 
-// NewWeGo 创建新的WeGo实例，支持多种客户端配置
+// New 创建新的WeGo实例，支持多种客户端配置
 // 同类型的客户端只能初始化一个，比如第一个参数是微信公众号，后面的不管还有几个公众号配置都忽略掉
-func NewWeGo(configs ...any) *WeGo {
+func New(configs ...any) *WeGo {
 	wego := &WeGo{}
 
 	for _, config := range configs {
@@ -32,12 +32,12 @@ func NewWeGo(configs ...any) *WeGo {
 		case *openplatform.Config:
 			// 如果还没有初始化过开放平台客户端，则初始化
 			if wego.OpenPlatformClient == nil {
-				wego.OpenPlatformClient = openplatform.NewAPIClient(cfg)
+				wego.OpenPlatformClient = openplatform.NewClient(cfg)
 			}
 		case *officialaccount.Config:
 			// 如果还没有初始化过公众号客户端，则初始化
 			if wego.OfficialAccountClient == nil {
-				wego.OfficialAccountClient = officialaccount.NewMPClient(cfg)
+				wego.OfficialAccountClient = officialaccount.NewClient(cfg)
 			}
 		default:
 			log.Printf("警告：不支持的配置类型 %T", cfg)
@@ -49,9 +49,9 @@ func NewWeGo(configs ...any) *WeGo {
 	return wego
 }
 
-// NewWeGoWithStorage 创建新的WeGo实例（使用自定义存储）
+// NewWithStorage 创建新的WeGo实例（使用自定义存储）
 // 同类型的客户端只能初始化一个，比如第一个参数是微信公众号，后面的不管还有几个公众号配置都忽略掉
-func NewWeGoWithStorage(storage storage.TokenStorage, configs ...any) *WeGo {
+func NewWithStorage(storage storage.TokenStorage, configs ...any) *WeGo {
 	wego := &WeGo{}
 
 	for _, config := range configs {
@@ -59,7 +59,7 @@ func NewWeGoWithStorage(storage storage.TokenStorage, configs ...any) *WeGo {
 		case *openplatform.Config:
 			// 如果还没有初始化过开放平台客户端，则初始化
 			if wego.OpenPlatformClient == nil {
-				wego.OpenPlatformClient = openplatform.NewAPIClientWithStorage(cfg, storage)
+				wego.OpenPlatformClient = openplatform.NewClientWithStorage(cfg, storage)
 			}
 		case *officialaccount.Config:
 			// 如果还没有初始化过公众号客户端，则初始化

@@ -15,8 +15,8 @@ import (
 	"github.com/jcbowen/wego/storage"
 )
 
-// APIClient API客户端
-type APIClient struct {
+// Client API客户端
+type Client struct {
 	config       *Config
 	httpClient   core.HTTPClient
 	storage      storage.TokenStorage
@@ -26,30 +26,30 @@ type APIClient struct {
 	req          *core.Request
 }
 
-// NewAPIClient 创建新的API客户端（使用默认文件存储）
+// NewClient 创建新的API客户端（使用默认文件存储）
 // @param config *Config 开放平台配置信息
 // @param opt ...any 可选参数，支持以下类型：
 //   - debugger.LoggerInterface: 自定义日志器
 //   - HTTPClient: 自定义HTTP客户端
 //   - EventHandler: 自定义事件处理器
 //
-// @return *APIClient API客户端实例
-func NewAPIClient(config *Config, opt ...any) (apiClient *APIClient) {
+// @return *Client API客户端实例
+func NewClient(config *Config, opt ...any) (apiClient *Client) {
 	// 使用当前工作目录下的 ./runtime/wego_storage 文件夹作为默认存储路径
 	fileStorage, err := storage.NewFileStorage("./runtime/wego_storage")
 	if err != nil {
 		// 如果文件存储创建失败，回退到内存存储并输出日志
 		logger := &debugger.DefaultLogger{}
 		logger.Warn(fmt.Sprintf("文件存储创建失败，回退到内存存储: %v", err))
-		apiClient = NewAPIClientWithStorage(config, storage.NewMemoryStorage(), opt...)
+		apiClient = NewClientWithStorage(config, storage.NewMemoryStorage(), opt...)
 	}
-	apiClient = NewAPIClientWithStorage(config, fileStorage, opt...)
+	apiClient = NewClientWithStorage(config, fileStorage, opt...)
 	return
 }
 
-// NewAPIClientWithStorage 创建新的API客户端（使用自定义存储）
-func NewAPIClientWithStorage(config *Config, storage storage.TokenStorage, opt ...any) *APIClient {
-	client := &APIClient{
+// NewClientWithStorage 创建新的API客户端（使用自定义存储）
+func NewClientWithStorage(config *Config, storage storage.TokenStorage, opt ...any) *Client {
+	client := &Client{
 		config:     config,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		storage:    storage,
@@ -83,7 +83,7 @@ func NewAPIClientWithStorage(config *Config, storage storage.TokenStorage, opt .
 }
 
 // SetLogger 设置自定义日志器
-func (c *APIClient) SetLogger(logger debugger.LoggerInterface) {
+func (c *Client) SetLogger(logger debugger.LoggerInterface) {
 	c.logger = logger
 	// 同时更新请求对象中的日志器
 	if c.req != nil {
@@ -92,17 +92,17 @@ func (c *APIClient) SetLogger(logger debugger.LoggerInterface) {
 }
 
 // SetHTTPClient 设置自定义HTTP客户端
-func (c *APIClient) SetHTTPClient(client core.HTTPClient) {
+func (c *Client) SetHTTPClient(client core.HTTPClient) {
 	c.httpClient = client
 }
 
 // SetEventHandler 设置事件处理器
-func (c *APIClient) SetEventHandler(handler EventHandler) {
+func (c *Client) SetEventHandler(handler EventHandler) {
 	c.eventHandler = handler
 }
 
 // GetEventHandler 获取事件处理器
-func (c *APIClient) GetEventHandler() EventHandler {
+func (c *Client) GetEventHandler() EventHandler {
 	if c.eventHandler == nil {
 		return &DefaultEventHandler{}
 	}
@@ -110,37 +110,37 @@ func (c *APIClient) GetEventHandler() EventHandler {
 }
 
 // GetConfig 获取配置信息
-func (c *APIClient) GetConfig() *Config {
+func (c *Client) GetConfig() *Config {
 	return c.config
 }
 
 // GetLogger 获取日志器
-func (c *APIClient) GetLogger() debugger.LoggerInterface {
+func (c *Client) GetLogger() debugger.LoggerInterface {
 	return c.logger
 }
 
 // SetComponentToken 设置开放平台令牌
-func (c *APIClient) SetComponentToken(token *storage.ComponentAccessToken) error {
+func (c *Client) SetComponentToken(token *storage.ComponentAccessToken) error {
 	return c.storage.SaveComponentToken(context.Background(), token)
 }
 
 // GetComponentToken 获取开放平台令牌
-func (c *APIClient) GetComponentToken(ctx context.Context) (*storage.ComponentAccessToken, error) {
+func (c *Client) GetComponentToken(ctx context.Context) (*storage.ComponentAccessToken, error) {
 	return c.storage.GetComponentToken(ctx)
 }
 
 // SetPreAuthCode 设置预授权码
-func (c *APIClient) SetPreAuthCode(ctx context.Context, preAuthCode *storage.PreAuthCode) error {
+func (c *Client) SetPreAuthCode(ctx context.Context, preAuthCode *storage.PreAuthCode) error {
 	return c.storage.SavePreAuthCode(ctx, preAuthCode)
 }
 
 // GetPreAuthCode 获取预授权码
-func (c *APIClient) GetPreAuthCode(ctx context.Context) (*storage.PreAuthCode, error) {
+func (c *Client) GetPreAuthCode(ctx context.Context) (*storage.PreAuthCode, error) {
 	return c.storage.GetPreAuthCode(ctx)
 }
 
 // SetAuthorizerToken 设置授权方token信息
-func (c *APIClient) SetAuthorizerToken(authorizerAppID, accessToken, refreshToken string, expiresIn int) error {
+func (c *Client) SetAuthorizerToken(authorizerAppID, accessToken, refreshToken string, expiresIn int) error {
 	token := &storage.AuthorizerAccessToken{
 		AuthorizerAppID:        authorizerAppID,
 		AuthorizerAccessToken:  accessToken,
@@ -153,7 +153,7 @@ func (c *APIClient) SetAuthorizerToken(authorizerAppID, accessToken, refreshToke
 }
 
 // GetAuthorizerAccessToken 获取授权方access_token
-func (c *APIClient) GetAuthorizerAccessToken(ctx context.Context, authorizerAppID string) (string, error) {
+func (c *Client) GetAuthorizerAccessToken(ctx context.Context, authorizerAppID string) (string, error) {
 	// 从存储中获取授权方token
 	token, err := c.storage.GetAuthorizerToken(ctx, authorizerAppID)
 	if err != nil {
@@ -172,7 +172,7 @@ func (c *APIClient) GetAuthorizerAccessToken(ctx context.Context, authorizerAppI
 // @param ctx context.Context 上下文
 // @return *storage.ComponentVerifyTicket 验证票据结构，包含票据内容和有效期信息
 // @return error 错误信息
-func (c *APIClient) GetComponentVerifyTicket(ctx context.Context) (*storage.ComponentVerifyTicket, error) {
+func (c *Client) GetComponentVerifyTicket(ctx context.Context) (*storage.ComponentVerifyTicket, error) {
 	return c.storage.GetComponentVerifyTicket(ctx)
 }
 
@@ -180,12 +180,12 @@ func (c *APIClient) GetComponentVerifyTicket(ctx context.Context) (*storage.Comp
 // @param ctx context.Context 上下文
 // @param ticket string 票据内容
 // @return error 错误信息
-func (c *APIClient) SaveComponentVerifyTicket(ctx context.Context, ticket string) error {
+func (c *Client) SaveComponentVerifyTicket(ctx context.Context, ticket string) error {
 	return c.storage.SaveComponentVerifyTicket(ctx, ticket)
 }
 
 // refreshAuthorizerAccessToken 刷新授权方access_token
-func (c *APIClient) refreshAuthorizerAccessToken(ctx context.Context, authorizerAppID string) (string, error) {
+func (c *Client) refreshAuthorizerAccessToken(ctx context.Context, authorizerAppID string) (string, error) {
 	// 双重检查：再次从存储中获取
 	token, err := c.storage.GetAuthorizerToken(ctx, authorizerAppID)
 	if err != nil {
@@ -300,7 +300,7 @@ type GetAuthorizerListResponse struct {
 }
 
 // GetComponentAccessToken 获取第三方平台access_token
-func (c *APIClient) GetComponentAccessToken(ctx context.Context, verifyTicket string) (*storage.ComponentAccessToken, error) {
+func (c *Client) GetComponentAccessToken(ctx context.Context, verifyTicket string) (*storage.ComponentAccessToken, error) {
 	// 先从存储中获取
 	if token, err := c.GetComponentToken(ctx); err == nil && token != nil && token.ExpiresAt.After(time.Now()) {
 		return token, nil
@@ -354,7 +354,7 @@ func (c *APIClient) GetComponentAccessToken(ctx context.Context, verifyTicket st
 }
 
 // GetPreAuthCodeFromAPI 从微信API获取预授权码
-func (c *APIClient) GetPreAuthCodeFromAPI(ctx context.Context) (*PreAuthCodeResponse, error) {
+func (c *Client) GetPreAuthCodeFromAPI(ctx context.Context) (*PreAuthCodeResponse, error) {
 	// 先从存储中获取
 	if preAuthCode, err := c.storage.GetPreAuthCode(ctx); err == nil && preAuthCode != nil && preAuthCode.ExpiresAt.After(time.Now()) {
 		return &PreAuthCodeResponse{
@@ -403,7 +403,7 @@ func (c *APIClient) GetPreAuthCodeFromAPI(ctx context.Context) (*PreAuthCodeResp
 // 支持明文和加密两种消息格式
 // 根据微信官方文档<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/authorize_event.html" index="0">0</mcreference>，
 // 接收POST请求后只需直接返回字符串"success"
-func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, msgSignature, timestamp, nonce, encryptType string) (string, error) {
+func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, msgSignature, timestamp, nonce, encryptType string) (string, error) {
 	// 首先检测是否为加密消息
 	var encryptedMsg struct {
 		XMLName    xml.Name `xml:"xml"`
@@ -560,7 +560,7 @@ func (c *APIClient) HandleAuthorizationEvent(ctx context.Context, xmlData []byte
 }
 
 // validateAuthorizationEvent 验证授权事件
-func (c *APIClient) validateAuthorizationEvent(event *AuthorizationEvent) error {
+func (c *Client) validateAuthorizationEvent(event *AuthorizationEvent) error {
 	// 验证AppID是否匹配
 	if event.AppId != c.config.ComponentAppID {
 		return fmt.Errorf("AppID不匹配: expected=%s, actual=%s", c.config.ComponentAppID, event.AppId)
@@ -584,7 +584,7 @@ func (c *APIClient) validateAuthorizationEvent(event *AuthorizationEvent) error 
 }
 
 // DecryptMessage 解密消息（用于处理加密的授权事件）
-func (c *APIClient) DecryptMessage(encryptedMsg, msgSignature, timestamp, nonce string) ([]byte, error) {
+func (c *Client) DecryptMessage(encryptedMsg, msgSignature, timestamp, nonce string) ([]byte, error) {
 	// 验证消息签名
 	if err := c.verifySignature(msgSignature, timestamp, nonce, encryptedMsg); err != nil {
 		return nil, fmt.Errorf("消息签名验证失败: %v", err)
@@ -603,7 +603,7 @@ func (c *APIClient) DecryptMessage(encryptedMsg, msgSignature, timestamp, nonce 
 }
 
 // verifySignature 验证消息签名
-func (c *APIClient) verifySignature(signature, timestamp, nonce, encryptedMsg string) error {
+func (c *Client) verifySignature(signature, timestamp, nonce, encryptedMsg string) error {
 	// 根据微信开放平台签名算法验证签名
 	// 签名算法：sha1(sort(token, timestamp, nonce, encryptedMsg))
 
@@ -622,7 +622,7 @@ func (c *APIClient) verifySignature(signature, timestamp, nonce, encryptedMsg st
 }
 
 // QueryAuth 使用授权码换取授权信息
-func (c *APIClient) QueryAuth(ctx context.Context, authorizationCode string) (*QueryAuthResponse, error) {
+func (c *Client) QueryAuth(ctx context.Context, authorizationCode string) (*QueryAuthResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -658,7 +658,7 @@ func (c *APIClient) QueryAuth(ctx context.Context, authorizationCode string) (*Q
 }
 
 // RefreshAuthorizerToken 刷新授权方access_token
-func (c *APIClient) RefreshAuthorizerToken(ctx context.Context, authorizerAppID, refreshToken string) (*AuthorizationInfo, error) {
+func (c *Client) RefreshAuthorizerToken(ctx context.Context, authorizerAppID, refreshToken string) (*AuthorizationInfo, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -701,7 +701,7 @@ func (c *APIClient) RefreshAuthorizerToken(ctx context.Context, authorizerAppID,
 }
 
 // GetAuthorizerInfo 获取授权方信息
-func (c *APIClient) GetAuthorizerInfo(ctx context.Context, authorizerAppID string) (*GetAuthorizerInfoResponse, error) {
+func (c *Client) GetAuthorizerInfo(ctx context.Context, authorizerAppID string) (*GetAuthorizerInfoResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -727,7 +727,7 @@ func (c *APIClient) GetAuthorizerInfo(ctx context.Context, authorizerAppID strin
 }
 
 // GetAuthorizerList 获取授权方列表
-func (c *APIClient) GetAuthorizerList(ctx context.Context, offset, count int) (*GetAuthorizerListResponse, error) {
+func (c *Client) GetAuthorizerList(ctx context.Context, offset, count int) (*GetAuthorizerListResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -756,7 +756,7 @@ func (c *APIClient) GetAuthorizerList(ctx context.Context, offset, count int) (*
 // GetAllAuthorizers 获取所有授权方列表，自动处理分页
 // 该方法会循环调用GetAuthorizerList，直到获取所有授权方数据
 // 返回所有授权方信息的切片和可能的错误
-func (c *APIClient) GetAllAuthorizers(ctx context.Context) (allAuthorizers []struct {
+func (c *Client) GetAllAuthorizers(ctx context.Context) (allAuthorizers []struct {
 	AuthorizerAppID string `json:"authorizer_appid"`
 	RefreshToken    string `json:"refresh_token,omitempty"` // 虽然文档写了，但是实际上获取不到
 	AuthTime        int64  `json:"auth_time"`
@@ -821,7 +821,7 @@ func (c *APIClient) GetAllAuthorizers(ctx context.Context) (allAuthorizers []str
 // GenerateAuthURL 生成授权链接
 // authType: 授权类型 (1:手机端仅展示公众号, 2:仅展示小程序, 3:公众号和小程序都展示, 4:小程序推客账号, 5:视频号账号, 6:全部, 8:带货助手账号)
 // platform: 平台类型 ("pc": PC端, "mobile": 移动端)
-func (c *APIClient) GenerateAuthURL(preAuthCode string, authType int, bizAppID string, platform string) string {
+func (c *Client) GenerateAuthURL(preAuthCode string, authType int, bizAppID string, platform string) string {
 	var baseURL string
 
 	if platform == "mobile" {
@@ -865,17 +865,17 @@ func (c *APIClient) GenerateAuthURL(preAuthCode string, authType int, bizAppID s
 }
 
 // GeneratePcAuthURL 生成PC端授权链接
-func (c *APIClient) GeneratePcAuthURL(preAuthCode string, authType int, bizAppID string) string {
+func (c *Client) GeneratePcAuthURL(preAuthCode string, authType int, bizAppID string) string {
 	return c.GenerateAuthURL(preAuthCode, authType, bizAppID, "pc")
 }
 
 // GenerateMobileAuthURL 生成移动端授权链接
-func (c *APIClient) GenerateMobileAuthURL(preAuthCode string, authType int, bizAppID string) string {
+func (c *Client) GenerateMobileAuthURL(preAuthCode string, authType int, bizAppID string) string {
 	return c.GenerateAuthURL(preAuthCode, authType, bizAppID, "mobile")
 }
 
 // ClearQuota 重置API调用次数
-func (c *APIClient) ClearQuota(ctx context.Context) (*core.APIResponse, error) {
+func (c *Client) ClearQuota(ctx context.Context) (*core.APIResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -900,7 +900,7 @@ func (c *APIClient) ClearQuota(ctx context.Context) (*core.APIResponse, error) {
 }
 
 // GetApiQuota 查询API调用额度
-func (c *APIClient) GetApiQuota(ctx context.Context, authorizerAppID string) (*GetApiQuotaResponse, error) {
+func (c *Client) GetApiQuota(ctx context.Context, authorizerAppID string) (*GetApiQuotaResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -926,7 +926,7 @@ func (c *APIClient) GetApiQuota(ctx context.Context, authorizerAppID string) (*G
 }
 
 // GetRidInfo 查询rid信息
-func (c *APIClient) GetRidInfo(ctx context.Context, rid string) (*GetRidInfoResponse, error) {
+func (c *Client) GetRidInfo(ctx context.Context, rid string) (*GetRidInfoResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -951,7 +951,7 @@ func (c *APIClient) GetRidInfo(ctx context.Context, rid string) (*GetRidInfoResp
 }
 
 // ClearComponentQuota 使用AppSecret重置第三方平台API调用次数
-func (c *APIClient) ClearComponentQuota(ctx context.Context) (*core.APIResponse, error) {
+func (c *Client) ClearComponentQuota(ctx context.Context) (*core.APIResponse, error) {
 	request := ClearComponentQuotaRequest{
 		ComponentAppID:     c.config.ComponentAppID,
 		ComponentAppSecret: c.config.ComponentAppSecret,
@@ -971,7 +971,7 @@ func (c *APIClient) ClearComponentQuota(ctx context.Context) (*core.APIResponse,
 }
 
 // SetAuthorizerOption 设置授权方选项信息
-func (c *APIClient) SetAuthorizerOption(ctx context.Context, authorizerAppID, optionName, optionValue string) (*core.APIResponse, error) {
+func (c *Client) SetAuthorizerOption(ctx context.Context, authorizerAppID, optionName, optionValue string) (*core.APIResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -999,7 +999,7 @@ func (c *APIClient) SetAuthorizerOption(ctx context.Context, authorizerAppID, op
 }
 
 // GetAuthorizerOption 获取授权方选项信息
-func (c *APIClient) GetAuthorizerOption(ctx context.Context, authorizerAppID, optionName string) (*GetAuthorizerOptionResponse, error) {
+func (c *Client) GetAuthorizerOption(ctx context.Context, authorizerAppID, optionName string) (*GetAuthorizerOptionResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -1026,7 +1026,7 @@ func (c *APIClient) GetAuthorizerOption(ctx context.Context, authorizerAppID, op
 }
 
 // GetTemplateDraftList 获取草稿箱列表
-func (c *APIClient) GetTemplateDraftList(ctx context.Context) (*GetTemplateDraftListResponse, error) {
+func (c *Client) GetTemplateDraftList(ctx context.Context) (*GetTemplateDraftListResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -1047,7 +1047,7 @@ func (c *APIClient) GetTemplateDraftList(ctx context.Context) (*GetTemplateDraft
 }
 
 // AddToTemplate 将草稿添加到模板库
-func (c *APIClient) AddToTemplate(ctx context.Context, draftID int64, templateType int) (*core.APIResponse, error) {
+func (c *Client) AddToTemplate(ctx context.Context, draftID int64, templateType int) (*core.APIResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -1073,7 +1073,7 @@ func (c *APIClient) AddToTemplate(ctx context.Context, draftID int64, templateTy
 }
 
 // GetTemplateList 获取模板列表
-func (c *APIClient) GetTemplateList(ctx context.Context) (*GetTemplateListResponse, error) {
+func (c *Client) GetTemplateList(ctx context.Context) (*GetTemplateListResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -1094,7 +1094,7 @@ func (c *APIClient) GetTemplateList(ctx context.Context) (*GetTemplateListRespon
 }
 
 // DeleteTemplate 删除代码模板
-func (c *APIClient) DeleteTemplate(ctx context.Context, templateID int64) (*core.APIResponse, error) {
+func (c *Client) DeleteTemplate(ctx context.Context, templateID int64) (*core.APIResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err

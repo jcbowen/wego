@@ -22,8 +22,8 @@ type Client struct {
 	stableTokenClient *StableTokenClient // 稳定版access_token客户端
 }
 
-// NewMPClient 创建新的微信公众号客户端（使用默认文件存储）
-func NewMPClient(config *Config) *Client {
+// NewClient 创建新的微信公众号客户端（使用默认文件存储）
+func NewClient(config *Config) *Client {
 	// 使用当前工作目录下的 wego_storage 文件夹作为默认存储路径
 	fileStorage, err := storage.NewFileStorage("./runtime/wego_storage")
 	if err != nil {

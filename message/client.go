@@ -12,11 +12,11 @@ import (
 
 // MessageClient 消息客户端
 type MessageClient struct {
-	Client *openplatform.APIClient
+	Client *openplatform.Client
 }
 
 // NewMessageClient 创建新的消息客户端
-func NewMessageClient(client *openplatform.APIClient) *MessageClient {
+func NewMessageClient(client *openplatform.Client) *MessageClient {
 	return &MessageClient{
 		Client: client,
 	}

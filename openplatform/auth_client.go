@@ -23,11 +23,11 @@ import (
 
 // AuthClient 授权相关客户端
 type AuthClient struct {
-	client *APIClient
+	client *Client
 }
 
 // NewAuthClient 创建授权客户端
-func NewAuthClient(client *APIClient) *AuthClient {
+func NewAuthClient(client *Client) *AuthClient {
 	return &AuthClient{
 		client: client,
 	}
