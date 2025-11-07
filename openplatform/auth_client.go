@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/officialaccount"
 )
 
@@ -114,7 +115,7 @@ func (c *AuthorizerClient) SendCustomMessage(ctx context.Context, toUser string,
 		return fmt.Errorf("不支持的客服消息类型")
 	}
 
-	var result APIResponse
+	var result core.APIResponse
 	err = c.authClient.client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return err
@@ -170,7 +171,7 @@ func (c *AuthorizerClient) CreateMenu(ctx context.Context, menu *Menu) error {
 
 	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APICreateMenuURL, url.QueryEscape(accessToken))
 
-	var result APIResponse
+	var result core.APIResponse
 	err = c.authClient.client.req.Make(ctx, "POST", apiURL, menu, &result)
 	if err != nil {
 		return err
@@ -193,7 +194,7 @@ func (c *AuthorizerClient) GetMenu(ctx context.Context) (*Menu, error) {
 	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APIGetMenuURL, url.QueryEscape(accessToken))
 
 	var result struct {
-		APIResponse
+		core.APIResponse
 		Menu Menu `json:"menu"`
 	}
 
@@ -218,7 +219,7 @@ func (c *AuthorizerClient) DeleteMenu(ctx context.Context) error {
 
 	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APIDeleteMenuURL, url.QueryEscape(accessToken))
 
-	var result APIResponse
+	var result core.APIResponse
 	err = c.authClient.client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return err
@@ -278,7 +279,7 @@ func (c *AuthorizerClient) CallAPI(ctx context.Context, apiURL string, params in
 	}
 
 	// 6. 解析响应
-	var apiResp APIResponse
+	var apiResp core.APIResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
 		return nil, fmt.Errorf("响应解析失败: %v", err)
 	}
@@ -517,7 +518,7 @@ func (jm *JSSDKManager) validateURL(url string) error {
 
 // UserInfo 用户信息
 type UserInfo struct {
-	APIResponse
+	core.APIResponse
 	Subscribe      int    `json:"subscribe"`
 	OpenID         string `json:"openid"`
 	Nickname       string `json:"nickname"`
@@ -570,7 +571,7 @@ func (c *AuthorizerClient) GetUserInfo(ctx context.Context, openID string) (*Use
 
 // UserList 用户列表
 type UserList struct {
-	APIResponse
+	core.APIResponse
 	Total int `json:"total"`
 	Count int `json:"count"`
 	Data  struct {
@@ -620,7 +621,7 @@ func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *of
 
 // MediaResponse 媒体文件响应
 type MediaResponse struct {
-	APIResponse
+	core.APIResponse
 	Type      string `json:"type"`
 	MediaID   string `json:"media_id"`
 	CreatedAt int64  `json:"created_at"`
@@ -743,7 +744,7 @@ func (c *AuthorizerClient) GetMedia(ctx context.Context, mediaID string) ([]byte
 			return nil, fmt.Errorf("读取响应失败: %v", err)
 		}
 
-		var result APIResponse
+		var result core.APIResponse
 		if err := json.Unmarshal(respBody, &result); err != nil {
 			return nil, fmt.Errorf("解析响应失败: %v", err)
 		}
@@ -816,7 +817,7 @@ func (oc *OAuthClient) GetUserInfoAuthorizeURL(state string) string {
 
 // OAuthToken 网页授权Token
 type OAuthToken struct {
-	APIResponse
+	core.APIResponse
 	AccessToken  string `json:"access_token"`
 	ExpiresIn    int64  `json:"expires_in"`
 	RefreshToken string `json:"refresh_token"`
@@ -992,7 +993,7 @@ type QRCodeRequest struct {
 
 // QRCodeResponse 二维码响应
 type QRCodeResponse struct {
-	APIResponse
+	core.APIResponse
 	Ticket        string `json:"ticket"`
 	ExpireSeconds int64  `json:"expire_seconds"`
 	URL           string `json:"url"`
@@ -1061,7 +1062,7 @@ type WXACodeRequest struct {
 
 // WXACodeResponse 小程序码响应
 type WXACodeResponse struct {
-	APIResponse
+	core.APIResponse
 	ContentType string `json:"contentType"`
 	Buffer      []byte `json:"buffer"`
 }
@@ -1101,7 +1102,7 @@ func (mpc *MiniProgramClient) GetWXACode(ctx context.Context, request *WXACodeRe
 
 // OAuthUserInfo 网页授权用户信息
 type OAuthUserInfo struct {
-	APIResponse
+	core.APIResponse
 	OpenID     string   `json:"openid"`
 	Nickname   string   `json:"nickname"`
 	Sex        int      `json:"sex"`

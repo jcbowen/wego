@@ -233,7 +233,7 @@ type PreAuthCodeRequest struct {
 
 // PreAuthCodeResponse 预授权码响应
 type PreAuthCodeResponse struct {
-	APIResponse
+	core.APIResponse
 	PreAuthCode string `json:"pre_auth_code"`
 	ExpiresIn   int    `json:"expires_in"`
 }
@@ -246,7 +246,7 @@ type QueryAuthRequest struct {
 
 // QueryAuthResponse 授权信息响应
 type QueryAuthResponse struct {
-	APIResponse
+	core.APIResponse
 	AuthorizationInfo AuthorizationInfo `json:"authorization_info"`
 }
 
@@ -259,7 +259,7 @@ type AuthorizerTokenRequest struct {
 
 // AuthorizerTokenResponse 授权方token响应
 type AuthorizerTokenResponse struct {
-	APIResponse
+	core.APIResponse
 	AuthorizerAccessToken  string `json:"authorizer_access_token"`
 	ExpiresIn              int    `json:"expires_in"`
 	AuthorizerRefreshToken string `json:"authorizer_refresh_token"`
@@ -273,7 +273,7 @@ type GetAuthorizerInfoRequest struct {
 
 // GetAuthorizerInfoResponse 授权方信息响应
 type GetAuthorizerInfoResponse struct {
-	APIResponse
+	core.APIResponse
 	AuthorizerInfo AuthorizerInfo `json:"authorizer_info"`
 }
 
@@ -286,7 +286,7 @@ type GetAuthorizerListRequest struct {
 
 // GetAuthorizerListResponse 获取授权方列表响应
 type GetAuthorizerListResponse struct {
-	APIResponse
+	core.APIResponse
 	TotalCount int `json:"total_count"`
 	List       []struct {
 		AuthorizerAppID string `json:"authorizer_appid"`
@@ -321,7 +321,7 @@ func (c *APIClient) GetComponentAccessToken(ctx context.Context, verifyTicket st
 	}
 
 	var result struct {
-		APIResponse
+		core.APIResponse
 		ComponentAccessToken string `json:"component_access_token"`
 		ExpiresIn            int    `json:"expires_in"`
 	}
@@ -354,7 +354,7 @@ func (c *APIClient) GetPreAuthCodeFromAPI(ctx context.Context) (*PreAuthCodeResp
 	// 先从存储中获取
 	if preAuthCode, err := c.storage.GetPreAuthCode(ctx); err == nil && preAuthCode != nil && preAuthCode.ExpiresAt.After(time.Now()) {
 		return &PreAuthCodeResponse{
-			APIResponse: APIResponse{ErrCode: 0, ErrMsg: ""},
+			APIResponse: core.APIResponse{ErrCode: 0, ErrMsg: ""},
 			PreAuthCode: preAuthCode.PreAuthCode,
 			ExpiresIn:   preAuthCode.ExpiresIn,
 		}, nil
@@ -667,7 +667,7 @@ func (c *APIClient) RefreshAuthorizerToken(ctx context.Context, authorizerAppID,
 	}
 
 	var result struct {
-		APIResponse
+		core.APIResponse
 		AuthorizationInfo
 	}
 
@@ -871,7 +871,7 @@ func (c *APIClient) GenerateMobileAuthURL(preAuthCode string, authType int, bizA
 }
 
 // ClearQuota 重置API调用次数
-func (c *APIClient) ClearQuota(ctx context.Context) (*APIResponse, error) {
+func (c *APIClient) ClearQuota(ctx context.Context) (*core.APIResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -881,7 +881,7 @@ func (c *APIClient) ClearQuota(ctx context.Context) (*APIResponse, error) {
 		ComponentAppID: c.config.ComponentAppID,
 	}
 
-	var result APIResponse
+	var result core.APIResponse
 	clearQuotaUrl := fmt.Sprintf("%s?access_token=%s", APIClearQuotaURL, url.QueryEscape(componentToken.AccessToken))
 	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, "POST", clearQuotaUrl, request, &result)
 	if err != nil {
@@ -947,13 +947,13 @@ func (c *APIClient) GetRidInfo(ctx context.Context, rid string) (*GetRidInfoResp
 }
 
 // ClearComponentQuota 使用AppSecret重置第三方平台API调用次数
-func (c *APIClient) ClearComponentQuota(ctx context.Context) (*APIResponse, error) {
+func (c *APIClient) ClearComponentQuota(ctx context.Context) (*core.APIResponse, error) {
 	request := ClearComponentQuotaRequest{
 		ComponentAppID:     c.config.ComponentAppID,
 		ComponentAppSecret: c.config.ComponentAppSecret,
 	}
 
-	var result APIResponse
+	var result core.APIResponse
 	err := core.NewRequest(c.httpClient, c.logger).Make(ctx, "POST", APIClearComponentQuotaURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -967,7 +967,7 @@ func (c *APIClient) ClearComponentQuota(ctx context.Context) (*APIResponse, erro
 }
 
 // SetAuthorizerOption 设置授权方选项信息
-func (c *APIClient) SetAuthorizerOption(ctx context.Context, authorizerAppID, optionName, optionValue string) (*APIResponse, error) {
+func (c *APIClient) SetAuthorizerOption(ctx context.Context, authorizerAppID, optionName, optionValue string) (*core.APIResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -980,7 +980,7 @@ func (c *APIClient) SetAuthorizerOption(ctx context.Context, authorizerAppID, op
 		OptionValue:     optionValue,
 	}
 
-	var result APIResponse
+	var result core.APIResponse
 	setAuthorizerOptionUrl := fmt.Sprintf("%s?component_access_token=%s", APISetAuthorizerOptionURL, url.QueryEscape(componentToken.AccessToken))
 	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, "POST", setAuthorizerOptionUrl, request, &result)
 	if err != nil {
@@ -1043,7 +1043,7 @@ func (c *APIClient) GetTemplateDraftList(ctx context.Context) (*GetTemplateDraft
 }
 
 // AddToTemplate 将草稿添加到模板库
-func (c *APIClient) AddToTemplate(ctx context.Context, draftID int64, templateType int) (*APIResponse, error) {
+func (c *APIClient) AddToTemplate(ctx context.Context, draftID int64, templateType int) (*core.APIResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -1054,7 +1054,7 @@ func (c *APIClient) AddToTemplate(ctx context.Context, draftID int64, templateTy
 		TemplateType: templateType,
 	}
 
-	var result APIResponse
+	var result core.APIResponse
 	addToTemplateUrl := fmt.Sprintf("%s?access_token=%s", APIWxaAddToTemplateURL, url.QueryEscape(componentToken.AccessToken))
 	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, "POST", addToTemplateUrl, request, &result)
 	if err != nil {
@@ -1090,7 +1090,7 @@ func (c *APIClient) GetTemplateList(ctx context.Context) (*GetTemplateListRespon
 }
 
 // DeleteTemplate 删除代码模板
-func (c *APIClient) DeleteTemplate(ctx context.Context, templateID int64) (*APIResponse, error) {
+func (c *APIClient) DeleteTemplate(ctx context.Context, templateID int64) (*core.APIResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
@@ -1100,7 +1100,7 @@ func (c *APIClient) DeleteTemplate(ctx context.Context, templateID int64) (*APIR
 		TemplateID: templateID,
 	}
 
-	var result APIResponse
+	var result core.APIResponse
 	deleteTemplateUrl := fmt.Sprintf("%s?access_token=%s", APIWxaDeleteTemplateURL, url.QueryEscape(componentToken.AccessToken))
 	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, "POST", deleteTemplateUrl, request, &result)
 	if err != nil {
