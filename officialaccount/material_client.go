@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	
+
 	"github.com/jcbowen/wego/core"
 )
 
@@ -63,8 +63,8 @@ type BatchGetMaterialRequest struct {
 // BatchGetMaterialResponse 批量获取素材响应
 type BatchGetMaterialResponse struct {
 	core.APIResponse
-	TotalCount int `json:"total_count"`
-	ItemCount  int `json:"item_count"`
+	TotalCount int            `json:"total_count"`
+	ItemCount  int            `json:"item_count"`
 	Item       []MaterialItem `json:"item"`
 }
 
@@ -78,7 +78,7 @@ type MaterialItem struct {
 
 // NewsMaterialItem 图文素材项
 type NewsMaterialItem struct {
-	MediaID    string `json:"media_id"`
+	MediaID    string      `json:"media_id"`
 	Content    NewsContent `json:"content"`
 	UpdateTime int64       `json:"update_time"`
 }
@@ -196,7 +196,7 @@ func (c *MaterialClient) UploadMaterial(ctx context.Context, materialType Materi
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	// 发送请求
-	resp, err := c.Client.MakeRequestRaw(req)
+	resp, err := c.Client.req.MakeRaw(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP请求失败: %v", err)
 	}
@@ -232,10 +232,10 @@ func (c *MaterialClient) GetMaterial(ctx context.Context, mediaID string) ([]byt
 	}
 
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetMaterialURL, url.QueryEscape(accessToken))
-	
+
 	// 使用MakeRequest获取原始响应数据
 	var respData []byte
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &respData)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &respData)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func (c *MaterialClient) DeleteMaterial(ctx context.Context, mediaID string) (*D
 
 	var result DeleteMaterialResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIDeleteMaterialURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +283,7 @@ func (c *MaterialClient) UpdateMaterial(ctx context.Context, mediaID string, ind
 
 	var result UpdateNewsResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIUpdateNewsURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +304,7 @@ func (c *MaterialClient) GetMaterialCount(ctx context.Context) (*GetMaterialCoun
 
 	var result GetMaterialCountResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetMaterialCountURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +331,7 @@ func (c *MaterialClient) BatchGetMaterial(ctx context.Context, materialType Mate
 
 	var result BatchGetMaterialResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIBatchGetMaterialURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -356,7 +356,7 @@ func (c *MaterialClient) AddNews(ctx context.Context, articles []NewsArticle) (*
 
 	var result AddNewsResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIAddNewsURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -410,7 +410,7 @@ func (c *MaterialClient) UploadImage(ctx context.Context, filename string, data 
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	// 发送请求
-	resp, err := c.Client.MakeRequestRaw(req)
+	resp, err := c.Client.req.MakeRaw(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP请求失败: %v", err)
 	}
@@ -440,8 +440,8 @@ func (c *MaterialClient) UploadImage(ctx context.Context, filename string, data 
 // 请求方式：POST multipart/form-data
 // 注意事项：图片大小不超过2MB，语音大小不超过2MB，缩略图大小不超过64KB
 type AddMaterialRequest struct {
-	MediaID     string `json:"media_id,omitempty"` // 临时素材media_id（用于视频素材）
-	Title       string `json:"title,omitempty"`     // 视频素材标题
+	MediaID     string `json:"media_id,omitempty"`    // 临时素材media_id（用于视频素材）
+	Title       string `json:"title,omitempty"`       // 视频素材标题
 	Description string `json:"description,omitempty"` // 视频素材描述
 }
 
@@ -497,7 +497,7 @@ func (c *MaterialClient) AddMaterial(ctx context.Context, materialType MaterialT
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	// 发送请求
-	resp, err := c.Client.MakeRequestRaw(req)
+	resp, err := c.Client.req.MakeRaw(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP请求失败: %v", err)
 	}
@@ -536,7 +536,7 @@ func (c *MaterialClient) UploadVideo(ctx context.Context, mediaID, title, descri
 
 	var result UploadVideoResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIUploadVideoURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -598,7 +598,7 @@ func (c *MaterialClient) GetHDVoice(ctx context.Context, mediaID string) (*GetHD
 	req.Body = io.NopCloser(bytes.NewReader(requestBody))
 
 	// 发送请求
-	resp, err := c.Client.MakeRequestRaw(req)
+	resp, err := c.Client.req.MakeRaw(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP请求失败: %v", err)
 	}
@@ -646,14 +646,14 @@ func (c *MaterialClient) GetHDVoice(ctx context.Context, mediaID string) (*GetHD
 //   - 图文消息的正文中支持插入视频，视频需先通过素材管理接口上传获取media_id
 //   - 图文消息的正文中支持插入音频，音频需先通过素材管理接口上传获取media_id
 type DraftArticle struct {
-	Title              string `json:"title"`               // 标题
-	Author             string `json:"author"`             // 作者
-	Digest             string `json:"digest"`             // 图文消息的摘要
-	Content            string `json:"content"`            // 图文消息的具体内容，支持HTML标签
-	ContentSourceURL   string `json:"content_source_url"` // 图文消息的原文地址
-	ThumbMediaID       string `json:"thumb_media_id"`     // 图文消息的封面图片素材ID
-	ShowCoverPic       int    `json:"show_cover_pic"`     // 是否显示封面，0为不显示，1为显示
-	NeedOpenComment    int    `json:"need_open_comment"` // 是否打开评论，0不打开，1打开
+	Title              string `json:"title"`                 // 标题
+	Author             string `json:"author"`                // 作者
+	Digest             string `json:"digest"`                // 图文消息的摘要
+	Content            string `json:"content"`               // 图文消息的具体内容，支持HTML标签
+	ContentSourceURL   string `json:"content_source_url"`    // 图文消息的原文地址
+	ThumbMediaID       string `json:"thumb_media_id"`        // 图文消息的封面图片素材ID
+	ShowCoverPic       int    `json:"show_cover_pic"`        // 是否显示封面，0为不显示，1为显示
+	NeedOpenComment    int    `json:"need_open_comment"`     // 是否打开评论，0不打开，1打开
 	OnlyFansCanComment int    `json:"only_fans_can_comment"` // 是否粉丝才可评论，0所有人可评论，1粉丝才可评论
 }
 
@@ -746,9 +746,9 @@ type BatchGetDraftRequest struct {
 // 参考文档：https://developers.weixin.qq.com/doc/offiaccount/Draft_Box/Batch_get_draft.html
 // 接口说明：草稿项，用于批量获取草稿列表响应
 type DraftItem struct {
-	MediaID    string        `json:"media_id"`    // 草稿的media_id
-	Content    DraftContent  `json:"content"`     // 草稿内容
-	UpdateTime int64         `json:"update_time"` // 更新时间
+	MediaID    string       `json:"media_id"`    // 草稿的media_id
+	Content    DraftContent `json:"content"`     // 草稿内容
+	UpdateTime int64        `json:"update_time"` // 更新时间
 }
 
 // DraftContent 草稿内容
@@ -780,9 +780,9 @@ type BatchGetDraftResponse struct {
 //   - 只能修改草稿箱中的草稿
 //   - 修改后草稿的media_id不变
 type UpdateDraftRequest struct {
-	MediaID  string        `json:"media_id"`  // 草稿的media_id
-	Index    int           `json:"index"`      // 要更新的文章在图文消息中的位置，第一篇为0
-	Articles DraftArticle  `json:"articles"`   // 图文消息
+	MediaID  string       `json:"media_id"` // 草稿的media_id
+	Index    int          `json:"index"`    // 要更新的文章在图文消息中的位置，第一篇为0
+	Articles DraftArticle `json:"articles"` // 图文消息
 }
 
 // UpdateDraftResponse 修改草稿响应
@@ -811,7 +811,7 @@ func (c *MaterialClient) AddDraft(ctx context.Context, articles []DraftArticle) 
 
 	var result AddDraftResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIAddDraftURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -841,7 +841,7 @@ func (c *MaterialClient) GetDraft(ctx context.Context, mediaID string) (*GetDraf
 
 	var result GetDraftResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetDraftURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -871,7 +871,7 @@ func (c *MaterialClient) DeleteDraft(ctx context.Context, mediaID string) (*Dele
 
 	var result DeleteDraftResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIDeleteDraftURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -896,7 +896,7 @@ func (c *MaterialClient) GetDraftCount(ctx context.Context) (*GetDraftCountRespo
 
 	var result GetDraftCountResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetDraftCountURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -929,7 +929,7 @@ func (c *MaterialClient) BatchGetDraft(ctx context.Context, offset, count, noCon
 
 	var result BatchGetDraftResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIBatchGetDraftURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -961,7 +961,7 @@ func (c *MaterialClient) UpdateDraft(ctx context.Context, mediaID string, index 
 
 	var result UpdateDraftResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIUpdateDraftURL, url.QueryEscape(accessToken))
-	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
 	}
