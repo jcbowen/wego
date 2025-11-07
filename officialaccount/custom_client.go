@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	
+
 	"github.com/jcbowen/wego/core"
 )
 
@@ -65,10 +65,10 @@ func (m *VoiceMessage) GetMsgType() string {
 type VideoMessage struct {
 	MsgType string `json:"msgtype"`
 	Video   struct {
-		MediaID     string `json:"media_id"`
+		MediaID      string `json:"media_id"`
 		ThumbMediaID string `json:"thumb_media_id"`
-		Title       string `json:"title"`
-		Description string `json:"description"`
+		Title        string `json:"title"`
+		Description  string `json:"description"`
 	} `json:"video"`
 }
 
@@ -138,7 +138,7 @@ func (m *WXCardMessage) GetMsgType() string {
 
 // MiniProgramPageMessage 小程序卡片消息
 type MiniProgramPageMessage struct {
-	MsgType string `json:"msgtype"`
+	MsgType         string `json:"msgtype"`
 	MiniProgramPage struct {
 		Title        string `json:"title"`
 		AppID        string `json:"appid"`
@@ -153,16 +153,16 @@ func (m *MiniProgramPageMessage) GetMsgType() string {
 
 // SendCustomMessageRequest 发送客服消息请求
 type SendCustomMessageRequest struct {
-	Touser  string        `json:"touser"`
-	MsgType string        `json:"msgtype"`
-	Text    *TextMessage `json:"text,omitempty"`
-	Image   *ImageMessage `json:"image,omitempty"`
-	Voice   *VoiceMessage `json:"voice,omitempty"`
-	Video   *VideoMessage `json:"video,omitempty"`
-	Music   *MusicMessage `json:"music,omitempty"`
-	News    *NewsMessage `json:"news,omitempty"`
-	MPNews  *MPNewsMessage `json:"mpnews,omitempty"`
-	WXCard  *WXCardMessage `json:"wxcard,omitempty"`
+	Touser          string                  `json:"touser"`
+	MsgType         string                  `json:"msgtype"`
+	Text            *TextMessage            `json:"text,omitempty"`
+	Image           *ImageMessage           `json:"image,omitempty"`
+	Voice           *VoiceMessage           `json:"voice,omitempty"`
+	Video           *VideoMessage           `json:"video,omitempty"`
+	Music           *MusicMessage           `json:"music,omitempty"`
+	News            *NewsMessage            `json:"news,omitempty"`
+	MPNews          *MPNewsMessage          `json:"mpnews,omitempty"`
+	WXCard          *WXCardMessage          `json:"wxcard,omitempty"`
 	MiniProgramPage *MiniProgramPageMessage `json:"miniprogrampage,omitempty"`
 }
 
@@ -173,9 +173,9 @@ type SendCustomMessageResponse struct {
 
 // CustomAccount 客服账号
 type CustomAccount struct {
-	KfAccount string `json:"kf_account"`
-	KfNick    string `json:"kf_nick"`
-	KfID      string `json:"kf_id"`
+	KfAccount    string `json:"kf_account"`
+	KfNick       string `json:"kf_nick"`
+	KfID         string `json:"kf_id"`
 	KfHeadImgURL string `json:"kf_headimgurl"`
 }
 
@@ -271,8 +271,8 @@ type GetCustomSessionRequest struct {
 // GetCustomSessionResponse 获取客服会话响应
 type GetCustomSessionResponse struct {
 	core.APIResponse
-	KfAccount string `json:"kf_account"`
-	Createtime int64 `json:"createtime"`
+	KfAccount  string `json:"kf_account"`
+	Createtime int64  `json:"createtime"`
 }
 
 // GetCustomSessionListRequest 获取客服会话列表请求
@@ -295,7 +295,7 @@ type CustomSession struct {
 // GetWaitCaseResponse 获取未接入会话列表响应
 type GetWaitCaseResponse struct {
 	core.APIResponse
-	Count      int              `json:"count"`
+	Count        int            `json:"count"`
 	WaitCaseList []WaitCaseInfo `json:"waitcaselist"`
 }
 
@@ -365,7 +365,7 @@ func (c *CustomClient) SendCustomMessage(ctx context.Context, touser string, mes
 	}
 
 	var result SendCustomMessageResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APISendCustomMsgURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", APIMessageCustomSendURL, url.QueryEscape(accessToken))
 	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err

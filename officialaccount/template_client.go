@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	
+
 	"github.com/jcbowen/wego/core"
 )
 
@@ -22,11 +22,11 @@ func NewTemplateClient(client *MPClient) *TemplateClient {
 
 // SendTemplateMsgRequest 发送模板消息请求
 type SendTemplateMsgRequest struct {
-	Touser     string            `json:"touser"`
-	TemplateID string            `json:"template_id"`
-	URL        string            `json:"url,omitempty"`
-	MiniProgram MiniProgramInfo  `json:"miniprogram,omitempty"`
-	Data       map[string]TemplateData `json:"data"`
+	Touser      string                  `json:"touser"`
+	TemplateID  string                  `json:"template_id"`
+	URL         string                  `json:"url,omitempty"`
+	MiniProgram MiniProgramInfo         `json:"miniprogram,omitempty"`
+	Data        map[string]TemplateData `json:"data"`
 }
 
 // MiniProgramInfo 小程序信息
@@ -68,9 +68,9 @@ type QueryBlockTmplMsgRequest struct {
 
 // BlockTmplMsg 拦截的模板消息
 type BlockTmplMsg struct {
-	TemplateID string `json:"template_id"`
-	BlockTime  string `json:"block_time"`
-	BlockType  int    `json:"block_type"`
+	TemplateID  string `json:"template_id"`
+	BlockTime   string `json:"block_time"`
+	BlockType   int    `json:"block_type"`
 	BlockReason string `json:"block_reason"`
 }
 
@@ -100,17 +100,17 @@ type GetAllTemplatesResponse struct {
 // TemplateInfo 模板信息
 type TemplateInfo struct {
 	TemplateID      string `json:"template_id"`
-	Title          string `json:"title"`
+	Title           string `json:"title"`
 	PrimaryIndustry string `json:"primary_industry"`
 	DeputyIndustry  string `json:"deputy_industry"`
-	Content        string `json:"content"`
-	Example        string `json:"example"`
+	Content         string `json:"content"`
+	Example         string `json:"example"`
 }
 
 // GetIndustryResponse 获取行业信息响应
 type GetIndustryResponse struct {
 	core.APIResponse
-	PrimaryIndustry IndustryInfo `json:"primary_industry"`
+	PrimaryIndustry   IndustryInfo `json:"primary_industry"`
 	SecondaryIndustry IndustryInfo `json:"secondary_industry"`
 }
 
@@ -139,7 +139,7 @@ func (c *TemplateClient) SendTemplateMessage(ctx context.Context, request *SendT
 	}
 
 	var result SendTemplateMsgResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APISendTemplateMsgURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", APIMessageTemplateSendURL, url.QueryEscape(accessToken))
 	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -164,7 +164,7 @@ func (c *TemplateClient) AddTemplate(ctx context.Context, templateIDShort string
 	}
 
 	var result AddTemplateResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIAddTemplateURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateApiAddTemplateURL, url.QueryEscape(accessToken))
 	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -192,7 +192,7 @@ func (c *TemplateClient) QueryBlockTmplMsg(ctx context.Context, beginDate, endDa
 	}
 
 	var result QueryBlockTmplMsgResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIQueryBlockTmplMsgURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateGetIndustryURL, url.QueryEscape(accessToken))
 	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -217,7 +217,7 @@ func (c *TemplateClient) DeleteTemplate(ctx context.Context, templateID string) 
 	}
 
 	var result DeleteTemplateResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIDeleteTemplateURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateDelPrivateTemplateURL, url.QueryEscape(accessToken))
 	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -238,7 +238,7 @@ func (c *TemplateClient) GetAllTemplates(ctx context.Context) (*GetAllTemplatesR
 	}
 
 	var result GetAllTemplatesResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetAllTemplatesURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateGetAllPrivateTemplateURL, url.QueryEscape(accessToken))
 	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
@@ -259,7 +259,7 @@ func (c *TemplateClient) GetIndustry(ctx context.Context) (*GetIndustryResponse,
 	}
 
 	var result GetIndustryResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetIndustryURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateGetIndustryURL, url.QueryEscape(accessToken))
 	err = c.Client.MakeRequest(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
@@ -285,7 +285,7 @@ func (c *TemplateClient) SetIndustry(ctx context.Context, industryID1, industryI
 	}
 
 	var result SetIndustryResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APISetIndustryURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateApiSetIndustryURL, url.QueryEscape(accessToken))
 	err = c.Client.MakeRequest(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err

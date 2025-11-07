@@ -168,7 +168,7 @@ func (c *AuthorizerClient) CreateMenu(ctx context.Context, menu *Menu) error {
 		return err
 	}
 
-	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/menu/create?access_token=%s", url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APICreateMenuURL, url.QueryEscape(accessToken))
 
 	var result APIResponse
 	err = c.authClient.client.MakeRequest(ctx, "POST", apiURL, menu, &result)
@@ -190,7 +190,7 @@ func (c *AuthorizerClient) GetMenu(ctx context.Context) (*Menu, error) {
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/menu/get?access_token=%s", url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APIGetMenuURL, url.QueryEscape(accessToken))
 
 	var result struct {
 		APIResponse
@@ -216,7 +216,7 @@ func (c *AuthorizerClient) DeleteMenu(ctx context.Context) error {
 		return err
 	}
 
-	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/menu/delete?access_token=%s", url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APIDeleteMenuURL, url.QueryEscape(accessToken))
 
 	var result APIResponse
 	err = c.authClient.client.MakeRequest(ctx, "GET", apiURL, nil, &result)
@@ -335,7 +335,7 @@ func (c *AuthorizerClient) SendNewsMessage(ctx context.Context, toUser string, a
 		},
 	}
 
-	apiURL := "https://api.weixin.qq.com/cgi-bin/message/custom/send"
+	apiURL := officialaccount.APIMessageCustomSendURL
 
 	_, err := c.CallAPI(ctx, apiURL, message)
 	return err
@@ -646,7 +646,7 @@ func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *Te
 		return err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APISendTemplateMsgURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APIMessageTemplateSendURL, url.QueryEscape(accessToken))
 
 	var result struct {
 		APIResponse
