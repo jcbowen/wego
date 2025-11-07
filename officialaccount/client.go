@@ -23,25 +23,55 @@ type Client struct {
 }
 
 // NewClient 创建新的微信公众号客户端（使用默认文件存储）
-func NewClient(config *Config) *Client {
+// @param config *Config 公众号配置信息
+// @param opts ...any 可选参数，支持以下类型：
+//   - debugger.LoggerInterface: 自定义日志器
+//   - core.HTTPClient: 自定义HTTP客户端
+//
+// @return *Client 公众号客户端实例
+func NewClient(config *Config, opts ...any) *Client {
 	// 使用当前工作目录下的 wego_storage 文件夹作为默认存储路径
 	fileStorage, err := storage.NewFileStorage("./runtime/wego_storage")
 	if err != nil {
 		// 如果文件存储创建失败，回退到内存存储并输出日志
 		logger := &debugger.DefaultLogger{}
 		logger.Warn("文件存储创建失败，回退到内存存储: " + err.Error())
-		return NewMPClientWithStorage(config, storage.NewMemoryStorage())
+		return NewMPClientWithStorage(config, storage.NewMemoryStorage(), opts...)
 	}
-	return NewMPClientWithStorage(config, fileStorage)
+	return NewMPClientWithStorage(config, fileStorage, opts...)
 }
 
 // NewMPClientWithStorage 创建新的微信公众号客户端（使用自定义存储）
-func NewMPClientWithStorage(config *Config, storage storage.TokenStorage) *Client {
+// @param config *Config 公众号配置信息
+// @param storage storage.TokenStorage 自定义存储实例
+// @param opts ...any 可选参数，支持以下类型：
+//   - debugger.LoggerInterface: 自定义日志器
+//   - core.HTTPClient: 自定义HTTP客户端
+//
+// @return *Client 公众号客户端实例
+func NewMPClientWithStorage(config *Config, storage storage.TokenStorage, opts ...any) *Client {
 	client := &Client{
 		config:     config,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		storage:    storage,
 		logger:     &debugger.DefaultLogger{},
+	}
+
+	// 遍历所有可选参数，根据类型进行相应设置
+	if len(opts) > 0 {
+		for _, option := range opts {
+			switch v := option.(type) {
+			case debugger.LoggerInterface:
+				// 设置自定义日志器
+				client.SetLogger(v)
+			case core.HTTPClient:
+				// 设置自定义HTTP客户端
+				client.SetHTTPClient(v)
+			default:
+				// 记录未知类型的可选参数
+				client.logger.Warn(fmt.Sprintf("未知的可选参数类型: %T", v))
+			}
+		}
 	}
 
 	client.req = core.NewRequest(client.httpClient, client.logger)
@@ -67,6 +97,10 @@ func (c *Client) SetLogger(logger debugger.LoggerInterface) {
 // SetHTTPClient 设置自定义HTTP客户端
 func (c *Client) SetHTTPClient(client core.HTTPClient) {
 	c.httpClient = client
+	// 同时更新请求对象中的HTTP客户端
+	if c.req != nil {
+		c.req = core.NewRequest(client, c.logger)
+	}
 }
 
 // GetAccessToken 获取公众号access_token

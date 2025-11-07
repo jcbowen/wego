@@ -22,22 +22,45 @@ type WeGo struct {
 	OfficialAccountClient *officialaccount.Client
 }
 
-// New 创建新的WeGo实例，支持多种客户端配置
+// New 创建新的WeGo实例，支持多种客户端配置和可选参数
 // 同类型的客户端只能初始化一个，比如第一个参数是微信公众号，后面的不管还有几个公众号配置都忽略掉
-func New(configs ...any) *WeGo {
+// @param configParams ...any 配置参数，支持以下类型：
+//   - *openplatform.Config: 开放平台配置
+//   - *officialaccount.Config: 公众号配置
+//
+// @param optParams ...any 可选参数，支持以下类型：
+//   - debugger.LoggerInterface: 自定义日志器
+//   - core.HTTPClient: 自定义HTTP客户端
+//   - openplatform.EventHandler: 开放平台事件处理器
+//
+// @return *WeGo WeGo实例
+func New(params ...any) *WeGo {
 	wego := &WeGo{}
 
-	for _, config := range configs {
+	// 分离配置参数和可选参数
+	var configParams []any
+	var optParams []any
+
+	for _, param := range params {
+		switch param.(type) {
+		case *openplatform.Config, *officialaccount.Config:
+			configParams = append(configParams, param)
+		default:
+			optParams = append(optParams, param)
+		}
+	}
+
+	for _, config := range configParams {
 		switch cfg := config.(type) {
 		case *openplatform.Config:
 			// 如果还没有初始化过开放平台客户端，则初始化
 			if wego.OpenPlatformClient == nil {
-				wego.OpenPlatformClient = openplatform.NewClient(cfg)
+				wego.OpenPlatformClient = openplatform.NewClient(cfg, optParams...)
 			}
 		case *officialaccount.Config:
 			// 如果还没有初始化过公众号客户端，则初始化
 			if wego.OfficialAccountClient == nil {
-				wego.OfficialAccountClient = officialaccount.NewClient(cfg)
+				wego.OfficialAccountClient = officialaccount.NewClient(cfg, optParams...)
 			}
 		default:
 			log.Printf("警告：不支持的配置类型 %T", cfg)
@@ -49,22 +72,46 @@ func New(configs ...any) *WeGo {
 	return wego
 }
 
-// NewWithStorage 创建新的WeGo实例（使用自定义存储）
+// NewWithStorage 创建新的WeGo实例（使用自定义存储），支持可选参数
 // 同类型的客户端只能初始化一个，比如第一个参数是微信公众号，后面的不管还有几个公众号配置都忽略掉
-func NewWithStorage(storage storage.TokenStorage, configs ...any) *WeGo {
+// @param storage storage.TokenStorage 自定义存储实例
+// @param configParams ...any 配置参数，支持以下类型：
+//   - *openplatform.Config: 开放平台配置
+//   - *officialaccount.Config: 公众号配置
+//
+// @param optParams ...any 可选参数，支持以下类型：
+//   - debugger.LoggerInterface: 自定义日志器
+//   - core.HTTPClient: 自定义HTTP客户端
+//   - openplatform.EventHandler: 开放平台事件处理器
+//
+// @return *WeGo WeGo实例
+func NewWithStorage(storage storage.TokenStorage, params ...any) *WeGo {
 	wego := &WeGo{}
 
-	for _, config := range configs {
+	// 分离配置参数和可选参数
+	var configParams []any
+	var optParams []any
+
+	for _, param := range params {
+		switch param.(type) {
+		case *openplatform.Config, *officialaccount.Config:
+			configParams = append(configParams, param)
+		default:
+			optParams = append(optParams, param)
+		}
+	}
+
+	for _, config := range configParams {
 		switch cfg := config.(type) {
 		case *openplatform.Config:
 			// 如果还没有初始化过开放平台客户端，则初始化
 			if wego.OpenPlatformClient == nil {
-				wego.OpenPlatformClient = openplatform.NewClientWithStorage(cfg, storage)
+				wego.OpenPlatformClient = openplatform.NewClientWithStorage(cfg, storage, optParams...)
 			}
 		case *officialaccount.Config:
 			// 如果还没有初始化过公众号客户端，则初始化
 			if wego.OfficialAccountClient == nil {
-				wego.OfficialAccountClient = officialaccount.NewMPClientWithStorage(cfg, storage)
+				wego.OfficialAccountClient = officialaccount.NewMPClientWithStorage(cfg, storage, optParams...)
 			}
 		default:
 			// 忽略不支持的配置类型
@@ -82,6 +129,16 @@ func (w *WeGo) SetLogger(logger debugger.LoggerInterface) {
 	}
 	if w.OfficialAccountClient != nil {
 		w.OfficialAccountClient.SetLogger(logger)
+	}
+}
+
+// SetHTTPClient 设置自定义HTTP客户端
+func (w *WeGo) SetHTTPClient(client core.HTTPClient) {
+	if w.OpenPlatformClient != nil {
+		w.OpenPlatformClient.SetHTTPClient(client)
+	}
+	if w.OfficialAccountClient != nil {
+		w.OfficialAccountClient.SetHTTPClient(client)
 	}
 }
 

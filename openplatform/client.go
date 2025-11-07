@@ -94,6 +94,10 @@ func (c *Client) SetLogger(logger debugger.LoggerInterface) {
 // SetHTTPClient 设置自定义HTTP客户端
 func (c *Client) SetHTTPClient(client core.HTTPClient) {
 	c.httpClient = client
+	// 同时更新请求对象中的HTTP客户端
+	if c.req != nil {
+		c.req = core.NewRequest(client, c.logger)
+	}
 }
 
 // SetEventHandler 设置事件处理器
