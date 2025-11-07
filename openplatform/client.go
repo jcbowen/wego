@@ -33,26 +33,54 @@ type APIClient struct {
 }
 
 // NewAPIClient 创建新的API客户端（使用默认文件存储）
-func NewAPIClient(config *OpenPlatformConfig) *APIClient {
-	// 使用当前工作目录下的 wego_storage 文件夹作为默认存储路径
+// @param config *OpenPlatformConfig 开放平台配置信息
+// @param opt ...any 可选参数，支持以下类型：
+//   - debugger.LoggerInterface: 自定义日志器
+//   - HTTPClient: 自定义HTTP客户端
+//   - EventHandler: 自定义事件处理器
+//
+// @return *APIClient API客户端实例
+func NewAPIClient(config *OpenPlatformConfig, opt ...any) (apiClient *APIClient) {
+	// 使用当前工作目录下的 ./runtime/wego_storage 文件夹作为默认存储路径
 	fileStorage, err := storage.NewFileStorage("./runtime/wego_storage")
 	if err != nil {
 		// 如果文件存储创建失败，回退到内存存储并输出日志
 		logger := &debugger.DefaultLogger{}
 		logger.Warn(fmt.Sprintf("文件存储创建失败，回退到内存存储: %v", err))
-		return NewAPIClientWithStorage(config, storage.NewMemoryStorage())
+		apiClient = NewAPIClientWithStorage(config, storage.NewMemoryStorage(), opt...)
 	}
-	return NewAPIClientWithStorage(config, fileStorage)
+	apiClient = NewAPIClientWithStorage(config, fileStorage, opt...)
+	return
 }
 
 // NewAPIClientWithStorage 创建新的API客户端（使用自定义存储）
-func NewAPIClientWithStorage(config *OpenPlatformConfig, storage storage.TokenStorage) *APIClient {
+func NewAPIClientWithStorage(config *OpenPlatformConfig, storage storage.TokenStorage, opt ...any) *APIClient {
 	client := &APIClient{
 		config:     config,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		storage:    storage,
 		logger:     &debugger.DefaultLogger{},
 		crypt:      crypto.NewWXBizMsgCrypt(config.ComponentToken, config.EncodingAESKey, config.ComponentAppID),
+	}
+
+	// 遍历所有可选参数，根据类型进行相应设置
+	if len(opt) > 0 {
+		for _, option := range opt {
+			switch v := option.(type) {
+			case debugger.LoggerInterface:
+				// 设置自定义日志器
+				client.SetLogger(v)
+			case HTTPClient:
+				// 设置自定义HTTP客户端
+				client.SetHTTPClient(v)
+			case EventHandler:
+				// 设置自定义事件处理器
+				client.SetEventHandler(v)
+			default:
+				// 记录未知类型的可选参数
+				client.logger.Warn(fmt.Sprintf("未知的可选参数类型: %T", v))
+			}
+		}
 	}
 
 	return client
@@ -229,7 +257,12 @@ func (c *APIClient) MakeRequest(ctx context.Context, method, url string, body in
 		return fmt.Errorf("读取响应体失败: %v", err)
 	}
 
-	if err := json.Unmarshal(respBody, result); err != nil {
+	c.logger.Debug(string(respBody), map[string]interface{}{
+		"client": "OpenPlatform",
+		"method": "MakeRequest",
+	})
+
+	if err = json.Unmarshal(respBody, result); err != nil {
 		return fmt.Errorf("解析响应失败: %v", err)
 	}
 
@@ -773,6 +806,78 @@ func (c *APIClient) GetAuthorizerList(ctx context.Context, offset, count int) (*
 	}
 
 	return &result, nil
+}
+
+// GetAllAuthorizers 获取所有授权方列表，自动处理分页
+// 该方法会循环调用GetAuthorizerList，直到获取所有授权方数据
+// 返回所有授权方信息的切片和可能的错误
+func (c *APIClient) GetAllAuthorizers(ctx context.Context) ([]struct {
+	AuthorizerAppID string `json:"authorizer_appid"`
+	RefreshToken    string `json:"refresh_token"`
+	AuthTime        int64  `json:"auth_time"`
+}, error) {
+	const (
+		pageSize = 500 // 每页获取的数量，微信API最大支持500
+		maxRetry = 3   // 最大重试次数
+	)
+
+	var allAuthorizers []struct {
+		AuthorizerAppID string `json:"authorizer_appid"`
+		RefreshToken    string `json:"refresh_token"`
+		AuthTime        int64  `json:"auth_time"`
+	}
+
+	offset := 0
+
+	for {
+		var response *GetAuthorizerListResponse
+		var err error
+
+		// 重试机制
+		for retry := 0; retry < maxRetry; retry++ {
+			response, err = c.GetAuthorizerList(ctx, offset, pageSize)
+			if err == nil {
+				break
+			}
+
+			// 如果是最后一次重试仍然失败，则返回错误
+			if retry == maxRetry-1 {
+				return nil, fmt.Errorf("获取授权方列表失败，重试%d次后仍然失败: %v", maxRetry, err)
+			}
+
+			// 等待一段时间后重试
+			time.Sleep(time.Duration(retry+1) * time.Second)
+		}
+
+		// 检查响应是否有效
+		if response == nil {
+			return nil, fmt.Errorf("获取授权方列表响应为空")
+		}
+
+		// 添加当前页的数据到总列表
+		if len(response.List) > 0 {
+			allAuthorizers = append(allAuthorizers, response.List...)
+		}
+
+		// 判断是否还有更多数据
+		// 如果当前页返回的数量小于请求的数量，或者已经获取了所有数据，则结束循环
+		if len(response.List) < pageSize || len(allAuthorizers) >= response.TotalCount {
+			break
+		}
+
+		// 更新offset，准备获取下一页
+		offset += pageSize
+
+		// 防止无限循环，如果获取的数据量超过总数量，则退出
+		if offset >= response.TotalCount {
+			break
+		}
+
+		// 添加小延迟，避免对API造成过大压力
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	return allAuthorizers, nil
 }
 
 // GenerateAuthURL 生成授权链接
