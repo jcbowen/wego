@@ -6,8 +6,8 @@ import (
 
 // APIResponse 微信API通用响应结构
 type APIResponse struct {
-	ErrCode int    `json:"errcode"`
-	ErrMsg  string `json:"errmsg"`
+	ErrCode int    `json:"errcode"` // 错误码，0表示成功
+	ErrMsg  string `json:"errmsg"`  // 错误描述
 }
 
 // Error 实现error接口
