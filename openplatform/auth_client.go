@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jcbowen/wego/officialaccount"
 )
 
 // AuthClient 授权相关客户端
@@ -644,7 +646,7 @@ func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *Te
 		return err
 	}
 
-	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=%s", url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APISendTemplateMsgURL, url.QueryEscape(accessToken))
 
 	var result struct {
 		APIResponse

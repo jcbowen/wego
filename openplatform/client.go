@@ -742,7 +742,7 @@ func (c *APIClient) RefreshAuthorizerToken(ctx context.Context, authorizerAppID,
 		AuthorizationInfo
 	}
 
-	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/component/api_authorizer_token?component_access_token=%s",
+	apiURL := fmt.Sprintf("%s?component_access_token=%s", APIAuthorizerTokenURL,
 		url.QueryEscape(componentToken.AccessToken))
 
 	err = c.MakeRequest(ctx, "POST", apiURL, request, &result)
@@ -1100,7 +1100,7 @@ func (c *APIClient) GetTemplateDraftList(ctx context.Context) (*GetTemplateDraft
 	}
 
 	var result GetTemplateDraftListResponse
-	getTemplateDraftListUrl := fmt.Sprintf("%s?access_token=%s", APIGetTemplateDraftListURL, url.QueryEscape(componentToken.AccessToken))
+	getTemplateDraftListUrl := fmt.Sprintf("%s?access_token=%s", APIWxaGetTemplateDraftListURL, url.QueryEscape(componentToken.AccessToken))
 	err = c.MakeRequest(ctx, "GET", getTemplateDraftListUrl, nil, &result)
 	if err != nil {
 		return nil, err
@@ -1126,7 +1126,7 @@ func (c *APIClient) AddToTemplate(ctx context.Context, draftID int64, templateTy
 	}
 
 	var result APIResponse
-	addToTemplateUrl := fmt.Sprintf("%s?access_token=%s", APIAddToTemplateURL, url.QueryEscape(componentToken.AccessToken))
+	addToTemplateUrl := fmt.Sprintf("%s?access_token=%s", APIWxaAddToTemplateURL, url.QueryEscape(componentToken.AccessToken))
 	err = c.MakeRequest(ctx, "POST", addToTemplateUrl, request, &result)
 	if err != nil {
 		return nil, err
@@ -1147,7 +1147,7 @@ func (c *APIClient) GetTemplateList(ctx context.Context) (*GetTemplateListRespon
 	}
 
 	var result GetTemplateListResponse
-	getTemplateListUrl := fmt.Sprintf("%s?access_token=%s", APIGetTemplateListURL, url.QueryEscape(componentToken.AccessToken))
+	getTemplateListUrl := fmt.Sprintf("%s?access_token=%s", APIWxaGetTemplateListURL, url.QueryEscape(componentToken.AccessToken))
 	err = c.MakeRequest(ctx, "GET", getTemplateListUrl, nil, &result)
 	if err != nil {
 		return nil, err
@@ -1172,7 +1172,7 @@ func (c *APIClient) DeleteTemplate(ctx context.Context, templateID int64) (*APIR
 	}
 
 	var result APIResponse
-	deleteTemplateUrl := fmt.Sprintf("%s?access_token=%s", APIDeleteTemplateURL, url.QueryEscape(componentToken.AccessToken))
+	deleteTemplateUrl := fmt.Sprintf("%s?access_token=%s", APIWxaDeleteTemplateURL, url.QueryEscape(componentToken.AccessToken))
 	err = c.MakeRequest(ctx, "POST", deleteTemplateUrl, request, &result)
 	if err != nil {
 		return nil, err
