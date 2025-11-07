@@ -191,11 +191,6 @@ func (s *FileStorage) GetAuthorizerToken(ctx context.Context, authorizerAppID st
 		return nil, err
 	}
 
-	// 检查是否过期
-	if time.Now().After(token.ExpiresAt) {
-		return nil, nil
-	}
-
 	return &token, nil
 }
 

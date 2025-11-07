@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
@@ -63,9 +64,9 @@ type DBAuthorizerToken struct {
 
 // DBPrevEncodingAESKey 上一次EncodingAESKey数据库模型
 type DBPrevEncodingAESKey struct {
-	ID              uint      `gorm:"primaryKey"`
-	AppID           string    `gorm:"type:varchar(64);not null;uniqueIndex"`
-	PrevEncodingKey string    `gorm:"type:varchar(256);not null"`
+	ID              uint   `gorm:"primaryKey"`
+	AppID           string `gorm:"type:varchar(64);not null;uniqueIndex"`
+	PrevEncodingKey string `gorm:"type:varchar(256);not null"`
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -75,7 +76,7 @@ type DBComponentVerifyTicket struct {
 	ID        uint      `gorm:"primaryKey"`
 	Ticket    string    `gorm:"type:varchar(512);not null"` // 票据内容
 	CreatedAt time.Time `gorm:"not null"`                   // 创建时间
-	ExpiresAt time.Time `gorm:"not null;index"`            // 过期时间（创建时间+12小时）
+	ExpiresAt time.Time `gorm:"not null;index"`             // 过期时间（创建时间+12小时）
 }
 
 // SaveComponentToken 保存组件令牌到数据库
@@ -198,17 +199,10 @@ func (s *DBStorage) GetAuthorizerToken(ctx context.Context, authorizerAppID stri
 	var dbToken DBAuthorizerToken
 
 	if err := s.db.Where("authorizer_app_id = ?", authorizerAppID).First(&dbToken).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	// 检查是否过期
-	if time.Now().After(dbToken.ExpiresAt) {
-		// 自动删除过期令牌
-		s.db.Delete(&dbToken)
-		return nil, nil
 	}
 
 	return &AuthorizerAccessToken{
@@ -276,9 +270,9 @@ func (s *DBStorage) GetPrevEncodingAESKey(ctx context.Context, appID string) (*P
 	}
 
 	return &PrevEncodingAESKey{
-		AppID:           appID,
+		AppID:              appID,
 		PrevEncodingAESKey: dbKey.PrevEncodingKey,
-		UpdatedAt:       time.Now(),
+		UpdatedAt:          time.Now(),
 	}, nil
 }
 

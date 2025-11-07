@@ -150,14 +150,7 @@ func (s *MemoryStorage) GetAuthorizerToken(ctx context.Context, authorizerAppID 
 		s.mu.RUnlock()
 		return nil, nil
 	}
-	// 检查是否过期
-	if time.Now().After(token.ExpiresAt) {
-		s.mu.RUnlock()
-		s.mu.Lock()
-		delete(s.authorizerTokens, authorizerAppID)
-		s.mu.Unlock()
-		return nil, nil
-	}
+	
 	tokenCopy := token
 	s.mu.RUnlock()
 	return tokenCopy, nil
