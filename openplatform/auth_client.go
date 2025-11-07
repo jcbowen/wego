@@ -604,65 +604,18 @@ func (c *AuthorizerClient) GetUserList(ctx context.Context, nextOpenID string) (
 	return &result, nil
 }
 
-// TemplateMessage 模板消息
-type TemplateMessage struct {
-	ToUser      string                   `json:"touser"`
-	TemplateID  string                   `json:"template_id"`
-	URL         string                   `json:"url,omitempty"`
-	MiniProgram *TemplateMiniProgramInfo `json:"miniprogram,omitempty"`
-	Data        map[string]TemplateData  `json:"data"`
-}
-
-// TemplateData 模板消息数据
-type TemplateData struct {
-	Value string `json:"value"`
-	Color string `json:"color,omitempty"`
-}
-
-// TemplateMiniProgramInfo 模板消息小程序信息
-type TemplateMiniProgramInfo struct {
-	AppID    string `json:"appid"`
-	PagePath string `json:"pagepath"`
-}
-
 // SendTemplateMessage 发送模板消息
-func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *TemplateMessage) error {
-	// 验证参数
-	if template == nil {
-		return fmt.Errorf("模板消息不能为空")
-	}
-	if template.ToUser == "" {
-		return fmt.Errorf("接收用户不能为空")
-	}
-	if template.TemplateID == "" {
-		return fmt.Errorf("模板ID不能为空")
-	}
+func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *officialaccount.SendTemplateMsgRequest) (*officialaccount.SendTemplateMsgResponse, error) {
 	if c.authorizerAppID == "" {
-		return fmt.Errorf("授权方AppID不能为空")
+		return nil, fmt.Errorf("授权方AppID不能为空")
 	}
 
 	accessToken, err := c.authClient.client.GetAuthorizerAccessToken(ctx, c.authorizerAppID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APIMessageTemplateSendURL, url.QueryEscape(accessToken))
-
-	var result struct {
-		APIResponse
-		MsgID int64 `json:"msgid"`
-	}
-
-	err = c.authClient.client.req.Make(ctx, "POST", apiURL, template, &result)
-	if err != nil {
-		return err
-	}
-
-	if !result.IsSuccess() {
-		return &result.APIResponse
-	}
-
-	return nil
+	return officialaccount.NewTemplate(c.authClient.client.req).SendTemplateMessage(ctx, template, accessToken)
 }
 
 // MediaResponse 媒体文件响应

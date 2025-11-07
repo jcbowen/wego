@@ -20,7 +20,7 @@ func NewTemplate(req *core.Request) *Template {
 
 // SendTemplateMsgRequest 发送模板消息请求
 type SendTemplateMsgRequest struct {
-	Touser      string                  `json:"touser"`
+	ToUser      string                  `json:"touser"`
 	TemplateID  string                  `json:"template_id"`
 	URL         string                  `json:"url,omitempty"`
 	MiniProgram MiniProgramInfo         `json:"miniprogram,omitempty"`
@@ -46,11 +46,25 @@ type SendTemplateMsgResponse struct {
 }
 
 // SendTemplateMessage 发送公众号模板消息
-func (c *Template) SendTemplateMessage(ctx context.Context, request *SendTemplateMsgRequest, accessToken string) (*SendTemplateMsgResponse, error) {
+func (c *Template) SendTemplateMessage(ctx context.Context, template *SendTemplateMsgRequest, accessToken string) (*SendTemplateMsgResponse, error) {
+	// 验证参数
+	if template == nil {
+		return nil, fmt.Errorf("模板消息不能为空")
+	}
+	if template.ToUser == "" {
+		return nil, fmt.Errorf("接收用户不能为空")
+	}
+	if template.TemplateID == "" {
+		return nil, fmt.Errorf("模板ID不能为空")
+	}
+	if template.Data == nil {
+		return nil, fmt.Errorf("模板数据不能为空")
+	}
+
 	var result SendTemplateMsgResponse
 
 	apiURL := fmt.Sprintf("%s?access_token=%s", APIMessageTemplateSendURL, url.QueryEscape(accessToken))
-	err := c.req.Make(ctx, "POST", apiURL, request, &result)
+	err := c.req.Make(ctx, "POST", apiURL, template, &result)
 
 	if err != nil {
 		return nil, err
