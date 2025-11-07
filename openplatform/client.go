@@ -349,7 +349,7 @@ type GetAuthorizerListResponse struct {
 	TotalCount int `json:"total_count"`
 	List       []struct {
 		AuthorizerAppID string `json:"authorizer_appid"`
-		RefreshToken    string `json:"refresh_token"`
+		RefreshToken    string `json:"refresh_token"` // 通过接口已经获取不到了，只能重新授权
 		AuthTime        int64  `json:"auth_time"`
 	} `json:"list"`
 }
@@ -813,7 +813,7 @@ func (c *APIClient) GetAuthorizerList(ctx context.Context, offset, count int) (*
 // 返回所有授权方信息的切片和可能的错误
 func (c *APIClient) GetAllAuthorizers(ctx context.Context) ([]struct {
 	AuthorizerAppID string `json:"authorizer_appid"`
-	RefreshToken    string `json:"refresh_token"`
+	RefreshToken    string `json:"refresh_token"` // 通过接口已经获取不到了，只能重新授权
 	AuthTime        int64  `json:"auth_time"`
 }, error) {
 	const (
