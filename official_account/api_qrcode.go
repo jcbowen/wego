@@ -77,5 +77,5 @@ func (q *Qrcode) ShowQrcode(ticket string) (string, error) {
 		return "", fmt.Errorf("二维码ticket不能为空")
 	}
 
-	return fmt.Sprintf("https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=%s", url.QueryEscape(ticket)), nil
+	return fmt.Sprintf("%s?ticket=%s", APIQRCodeShowURL, url.QueryEscape(ticket)), nil
 }
