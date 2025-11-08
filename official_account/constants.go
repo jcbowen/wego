@@ -10,6 +10,9 @@ const (
 	APIGetCallbackIpURL     = "https://api.weixin.qq.com/cgi-bin/getcallbackip"
 	APIClearQuotaURL        = "https://api.weixin.qq.com/cgi-bin/clear_quota"
 
+	// 网页授权
+	ConnectOauth2AuthorizeURL = "https://open.weixin.qq.com/connect/oauth2/authorize"
+
 	// 自定义菜单
 	APICreateMenuURL            = "https://api.weixin.qq.com/cgi-bin/menu/create"
 	APIGetCurrentMenuURL        = "https://api.weixin.qq.com/cgi-bin/get_current_selfmenu_info"

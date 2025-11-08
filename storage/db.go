@@ -97,9 +97,9 @@ type DBComponentVerifyTicket struct {
 	base.MysqlBaseModel
 
 	ID        uint      `gorm:"column:id;type:INT(11) UNSIGNED;primaryKey;autoIncrement" json:"id"`
-	Ticket    string    `gorm:"column:ticket;type:varchar(512);not null;comment:票据内容" json:"ticket"`                          // 票据内容
+	Ticket    string    `gorm:"column:ticket;type:varchar(512);not null;comment:票据内容" json:"ticket"`                    // 票据内容
 	ExpiresAt time.Time `gorm:"column:expires_at;type:DATETIME;default:NULL;comment:过期时间（创建时间+12小时）" json:"expires_at"` // 过期时间（创建时间+12小时）
-	CreatedAt time.Time `gorm:"column:created_at;type:DATETIME;default:NULL;comment:创建时间" json:"created_at"`                  // 创建时间
+	CreatedAt time.Time `gorm:"column:created_at;type:DATETIME;default:NULL;comment:创建时间" json:"created_at"`            // 创建时间
 }
 
 // SaveComponentToken 保存组件令牌到数据库

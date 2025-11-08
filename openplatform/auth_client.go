@@ -779,7 +779,25 @@ func (c *AuthorizerClient) GetOAuthClient(redirectURI string) *OAuthClient {
 }
 
 // GetAuthorizeURL 生成授权页面URL
-func (oc *OAuthClient) GetAuthorizeURL(scope, state string) string {
+//   - opts
+//     -- scope：授权类型，snsapi_base 静默授权，snsapi_userinfo 授权并获取用户信息
+//     -- state：用于保持请求和回调的状态，授权请求后原样带回给第三方。
+//     -- forcePopup 强制此次授权需要用户弹窗确认；默认为false；需要注意的是，若用户命中了特殊场景下的静默授权逻辑，则此参数不生效
+func (oc *OAuthClient) GetAuthorizeURL(opts ...string) string {
+	// 解析参数
+	var scope, state, forcePopup string
+	if len(opts) > 0 {
+		scope = opts[0]
+	}
+	if len(opts) > 1 {
+		state = opts[1]
+	}
+	if len(opts) > 2 {
+		if opts[2] == "true" {
+			forcePopup = "true"
+		}
+	}
+
 	// 验证参数
 	if oc.authorizerClient.authorizerAppID == "" {
 		panic("authorizerAppID不能为空")
@@ -800,10 +818,13 @@ func (oc *OAuthClient) GetAuthorizeURL(scope, state string) string {
 	if state != "" {
 		params.Set("state", state)
 	}
+	if forcePopup == "true" {
+		params.Set("force_popup", forcePopup)
+	}
 	params.Set("component_appid", oc.authorizerClient.authClient.client.GetConfig().ComponentAppID)
 
 	// 使用微信官方文档指定的授权URL
-	return "https://open.weixin.qq.com/connect/oauth2/authorize?" + params.Encode() + "#wechat_redirect"
+	return fmt.Sprintf("%s?%s#wechat_redirect", official_account.ConnectOauth2AuthorizeURL, params.Encode())
 }
 
 // GetBaseAuthorizeURL 生成静默授权URL
@@ -842,9 +863,6 @@ func (oc *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthT
 		return nil, fmt.Errorf("获取ComponentAccessToken失败: %v", err)
 	}
 
-	// 使用微信官方文档指定的URL
-	apiURL := "https://api.weixin.qq.com/sns/oauth2/component/access_token"
-
 	// 严格按照微信官方文档要求的参数格式
 	params := map[string]interface{}{
 		"appid":                  oc.authorizerClient.authorizerAppID,
@@ -855,7 +873,7 @@ func (oc *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthT
 	}
 
 	var oauthToken OAuthToken
-	err = oc.authorizerClient.authClient.client.req.Make(ctx, "POST", apiURL, params, &oauthToken)
+	err = oc.authorizerClient.authClient.client.req.Make(ctx, "POST", APIComponentAccessTokenURL, params, &oauthToken)
 	if err != nil {
 		return nil, err
 	}
