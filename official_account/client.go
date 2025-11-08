@@ -1,4 +1,4 @@
-package officialaccount
+package official_account
 
 import (
 	"context"

@@ -7,7 +7,7 @@ import (
 	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/message"
-	"github.com/jcbowen/wego/officialaccount"
+	"github.com/jcbowen/wego/official_account"
 	"github.com/jcbowen/wego/openplatform"
 	"github.com/jcbowen/wego/storage"
 	"github.com/jcbowen/wego/types"
@@ -19,7 +19,7 @@ type WeGo struct {
 	OpenPlatformClient *openplatform.Client
 
 	// 公众号客户端
-	OfficialAccountClient *officialaccount.Client
+	OfficialAccountClient *official_account.Client
 }
 
 // New 创建新的WeGo实例，支持多种客户端配置和可选参数
@@ -43,7 +43,7 @@ func New(params ...any) *WeGo {
 
 	for _, param := range params {
 		switch param.(type) {
-		case *openplatform.Config, *officialaccount.Config:
+		case *openplatform.Config, *official_account.Config:
 			configParams = append(configParams, param)
 		default:
 			optParams = append(optParams, param)
@@ -57,10 +57,10 @@ func New(params ...any) *WeGo {
 			if wego.OpenPlatformClient == nil {
 				wego.OpenPlatformClient = openplatform.NewClient(cfg, optParams...)
 			}
-		case *officialaccount.Config:
+		case *official_account.Config:
 			// 如果还没有初始化过公众号客户端，则初始化
 			if wego.OfficialAccountClient == nil {
-				wego.OfficialAccountClient = officialaccount.NewClient(cfg, optParams...)
+				wego.OfficialAccountClient = official_account.NewClient(cfg, optParams...)
 			}
 		default:
 			log.Printf("警告：不支持的配置类型 %T", cfg)
@@ -94,7 +94,7 @@ func NewWithStorage(storage storage.TokenStorage, params ...any) *WeGo {
 
 	for _, param := range params {
 		switch param.(type) {
-		case *openplatform.Config, *officialaccount.Config:
+		case *openplatform.Config, *official_account.Config:
 			configParams = append(configParams, param)
 		default:
 			optParams = append(optParams, param)
@@ -108,10 +108,10 @@ func NewWithStorage(storage storage.TokenStorage, params ...any) *WeGo {
 			if wego.OpenPlatformClient == nil {
 				wego.OpenPlatformClient = openplatform.NewClientWithStorage(cfg, storage, optParams...)
 			}
-		case *officialaccount.Config:
+		case *official_account.Config:
 			// 如果还没有初始化过公众号客户端，则初始化
 			if wego.OfficialAccountClient == nil {
-				wego.OfficialAccountClient = officialaccount.NewMPClientWithStorage(cfg, storage, optParams...)
+				wego.OfficialAccountClient = official_account.NewMPClientWithStorage(cfg, storage, optParams...)
 			}
 		default:
 			// 忽略不支持的配置类型
@@ -159,51 +159,51 @@ func (w *WeGo) OpenPlatformMessage() *message.MessageClient {
 }
 
 // OfficialAccountAPI 返回公众号API相关功能
-func (w *WeGo) OfficialAccountAPI() *officialaccount.APIClient {
+func (w *WeGo) OfficialAccountAPI() *official_account.APIClient {
 	if w.OfficialAccountClient == nil {
 		panic("未初始化公众号客户端")
 	}
-	return officialaccount.NewMPAPIClient(w.OfficialAccountClient)
+	return official_account.NewMPAPIClient(w.OfficialAccountClient)
 }
 
 // OfficialAccountMenu 返回公众号菜单相关功能
-func (w *WeGo) OfficialAccountMenu() *officialaccount.MenuClient {
+func (w *WeGo) OfficialAccountMenu() *official_account.MenuClient {
 	if w.OfficialAccountClient == nil {
 		panic("未初始化公众号客户端")
 	}
-	return officialaccount.NewMenuClient(w.OfficialAccountClient)
+	return official_account.NewMenuClient(w.OfficialAccountClient)
 }
 
 // OfficialAccountMessage 返回公众号消息相关功能
-func (w *WeGo) OfficialAccountMessage() *officialaccount.MessageClient {
+func (w *WeGo) OfficialAccountMessage() *official_account.MessageClient {
 	if w.OfficialAccountClient == nil {
 		panic("未初始化公众号客户端")
 	}
-	return officialaccount.NewMessageClient(w.OfficialAccountClient)
+	return official_account.NewMessageClient(w.OfficialAccountClient)
 }
 
 // OfficialAccountTemplate 返回公众号模板消息相关功能
-func (w *WeGo) OfficialAccountTemplate() *officialaccount.TemplateClient {
+func (w *WeGo) OfficialAccountTemplate() *official_account.TemplateClient {
 	if w.OfficialAccountClient == nil {
 		panic("未初始化公众号客户端")
 	}
-	return officialaccount.NewTemplateClient(w.OfficialAccountClient)
+	return official_account.NewTemplateClient(w.OfficialAccountClient)
 }
 
 // OfficialAccountCustom 返回公众号客服消息相关功能
-func (w *WeGo) OfficialAccountCustom() *officialaccount.CustomClient {
+func (w *WeGo) OfficialAccountCustom() *official_account.CustomClient {
 	if w.OfficialAccountClient == nil {
 		panic("未初始化公众号客户端")
 	}
-	return officialaccount.NewCustomClient(w.OfficialAccountClient)
+	return official_account.NewCustomClient(w.OfficialAccountClient)
 }
 
 // OfficialAccountMaterial 返回公众号素材管理相关功能
-func (w *WeGo) OfficialAccountMaterial() *officialaccount.MaterialClient {
+func (w *WeGo) OfficialAccountMaterial() *official_account.MaterialClient {
 	if w.OfficialAccountClient == nil {
 		panic("未初始化公众号客户端")
 	}
-	return officialaccount.NewMaterialClient(w.OfficialAccountClient)
+	return official_account.NewMaterialClient(w.OfficialAccountClient)
 }
 
 // Crypto 返回加密解密相关功能
@@ -263,28 +263,28 @@ type (
 	OpenPlatformAuthorizerInfo    = openplatform.AuthorizerInfo
 
 	// 微信公众号开发相关类型
-	OfficialAccountConfig         = officialaccount.Config
-	OfficialAccountClient         = officialaccount.Client
-	OfficialAccountAPIClient      = officialaccount.APIClient
-	OfficialAccountMenuClient     = officialaccount.MenuClient
-	OfficialAccountMessageClient  = officialaccount.MessageClient
-	OfficialAccountTemplateClient = officialaccount.TemplateClient
-	OfficialAccountCustomClient   = officialaccount.CustomClient
-	OfficialAccountMaterialClient = officialaccount.MaterialClient
+	OfficialAccountConfig         = official_account.Config
+	OfficialAccountClient         = official_account.Client
+	OfficialAccountAPIClient      = official_account.APIClient
+	OfficialAccountMenuClient     = official_account.MenuClient
+	OfficialAccountMessageClient  = official_account.MessageClient
+	OfficialAccountTemplateClient = official_account.TemplateClient
+	OfficialAccountCustomClient   = official_account.CustomClient
+	OfficialAccountMaterialClient = official_account.MaterialClient
 
 	// 微信公众号数据结构体
-	OfficialAccountMenu                   = officialaccount.Menu
-	OfficialAccountButton                 = officialaccount.Button
-	OfficialAccountTemplateMessageRequest = officialaccount.TemplateMessageRequest
-	OfficialAccountTemplateMessageData    = officialaccount.TemplateMessageData
-	OfficialAccountMessageText            = officialaccount.MessageText
-	OfficialAccountMessageImage           = officialaccount.MessageImage
-	OfficialAccountMessageVoice           = officialaccount.MessageVoice
-	OfficialAccountMessageVideo           = officialaccount.MessageVideo
-	OfficialAccountMusicMessage           = officialaccount.MessageMusic
-	OfficialAccountNewsMessage            = officialaccount.MessageNews
-	OfficialAccountWXCardMessage          = officialaccount.MessageWXCard
-	OfficialAccountMiniProgramPageMessage = officialaccount.MessageMiniProgramPage
-	OfficialAccountNewsArticle            = officialaccount.NewsArticle
+	OfficialAccountMenu                   = official_account.Menu
+	OfficialAccountButton                 = official_account.Button
+	OfficialAccountTemplateMessageRequest = official_account.TemplateMessageRequest
+	OfficialAccountTemplateMessageData    = official_account.TemplateMessageData
+	OfficialAccountMessageText            = official_account.MessageText
+	OfficialAccountMessageImage           = official_account.MessageImage
+	OfficialAccountMessageVoice           = official_account.MessageVoice
+	OfficialAccountMessageVideo           = official_account.MessageVideo
+	OfficialAccountMusicMessage           = official_account.MessageMusic
+	OfficialAccountNewsMessage            = official_account.MessageNews
+	OfficialAccountWXCardMessage          = official_account.MessageWXCard
+	OfficialAccountMiniProgramPageMessage = official_account.MessageMiniProgramPage
+	OfficialAccountNewsArticle            = official_account.NewsArticle
 	UserInfo                              = types.OAuthUserInfoResponse
 )

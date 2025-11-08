@@ -1,4 +1,4 @@
-package officialaccount
+package official_account
 
 // 微信公众号API地址常量
 const (
@@ -86,4 +86,8 @@ const (
 	APIAddWxaNewTemplateURL         = "https://api.weixin.qq.com/wxaapi/newtmpl/addtemplate"
 	APISendNewSubscribeMsgURL       = "https://api.weixin.qq.com/cgi-bin/message/subscribe/bizsend"
 	APITemplateSubscribeURL         = "https://api.weixin.qq.com/cgi-bin/message/template/subscribe"
+
+	// 二维码
+	APIQRCodeCreateURL = "https://api.weixin.qq.com/cgi-bin/qrcode/create"
+	APIQRCodeShowURL   = "https://mp.weixin.qq.com/cgi-bin/showqrcode"
 )

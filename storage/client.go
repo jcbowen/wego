@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"gorm.io/gorm"
+	"github.com/jcbowen/jcbaseGo"
 )
 
 // StorageClient 存储客户端
@@ -18,8 +18,8 @@ func (c *StorageClient) NewMemoryStorage() *MemoryStorage {
 }
 
 // NewDBStorage 创建新的数据库存储实例
-func (c *StorageClient) NewDBStorage(db *gorm.DB) (*DBStorage, error) {
-	return NewDBStorage(db)
+func (c *StorageClient) NewDBStorage(dbConfig jcbaseGo.DbStruct) (*DBStorage, error) {
+	return NewDBStorage(dbConfig)
 }
 
 // NewFileStorage 创建新的文件存储实例

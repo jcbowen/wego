@@ -1,4 +1,6 @@
-package officialaccount
+// Package official_account 微信公众号API - 模板消息
+// 本接口支持「服务号（仅认证）」账号类型调用。其他账号类型如无特殊说明，均不可调用。
+package official_account
 
 import (
 	"context"

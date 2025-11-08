@@ -1,3 +1,4 @@
+// Package openplatform 微信开放平台API - 调用授权方接口
 package openplatform
 
 import (
@@ -18,7 +19,7 @@ import (
 	"time"
 
 	"github.com/jcbowen/wego/core"
-	"github.com/jcbowen/wego/officialaccount"
+	"github.com/jcbowen/wego/official_account"
 )
 
 // AuthClient 授权相关客户端
@@ -169,7 +170,7 @@ func (c *AuthorizerClient) CreateMenu(ctx context.Context, menu *Menu) error {
 		return err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APICreateMenuURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.APICreateMenuURL, url.QueryEscape(accessToken))
 
 	var result core.APIResponse
 	err = c.authClient.client.req.Make(ctx, "POST", apiURL, menu, &result)
@@ -191,7 +192,7 @@ func (c *AuthorizerClient) GetMenu(ctx context.Context) (*Menu, error) {
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APIGetMenuURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.APIGetMenuURL, url.QueryEscape(accessToken))
 
 	var result struct {
 		core.APIResponse
@@ -217,7 +218,7 @@ func (c *AuthorizerClient) DeleteMenu(ctx context.Context) error {
 		return err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", officialaccount.APIDeleteMenuURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.APIDeleteMenuURL, url.QueryEscape(accessToken))
 
 	var result core.APIResponse
 	err = c.authClient.client.req.Make(ctx, "GET", apiURL, nil, &result)
@@ -336,7 +337,7 @@ func (c *AuthorizerClient) SendNewsMessage(ctx context.Context, toUser string, a
 		},
 	}
 
-	apiURL := officialaccount.APIMessageCustomSendURL
+	apiURL := official_account.APIMessageCustomSendURL
 
 	_, err := c.CallAPI(ctx, apiURL, message)
 	return err
@@ -606,7 +607,7 @@ func (c *AuthorizerClient) GetUserList(ctx context.Context, nextOpenID string) (
 }
 
 // SendTemplateMessage 发送模板消息
-func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *officialaccount.TemplateMessageRequest) (*officialaccount.SendTemplateMessageResponse, error) {
+func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *official_account.TemplateMessageRequest) (*official_account.SendTemplateMessageResponse, error) {
 	if c.authorizerAppID == "" {
 		return nil, fmt.Errorf("授权方AppID不能为空")
 	}
@@ -616,7 +617,7 @@ func (c *AuthorizerClient) SendTemplateMessage(ctx context.Context, template *of
 		return nil, err
 	}
 
-	return officialaccount.NewTemplate(c.authClient.client.req).SendTemplateMessage(ctx, template, accessToken)
+	return official_account.NewTemplate(c.authClient.client.req).SendTemplateMessage(ctx, template, accessToken)
 }
 
 // MediaResponse 媒体文件响应
@@ -979,35 +980,8 @@ func generateNonceStr() string {
 	return string(bts)
 }
 
-// QRCodeRequest 二维码请求
-type QRCodeRequest struct {
-	ExpireSeconds int64  `json:"expire_seconds,omitempty"`
-	ActionName    string `json:"action_name"`
-	ActionInfo    struct {
-		Scene struct {
-			SceneID  int    `json:"scene_id,omitempty"`
-			SceneStr string `json:"scene_str,omitempty"`
-		} `json:"scene"`
-	} `json:"action_info"`
-}
-
-// QRCodeResponse 二维码响应
-type QRCodeResponse struct {
-	core.APIResponse
-	Ticket        string `json:"ticket"`
-	ExpireSeconds int64  `json:"expire_seconds"`
-	URL           string `json:"url"`
-}
-
-// CreateQRCode 创建二维码
-func (c *AuthorizerClient) CreateQRCode(ctx context.Context, qrCode *QRCodeRequest) (*QRCodeResponse, error) {
-	// 验证参数
-	if qrCode == nil {
-		return nil, fmt.Errorf("二维码请求不能为空")
-	}
-	if qrCode.ActionName == "" {
-		return nil, fmt.Errorf("二维码动作名称不能为空")
-	}
+// Create 创建二维码
+func (c *AuthorizerClient) Create(ctx context.Context, qrCode *official_account.QRCodeRequest) (*official_account.QRCodeResponse, error) {
 	if c.authorizerAppID == "" {
 		return nil, fmt.Errorf("授权方AppID不能为空")
 	}
@@ -1017,29 +991,12 @@ func (c *AuthorizerClient) CreateQRCode(ctx context.Context, qrCode *QRCodeReque
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/qrcode/create?access_token=%s", url.QueryEscape(accessToken))
-
-	var result QRCodeResponse
-	err = c.authClient.client.req.Make(ctx, "POST", apiURL, qrCode, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	if !result.IsSuccess() {
-		return nil, &result.APIResponse
-	}
-
-	return &result, nil
+	return official_account.NewQrcode(c.authClient.client.req).Create(ctx, qrCode, accessToken)
 }
 
 // GetQRCodeURL 获取二维码图片URL
 func (c *AuthorizerClient) GetQRCodeURL(ticket string) (string, error) {
-	// 验证参数
-	if ticket == "" {
-		return "", fmt.Errorf("二维码ticket不能为空")
-	}
-
-	return fmt.Sprintf("https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=%s", url.QueryEscape(ticket)), nil
+	return official_account.NewQrcode(c.authClient.client.req).ShowQrcode(ticket)
 }
 
 // MiniProgramClient 小程序客户端

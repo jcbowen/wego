@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/jcbowen/jcbaseGo"
+	"github.com/jcbowen/jcbaseGo/component/orm/mysql"
 	"gorm.io/gorm"
 )
 
@@ -15,7 +17,17 @@ type DBStorage struct {
 }
 
 // NewDBStorage 创建数据库存储实例
-func NewDBStorage(db *gorm.DB) (*DBStorage, error) {
+// @param dbConfig jcbaseGo.DbStruct 数据库配置结构
+// @param opts ...string 可选参数
+// @return *DBStorage 数据库存储实例
+// @return error 错误信息
+func NewDBStorage(dbConfig jcbaseGo.DbStruct, opts ...string) (*DBStorage, error) {
+	// 创建mysql实例
+	mysqlInstance := mysql.New(dbConfig, opts...)
+
+	// 获取GORM数据库连接
+	db := mysqlInstance.GetDb()
+
 	// 自动迁移数据库表
 	if err := db.AutoMigrate(
 		&DBComponentToken{},
@@ -105,17 +117,10 @@ func (s *DBStorage) GetComponentToken(ctx context.Context) (*ComponentAccessToke
 
 	// 获取最新的令牌记录
 	if err := s.db.Order("created_at DESC").First(&dbToken).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	// 检查是否过期
-	if time.Now().After(dbToken.ExpiresAt) {
-		// 自动删除过期令牌
-		s.db.Delete(&dbToken)
-		return nil, nil
 	}
 
 	return &ComponentAccessToken{
@@ -156,7 +161,7 @@ func (s *DBStorage) GetPreAuthCode(ctx context.Context) (*PreAuthCode, error) {
 
 	// 获取最新的预授权码记录
 	if err := s.db.Order("created_at DESC").First(&dbCode).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -263,7 +268,7 @@ func (s *DBStorage) GetPrevEncodingAESKey(ctx context.Context, appID string) (*P
 	var dbKey DBPrevEncodingAESKey
 
 	if err := s.db.Where("app_id = ?", appID).First(&dbKey).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -315,7 +320,7 @@ func (s *DBStorage) GetComponentVerifyTicket(ctx context.Context) (*ComponentVer
 
 	// 获取最新的票据记录
 	if err := s.db.Order("created_at DESC").First(&dbTicket).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
