@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jcbowen/jcbaseGo"
+	"github.com/jcbowen/jcbaseGo/component/orm/base"
 	"github.com/jcbowen/jcbaseGo/component/orm/mysql"
 	"gorm.io/gorm"
 )
@@ -44,51 +45,61 @@ func NewDBStorage(dbConfig jcbaseGo.DbStruct, opts ...string) (*DBStorage, error
 
 // DBComponentToken 组件令牌数据库模型
 type DBComponentToken struct {
-	ID          uint      `gorm:"primaryKey"`
-	AccessToken string    `gorm:"type:varchar(512);not null"`
-	ExpiresIn   int       `gorm:"not null"`
-	ExpiresAt   time.Time `gorm:"not null;index"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	base.MysqlBaseModel
+
+	ID          uint      `gorm:"column:id;type:INT(11) UNSIGNED;primaryKey;autoIncrement" json:"id"`
+	AccessToken string    `gorm:"column:access_token;type:varchar(512);not null;comment:访问令牌" json:"access_token"`
+	ExpiresIn   int       `gorm:"column:expires_in;not null;comment:有效期限" json:"expires_in"`
+	ExpiresAt   time.Time `gorm:"column:expires_at;not null;index;comment:过期时间" json:"expires_at"`
+	CreatedAt   time.Time `gorm:"column:created_at;type:DATETIME;default:NULL;comment:创建时间" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;type:DATETIME;default:NULL;comment:更新时间" json:"updated_at"`
 }
 
 // DBPreAuthCode 预授权码数据库模型
 type DBPreAuthCode struct {
-	ID          uint      `gorm:"primaryKey"`
-	PreAuthCode string    `gorm:"type:varchar(256);not null"`
-	ExpiresIn   int       `gorm:"not null"`
-	ExpiresAt   time.Time `gorm:"not null;index"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	base.MysqlBaseModel
+
+	ID          uint      `gorm:"column:id;type:INT(11) UNSIGNED;primaryKey;autoIncrement" json:"id"`
+	PreAuthCode string    `gorm:"column:pre_auth_code;type:varchar(256);not null;comment:预授权码" json:"pre_auth_code"`
+	ExpiresIn   int       `gorm:"column:expires_in;not null;comment:有效期限" json:"expires_in"`
+	ExpiresAt   time.Time `gorm:"column:expires_at;not null;index;comment:过期时间" json:"expires_at"`
+	CreatedAt   time.Time `gorm:"column:created_at;type:DATETIME;default:NULL;comment:创建时间" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;type:DATETIME;default:NULL;comment:更新时间" json:"updated_at"`
 }
 
 // DBAuthorizerToken 授权方令牌数据库模型
 type DBAuthorizerToken struct {
-	ID                     uint      `gorm:"primaryKey"`
-	AuthorizerAppID        string    `gorm:"type:varchar(64);not null;uniqueIndex"`
-	AuthorizerAccessToken  string    `gorm:"type:varchar(512);not null"`
-	AuthorizerRefreshToken string    `gorm:"type:varchar(512)"`
-	ExpiresIn              int       `gorm:"not null"`
-	ExpiresAt              time.Time `gorm:"not null;index"`
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
+	base.MysqlBaseModel
+
+	ID                     uint      `gorm:"column:id;type:INT(11) UNSIGNED;primaryKey;autoIncrement" json:"id"`
+	AuthorizerAppID        string    `gorm:"column:authorizer_app_id;type:varchar(64);not null;uniqueIndex" json:"authorizer_app_id"`
+	AuthorizerAccessToken  string    `gorm:"column:authorizer_access_token;type:varchar(512);not null" json:"authorizer_access_token"`
+	AuthorizerRefreshToken string    `gorm:"column:authorizer_refresh_token;type:varchar(512)" json:"authorizer_refresh_token"`
+	ExpiresIn              int       `gorm:"column:expires_in;not null;comment:有效期限" json:"expires_in"`
+	ExpiresAt              time.Time `gorm:"column:expires_at;not null;index;comment:过期时间" json:"expires_at"`
+	CreatedAt              time.Time `gorm:"column:created_at;type:DATETIME;default:NULL;comment:创建时间" json:"created_at"`
+	UpdatedAt              time.Time `gorm:"column:updated_at;type:DATETIME;default:NULL;comment:更新时间" json:"updated_at"`
 }
 
 // DBPrevEncodingAESKey 上一次EncodingAESKey数据库模型
 type DBPrevEncodingAESKey struct {
-	ID              uint   `gorm:"primaryKey"`
-	AppID           string `gorm:"type:varchar(64);not null;uniqueIndex"`
-	PrevEncodingKey string `gorm:"type:varchar(256);not null"`
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	base.MysqlBaseModel
+
+	ID              uint      `gorm:"primaryKey"`
+	AppID           string    `gorm:"type:varchar(64);not null;uniqueIndex"`
+	PrevEncodingKey string    `gorm:"column:prev_encoding_key;type:varchar(256);not null;comment:上一次EncodingAESKey" json:"prev_encoding_key"`
+	CreatedAt       time.Time `gorm:"column:created_at;type:DATETIME;default:NULL;comment:创建时间" json:"created_at"`
+	UpdatedAt       time.Time `gorm:"column:updated_at;type:DATETIME;default:NULL;comment:更新时间" json:"updated_at"`
 }
 
 // DBComponentVerifyTicket 验证票据数据库模型
 type DBComponentVerifyTicket struct {
-	ID        uint      `gorm:"primaryKey"`
-	Ticket    string    `gorm:"type:varchar(512);not null"` // 票据内容
-	CreatedAt time.Time `gorm:"not null"`                   // 创建时间
-	ExpiresAt time.Time `gorm:"not null;index"`             // 过期时间（创建时间+12小时）
+	base.MysqlBaseModel
+
+	ID        uint      `gorm:"column:id;type:INT(11) UNSIGNED;primaryKey;autoIncrement" json:"id"`
+	Ticket    string    `gorm:"column:ticket;type:varchar(512);not null;comment:票据内容" json:"ticket"`                          // 票据内容
+	ExpiresAt time.Time `gorm:"column:expires_at;type:DATETIME;default:NULL;comment:过期时间（创建时间+12小时）" json:"expires_at"` // 过期时间（创建时间+12小时）
+	CreatedAt time.Time `gorm:"column:created_at;type:DATETIME;default:NULL;comment:创建时间" json:"created_at"`                  // 创建时间
 }
 
 // SaveComponentToken 保存组件令牌到数据库
