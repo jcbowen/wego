@@ -224,6 +224,17 @@ func (w *WeGo) OfficialAccountMaterial() *official_account.MaterialClient {
 	return official_account.NewMaterialClient(w.OfficialAccountClient)
 }
 
+// OfficialAccountSubscribe 返回公众号订阅消息相关功能
+// 功能：获取订阅消息客户端实例，用于管理订阅消息相关功能
+// 返回值：*official_account.SubscribeClient 订阅消息客户端指针
+func (w *WeGo) OfficialAccountSubscribe() *official_account.SubscribeClient {
+	if w.OfficialAccountClient == nil {
+		panic("未初始化公众号客户端")
+	}
+	apiClient := official_account.NewMPAPIClient(w.OfficialAccountClient)
+	return apiClient.GetSubscribeClient()
+}
+
 // Crypto 返回加密解密相关功能
 func (w *WeGo) Crypto() *crypto.CryptoClient {
 	return crypto.NewCryptoClient()

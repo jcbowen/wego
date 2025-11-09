@@ -112,3 +112,10 @@ func (c *APIClient) GetCallbackIp(ctx context.Context) (*GetCallbackIpResponse, 
 
 	return &result, nil
 }
+
+// GetSubscribeClient 获取订阅消息客户端
+// 功能：返回订阅消息客户端实例，用于管理订阅消息相关功能
+// 返回值：*SubscribeClient 订阅消息客户端指针
+func (c *APIClient) GetSubscribeClient() *SubscribeClient {
+	return NewSubscribeClient(c.Client)
+}
