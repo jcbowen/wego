@@ -10,6 +10,7 @@ WeGo 是一个 Go 语言编写的微信公众号开发库，提供了完整的�
 - ✅ 客服消息
 - ✅ 素材管理
 - ✅ 模板消息
+- ✅ 网页授权（OAuth2.0）
 - ✅ 完整的错误处理
 - ✅ 自动access_token管理
 - ✅ 支持多种存储后端
@@ -226,6 +227,35 @@ massMsg := &officialaccount.MassMessage{
 }
 resp, err := messageClient.SendMassMessage(ctx, massMsg)
 ```
+
+#### 7. 网页授权（OAuth2.0）
+
+```go
+// 获取OAuth客户端
+oauthClient := officialaccount.NewOAuthClient(client)
+
+// 生成授权URL
+authURL, err := oauthClient.GenerateAuthorizeURL(
+	"snsapi_userinfo", // 授权作用域
+	"http://yourdomain.com/callback", // 回调地址
+	"state123" // 自定义状态参数
+)
+
+// 处理授权回调
+// 获取授权码后，换取access_token
+accessToken, err := oauthClient.GetAccessToken(ctx, "authorization_code")
+
+// 获取用户信息
+userInfo, err := oauthClient.GetUserInfo(ctx, accessToken.AccessToken, accessToken.OpenID)
+
+// 刷新access_token
+refreshedToken, err := oauthClient.RefreshToken(ctx, accessToken.RefreshToken)
+
+// 验证access_token有效性
+isValid, err := oauthClient.VerifyAccessToken(ctx, accessToken.AccessToken, accessToken.OpenID)
+```
+
+详细使用说明请参考：[网页授权功能详解](./网页授权功能详解.md)
 
 ## 错误处理
 
