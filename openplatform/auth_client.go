@@ -99,7 +99,7 @@ func (c *AuthorizerClient) SendCustomMessage(ctx context.Context, toUser string,
 		return err
 	}
 
-	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/message/custom/send?access_token=%s", url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLMessageCustomSend, url.QueryEscape(accessToken))
 
 	request := map[string]interface{}{
 		"touser":  toUser,
@@ -170,7 +170,7 @@ func (c *AuthorizerClient) CreateMenu(ctx context.Context, menu *Menu) error {
 		return err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.APICreateMenuURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLCreateMenu, url.QueryEscape(accessToken))
 
 	var result core.APIResponse
 	err = c.authClient.client.req.Make(ctx, "POST", apiURL, menu, &result)
@@ -192,7 +192,7 @@ func (c *AuthorizerClient) GetMenu(ctx context.Context) (*Menu, error) {
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.APIGetMenuURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLGetMenu, url.QueryEscape(accessToken))
 
 	var result struct {
 		core.APIResponse
@@ -218,7 +218,7 @@ func (c *AuthorizerClient) DeleteMenu(ctx context.Context) error {
 		return err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.APIDeleteMenuURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLDeleteMenu, url.QueryEscape(accessToken))
 
 	var result core.APIResponse
 	err = c.authClient.client.req.Make(ctx, "GET", apiURL, nil, &result)
@@ -337,7 +337,7 @@ func (c *AuthorizerClient) SendNewsMessage(ctx context.Context, toUser string, a
 		},
 	}
 
-	apiURL := official_account.APIMessageCustomSendURL
+	apiURL := official_account.URLMessageCustomSend
 
 	_, err := c.CallAPI(ctx, apiURL, message)
 	return err
@@ -359,7 +359,7 @@ type ConditionalMenu struct {
 
 // CreateConditionalMenu 创建个性化菜单
 func (c *AuthorizerClient) CreateConditionalMenu(ctx context.Context, menu *ConditionalMenu) error {
-	apiURL := "https://api.weixin.qq.com/cgi-bin/menu/addconditional"
+	apiURL := official_account.URLAddConditionalMenu
 
 	_, err := c.CallAPI(ctx, apiURL, menu)
 	return err
@@ -367,7 +367,7 @@ func (c *AuthorizerClient) CreateConditionalMenu(ctx context.Context, menu *Cond
 
 // DeleteConditionalMenu 删除个性化菜单
 func (c *AuthorizerClient) DeleteConditionalMenu(ctx context.Context, menuID string) error {
-	apiURL := "https://api.weixin.qq.com/cgi-bin/menu/delconditional"
+	apiURL := official_account.URLDeleteConditionalMenu
 
 	params := map[string]interface{}{
 		"menuid": menuID,
@@ -554,8 +554,8 @@ func (c *AuthorizerClient) GetUserInfo(ctx context.Context, openID string) (*Use
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/user/info?access_token=%s&openid=%s&lang=zh_CN",
-		url.QueryEscape(accessToken), url.QueryEscape(openID))
+	apiURL := fmt.Sprintf("%s?access_token=%s&openid=%s&lang=zh_CN",
+		official_account.URLUserInfo, url.QueryEscape(accessToken), url.QueryEscape(openID))
 
 	var result UserInfo
 	err = c.authClient.client.req.Make(ctx, "GET", apiURL, nil, &result)
@@ -588,7 +588,7 @@ func (c *AuthorizerClient) GetUserList(ctx context.Context, nextOpenID string) (
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/user/get?access_token=%s", url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLGetUserList, url.QueryEscape(accessToken))
 	if nextOpenID != "" {
 		apiURL += "&next_openid=" + url.QueryEscape(nextOpenID)
 	}
@@ -649,8 +649,8 @@ func (c *AuthorizerClient) UploadMedia(ctx context.Context, mediaType, filename 
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/media/upload?access_token=%s&type=%s",
-		url.QueryEscape(accessToken), url.QueryEscape(mediaType))
+	apiURL := fmt.Sprintf("%s?access_token=%s&type=%s",
+		official_account.URLUploadMaterial, url.QueryEscape(accessToken), url.QueryEscape(mediaType))
 
 	// 创建multipart/form-data请求
 	body := &bytes.Buffer{}
@@ -720,8 +720,8 @@ func (c *AuthorizerClient) GetMedia(ctx context.Context, mediaID string) ([]byte
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/media/get?access_token=%s&media_id=%s",
-		url.QueryEscape(accessToken), url.QueryEscape(mediaID))
+	apiURL := fmt.Sprintf("%s?access_token=%s&media_id=%s",
+		official_account.URLGetMaterial, url.QueryEscape(accessToken), url.QueryEscape(mediaID))
 
 	// 创建HTTP请求
 	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
@@ -813,7 +813,7 @@ func (oc *OAuthClient) GetAuthorizeURL(opts ...string) string {
 	params := url.Values{}
 	params.Set("appid", oc.authorizerClient.authorizerAppID)
 	params.Set("redirect_uri", oc.redirectURI)
-	params.Set("response_type", "code")
+	params.Set("response_type", core.ResponseTypeCode)
 	params.Set("scope", scope)
 	if state != "" {
 		params.Set("state", state)
@@ -824,7 +824,7 @@ func (oc *OAuthClient) GetAuthorizeURL(opts ...string) string {
 	params.Set("component_appid", oc.authorizerClient.authClient.client.GetConfig().ComponentAppID)
 
 	// 使用微信官方文档指定的授权URL
-	return fmt.Sprintf("%s?%s#wechat_redirect", official_account.ConnectOauth2AuthorizeURL, params.Encode())
+	return fmt.Sprintf("%s?%s#wechat_redirect", official_account.URLConnectOAuth2Authorize, params.Encode())
 }
 
 // GetBaseAuthorizeURL 生成静默授权URL
@@ -867,13 +867,13 @@ func (oc *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthT
 	params := map[string]interface{}{
 		"appid":                  oc.authorizerClient.authorizerAppID,
 		"code":                   code,
-		"grant_type":             "authorization_code",
+		"grant_type":             core.GrantTypeAuthorizationCode,
 		"component_appid":        oc.authorizerClient.authClient.client.GetConfig().ComponentAppID,
 		"component_access_token": componentToken.AccessToken,
 	}
 
 	var oauthToken OAuthToken
-	err = oc.authorizerClient.authClient.client.req.Make(ctx, "POST", APIComponentAccessTokenURL, params, &oauthToken)
+	err = oc.authorizerClient.authClient.client.req.Make(ctx, "POST", URLComponentOAuth2AccessToken, params, &oauthToken)
 	if err != nil {
 		return nil, err
 	}
@@ -941,7 +941,7 @@ func (jm *JSSDKManager) GetConfig(ctx context.Context, url string, jsAPIList []s
 
 // getJSAPITicket 获取JSAPI Ticket
 func (jm *JSSDKManager) getJSAPITicket(ctx context.Context, accessToken string) (string, error) {
-	apiURL := "https://api.weixin.qq.com/cgi-bin/ticket/getticket"
+	apiURL := official_account.URLGetTicket
 
 	params := map[string]interface{}{
 		"access_token": accessToken,
@@ -1060,7 +1060,7 @@ func (mpc *MiniProgramClient) GetWXACode(ctx context.Context, request *WXACodeRe
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("https://api.weixin.qq.com/wxa/getwxacode?access_token=%s", url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetWxaCode, url.QueryEscape(accessToken))
 
 	var result WXACodeResponse
 	err = mpc.authorizerClient.authClient.client.req.Make(ctx, "POST", apiURL, request, &result)
@@ -1100,7 +1100,7 @@ func (oc *OAuthClient) GetUserInfo(ctx context.Context, accessToken, openID stri
 	}
 
 	// 使用微信官方文档指定的URL
-	apiURL := "https://api.weixin.qq.com/sns/userinfo"
+	apiURL := URLGetUserInfo
 
 	// 严格按照微信官方文档要求的参数格式
 	params := map[string]interface{}{
@@ -1139,12 +1139,12 @@ func (oc *OAuthClient) RefreshToken(ctx context.Context, refreshToken string) (*
 	}
 
 	// 使用微信官方文档指定的URL
-	apiURL := "https://api.weixin.qq.com/sns/oauth2/component/refresh_token"
+	apiURL := URLRefreshComponentAccessToken
 
 	// 严格按照微信官方文档要求的参数格式
 	params := map[string]interface{}{
 		"appid":                  oc.authorizerClient.authorizerAppID,
-		"grant_type":             "refresh_token",
+		"grant_type":             core.GrantTypeRefreshToken,
 		"refresh_token":          refreshToken,
 		"component_appid":        oc.authorizerClient.authClient.client.GetConfig().ComponentAppID,
 		"component_access_token": componentToken.AccessToken,

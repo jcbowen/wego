@@ -198,6 +198,24 @@ func (w *WeGo) OfficialAccountCustom() *official_account.CustomClient {
 	return official_account.NewCustomClient(w.OfficialAccountClient)
 }
 
+// OfficialAccountOAuth 返回公众号网页授权相关功能
+func (w *WeGo) OfficialAccountOAuth() *official_account.OAuthClient {
+	if w.OfficialAccountClient == nil {
+		panic("未初始化公众号客户端")
+	}
+	return official_account.NewOAuthClient(w.OfficialAccountClient)
+}
+
+// OpenPlatformOAuth 返回开放平台网页授权相关功能（代公众号授权）
+func (w *WeGo) OpenPlatformOAuth(redirectURI string) *openplatform.OAuthClient {
+	if w.OpenPlatformClient == nil {
+		panic("未初始化开放平台客户端")
+	}
+	authClient := openplatform.NewAuthClient(w.OpenPlatformClient)
+	authorizerClient := authClient.NewAuthorizerClient("") // 这里需要传入具体的authorizerAppID
+	return authorizerClient.GetOAuthClient(redirectURI)
+}
+
 // OfficialAccountMaterial 返回公众号素材管理相关功能
 func (w *WeGo) OfficialAccountMaterial() *official_account.MaterialClient {
 	if w.OfficialAccountClient == nil {

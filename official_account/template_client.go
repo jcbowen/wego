@@ -131,7 +131,7 @@ func (c *TemplateClient) AddTemplate(ctx context.Context, templateIDShort string
 	}
 
 	var result AddTemplateResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateApiAddTemplateURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateAddTemplate, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func (c *TemplateClient) QueryBlockTmplMsg(ctx context.Context, beginDate, endDa
 	}
 
 	var result QueryBlockTmplMsgResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateGetIndustryURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateGetIndustry, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -184,7 +184,7 @@ func (c *TemplateClient) DeleteTemplate(ctx context.Context, templateID string) 
 	}
 
 	var result DeleteTemplateResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateDelPrivateTemplateURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateDelPrivateTemplate, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -205,7 +205,7 @@ func (c *TemplateClient) GetAllTemplates(ctx context.Context) (*GetAllTemplatesR
 	}
 
 	var result GetAllTemplatesResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateGetAllPrivateTemplateURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateGetAllPrivateTemplate, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
@@ -226,7 +226,7 @@ func (c *TemplateClient) GetIndustry(ctx context.Context) (*GetIndustryResponse,
 	}
 
 	var result GetIndustryResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateGetIndustryURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateGetIndustry, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
@@ -252,7 +252,7 @@ func (c *TemplateClient) SetIndustry(ctx context.Context, industryID1, industryI
 	}
 
 	var result SetIndustryResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateApiSetIndustryURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateSetIndustry, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err

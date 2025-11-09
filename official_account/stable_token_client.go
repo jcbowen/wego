@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/jcbowen/wego/core"
 )
 
 // StableTokenClient 稳定版access_token客户端
@@ -44,7 +46,7 @@ func (c *StableTokenClient) getStableAccessTokenWithMode(ctx context.Context, mo
 
 	// 构建请求参数
 	request := StableAccessTokenRequest{
-		GrantType:    "client_credential",
+		GrantType:    core.GrantTypeClientCredential,
 		AppID:        c.client.config.AppID,
 		Secret:       c.client.config.AppSecret,
 		ForceRefresh: mode == StableAccessTokenModeForceRefresh,
@@ -52,7 +54,7 @@ func (c *StableTokenClient) getStableAccessTokenWithMode(ctx context.Context, mo
 
 	// 调用API获取稳定版access_token
 	var result StableAccessTokenResponse
-	err := c.client.req.Make(ctx, "POST", APIStableAccessTokenURL, request, &result)
+	err := c.client.req.Make(ctx, "POST", URLStableAccessToken, request, &result)
 	if err != nil {
 		return nil, fmt.Errorf("获取稳定版access_token失败: %v", err)
 	}

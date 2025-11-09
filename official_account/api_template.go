@@ -68,7 +68,7 @@ func (c *Template) SendTemplateMessage(ctx context.Context, template *TemplateMe
 
 	var result SendTemplateMessageResponse
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIMessageTemplateSendURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLMessageTemplateSend, url.QueryEscape(accessToken))
 	err := c.req.Make(ctx, "POST", apiURL, template, &result)
 
 	if err != nil {

@@ -147,7 +147,7 @@ func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
 	}
 
 	// 调用微信API获取access_token
-	apiURL := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s",
+	apiURL := fmt.Sprintf("%s/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s", core.BaseAPIURL,
 		c.config.AppID, c.config.AppSecret)
 
 	var result struct {
@@ -204,7 +204,7 @@ func (c *Client) ClearQuota(ctx context.Context) error {
 	}
 
 	// 构建请求URL
-	url := fmt.Sprintf("%s?access_token=%s", APIClearQuotaURL, accessToken)
+	url := fmt.Sprintf("%s?access_token=%s", URLClearQuota, accessToken)
 
 	// 构建请求体
 	request := ClearQuotaRequest{

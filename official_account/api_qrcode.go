@@ -55,7 +55,7 @@ func (q *Qrcode) Create(ctx context.Context, qrCode *QRCodeRequest, accessToken 
 		return nil, fmt.Errorf("二维码动作名称不能为空")
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIQRCodeCreateURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLQRCodeCreate, url.QueryEscape(accessToken))
 
 	var result QRCodeResponse
 	err := q.req.Make(ctx, "POST", apiURL, qrCode, &result)
@@ -77,5 +77,5 @@ func (q *Qrcode) ShowQrcode(ticket string) (string, error) {
 		return "", fmt.Errorf("二维码ticket不能为空")
 	}
 
-	return fmt.Sprintf("%s?ticket=%s", APIQRCodeShowURL, url.QueryEscape(ticket)), nil
+	return fmt.Sprintf("%s?ticket=%s", URLQRCodeShow, url.QueryEscape(ticket)), nil
 }

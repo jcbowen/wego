@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/openplatform"
 )
@@ -348,26 +349,6 @@ type CDATA struct {
 	Value string `xml:",cdata"`
 }
 
-// MessageType 消息类型常量
-const (
-	MessageTypeText       = "text"
-	MessageTypeImage      = "image"
-	MessageTypeVoice      = "voice"
-	MessageTypeVideo      = "video"
-	MessageTypeShortVideo = "shortvideo"
-	MessageTypeLocation   = "location"
-	MessageTypeLink       = "link"
-	MessageTypeEvent      = "event"
-)
-
-// EventType 事件类型常量
-const (
-	EventTypeComponentVerifyTicket = "component_verify_ticket"
-	EventTypeUnauthorized          = "unauthorized"
-	EventTypeAuthorized            = "authorized"
-	EventTypeUpdateAuthorized      = "updateauthorized"
-)
-
 // Message 基础消息结构
 type Message struct {
 	XMLName      xml.Name `xml:"xml"`
@@ -496,12 +477,12 @@ func (p *MessageProcessor) ProcessMessage(xmlData []byte) (interface{}, error) {
 
 	// 检查是否为第三方平台特殊事件
 	// 第三方平台事件通常有特定的Event类型
-	if baseMsg.MsgType == MessageTypeEvent {
+	if baseMsg.MsgType == core.MessageTypeEvent {
 		var eventMsg EventMessage
 		if err := xml.Unmarshal(xmlData, &eventMsg); err == nil {
 			// 检查是否为第三方平台特定事件
 			switch eventMsg.Event {
-			case EventTypeComponentVerifyTicket, EventTypeAuthorized, EventTypeUpdateAuthorized, EventTypeUnauthorized:
+			case core.EventTypeComponentVerifyTicket, core.EventTypeAuthorized, core.EventTypeUpdateAuthorized, core.EventTypeUnauthorized:
 				return p.handleThirdPartyMessage(xmlData, &baseMsg)
 			}
 		}
@@ -509,19 +490,19 @@ func (p *MessageProcessor) ProcessMessage(xmlData []byte) (interface{}, error) {
 
 	// 根据消息类型进行具体解析
 	switch baseMsg.MsgType {
-	case MessageTypeEvent:
+	case core.MessageTypeEvent:
 		return p.processEventMessage(xmlData)
-	case MessageTypeText:
+	case core.MessageTypeText:
 		return p.processTextMessage(xmlData)
-	case MessageTypeImage:
+	case core.MessageTypeImage:
 		return p.processImageMessage(xmlData)
-	case MessageTypeVoice:
+	case core.MessageTypeVoice:
 		return p.processVoiceMessage(xmlData)
-	case MessageTypeVideo:
+	case core.MessageTypeVideo:
 		return p.processVideoMessage(xmlData)
-	case MessageTypeLocation:
+	case core.MessageTypeLocation:
 		return p.processLocationMessage(xmlData)
-	case MessageTypeLink:
+	case core.MessageTypeLink:
 		return p.processLinkMessage(xmlData)
 	default:
 		return nil, fmt.Errorf("不支持的消息类型: %s", baseMsg.MsgType)
@@ -539,9 +520,9 @@ func (p *MessageProcessor) handleThirdPartyMessage(xmlData []byte, msg *Message)
 
 	// 根据事件类型进行处理
 	switch event.Event {
-	case EventTypeComponentVerifyTicket:
+	case core.EventTypeComponentVerifyTicket:
 		return p.handleComponentVerifyTicketEvent(xmlData)
-	case EventTypeAuthorized, EventTypeUpdateAuthorized, EventTypeUnauthorized:
+	case core.EventTypeAuthorized, core.EventTypeUpdateAuthorized, core.EventTypeUnauthorized:
 		return p.handleAuthorizeEvent(xmlData)
 	default:
 		// 如果不是第三方平台特定事件，则按普通事件处理
@@ -580,7 +561,7 @@ func (p *MessageProcessor) handleAuthorizeEvent(xmlData []byte) (interface{}, er
 
 	// 根据事件类型解析具体的事件
 	switch baseEvent.Event {
-	case "authorized":
+	case core.EventTypeAuthorized:
 		var event AuthorizedEvent
 		err := xml.Unmarshal(xmlData, &event)
 		if err != nil {
@@ -593,7 +574,7 @@ func (p *MessageProcessor) handleAuthorizeEvent(xmlData []byte) (interface{}, er
 				return nil, fmt.Errorf("处理授权事件失败: %v", err)
 			}
 		}
-	case "unauthorized":
+	case core.EventTypeUnauthorized:
 		var event UnauthorizedEvent
 		err := xml.Unmarshal(xmlData, &event)
 		if err != nil {
@@ -606,7 +587,7 @@ func (p *MessageProcessor) handleAuthorizeEvent(xmlData []byte) (interface{}, er
 				return nil, fmt.Errorf("处理授权事件失败: %v", err)
 			}
 		}
-	case "updateauthorized":
+	case core.EventTypeUpdateAuthorized:
 		var event UpdateAuthorizedEvent
 		err := xml.Unmarshal(xmlData, &event)
 		if err != nil {
@@ -649,7 +630,7 @@ func (p *MessageProcessor) processTextMessage(xmlData []byte) (interface{}, erro
 		return nil, fmt.Errorf("解析文本消息失败: %v", err)
 	}
 
-	handler, exists := p.messageHandlers[MessageTypeText]
+	handler, exists := p.messageHandlers[core.MessageTypeText]
 	if !exists {
 		return nil, fmt.Errorf("未注册的文本消息处理器")
 	}
@@ -664,7 +645,7 @@ func (p *MessageProcessor) processImageMessage(xmlData []byte) (interface{}, err
 		return nil, fmt.Errorf("解析图片消息失败: %v", err)
 	}
 
-	handler, exists := p.messageHandlers[MessageTypeImage]
+	handler, exists := p.messageHandlers[core.MessageTypeImage]
 	if !exists {
 		return nil, fmt.Errorf("未注册的图片消息处理器")
 	}
@@ -679,7 +660,7 @@ func (p *MessageProcessor) processVoiceMessage(xmlData []byte) (interface{}, err
 		return nil, fmt.Errorf("解析语音消息失败: %v", err)
 	}
 
-	handler, exists := p.messageHandlers[MessageTypeVoice]
+	handler, exists := p.messageHandlers[core.MessageTypeVoice]
 	if !exists {
 		return nil, fmt.Errorf("未注册的语音消息处理器")
 	}
@@ -694,7 +675,7 @@ func (p *MessageProcessor) processVideoMessage(xmlData []byte) (interface{}, err
 		return nil, fmt.Errorf("解析视频消息失败: %v", err)
 	}
 
-	handler, exists := p.messageHandlers[MessageTypeVideo]
+	handler, exists := p.messageHandlers[core.MessageTypeVideo]
 	if !exists {
 		return nil, fmt.Errorf("未注册的视频消息处理器")
 	}
@@ -709,7 +690,7 @@ func (p *MessageProcessor) processLocationMessage(xmlData []byte) (interface{}, 
 		return nil, fmt.Errorf("解析位置消息失败: %v", err)
 	}
 
-	handler, exists := p.messageHandlers[MessageTypeLocation]
+	handler, exists := p.messageHandlers[core.MessageTypeLocation]
 	if !exists {
 		return nil, fmt.Errorf("未注册的位置消息处理器")
 	}
@@ -724,7 +705,7 @@ func (p *MessageProcessor) processLinkMessage(xmlData []byte) (interface{}, erro
 		return nil, fmt.Errorf("解析链接消息失败: %v", err)
 	}
 
-	handler, exists := p.messageHandlers[MessageTypeLink]
+	handler, exists := p.messageHandlers[core.MessageTypeLink]
 	if !exists {
 		return nil, fmt.Errorf("未注册的链接消息处理器")
 	}

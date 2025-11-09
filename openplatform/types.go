@@ -6,6 +6,25 @@ import (
 	"github.com/jcbowen/wego/core"
 )
 
+// OAuthComponentAccessTokenRequest 第三方平台代公众号获取网页授权access_token请求参数
+type OAuthComponentAccessTokenRequest struct {
+	ComponentAppID       string `json:"component_appid"`        // 第三方平台appid
+	ComponentAppSecret   string `json:"component_appsecret"`    // 第三方平台appsecret
+	AppID                string `json:"appid"`                  // 授权公众号appid
+	Code                 string `json:"code"`                   // 填写第一步获取的code参数
+	GrantType            string `json:"grant_type"`             // 填写为authorization_code
+	ComponentAccessToken string `json:"component_access_token"` // 第三方平台component_access_token
+}
+
+// OAuthComponentRefreshTokenRequest 第三方平台代公众号刷新网页授权access_token请求参数
+type OAuthComponentRefreshTokenRequest struct {
+	ComponentAppID       string `json:"component_appid"`        // 第三方平台appid
+	AppID                string `json:"appid"`                  // 授权公众号appid
+	RefreshToken         string `json:"refresh_token"`          // 填写通过access_token获取到的refresh_token参数
+	GrantType            string `json:"grant_type"`             // 填写为refresh_token
+	ComponentAccessToken string `json:"component_access_token"` // 第三方平台component_access_token
+}
+
 // AuthorizationInfo 授权信息
 type AuthorizationInfo struct {
 	AuthorizerAppID        string     `json:"authorizer_appid"`

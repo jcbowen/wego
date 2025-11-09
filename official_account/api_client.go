@@ -58,7 +58,7 @@ func (c *APIClient) CallbackCheck(ctx context.Context, action, checkOperator str
 	}
 
 	var result CallbackCheckResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APICallbackCheckURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLCallbackCheck, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (c *APIClient) GetApiDomainIp(ctx context.Context) (*GetApiDomainIpResponse
 	}
 
 	var result GetApiDomainIpResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetApiDomainIpURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetApiDomainIp, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func (c *APIClient) GetCallbackIp(ctx context.Context) (*GetCallbackIpResponse, 
 	}
 
 	var result GetCallbackIpResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetCallbackIpURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCallbackIp, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err

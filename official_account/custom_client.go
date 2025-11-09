@@ -365,7 +365,7 @@ func (c *CustomClient) SendCustomMessage(ctx context.Context, touser string, mes
 	}
 
 	var result SendCustomMessageResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIMessageCustomSendURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLMessageCustomSend, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -391,7 +391,7 @@ func (c *CustomClient) AddCustomAccount(ctx context.Context, kfAccount, nickname
 	}
 
 	var result AddCustomAccountResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIAddCustomAccountURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddCustomAccount, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -417,7 +417,7 @@ func (c *CustomClient) UpdateCustomAccount(ctx context.Context, kfAccount, nickn
 	}
 
 	var result UpdateCustomAccountResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIUpdateCustomAccountURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLUpdateCustomAccount, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -442,7 +442,7 @@ func (c *CustomClient) DeleteCustomAccount(ctx context.Context, kfAccount string
 	}
 
 	var result DeleteCustomAccountResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIDeleteCustomAccountURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteCustomAccount, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -467,7 +467,7 @@ func (c *CustomClient) SetCustomAccountHeadImg(ctx context.Context, kfAccount st
 	}
 
 	var result SetCustomAccountHeadImgResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APISetCustomAccountHeadImgURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLSetCustomAccountHeadImg, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -488,7 +488,7 @@ func (c *CustomClient) GetAllCustomAccounts(ctx context.Context) (*GetAllCustomA
 	}
 
 	var result GetAllCustomAccountsResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetAllCustomAccountsURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetAllCustomAccounts, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
@@ -509,7 +509,7 @@ func (c *CustomClient) GetOnlineCustomAccounts(ctx context.Context) (*GetOnlineC
 	}
 
 	var result GetOnlineCustomAccountsResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetOnlineCustomAccountsURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetOnlineCustomAccounts, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
@@ -535,7 +535,7 @@ func (c *CustomClient) CreateCustomSession(ctx context.Context, kfAccount, openi
 	}
 
 	var result CreateCustomSessionResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APICreateCustomSessionURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLCreateCustomSession, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -561,7 +561,7 @@ func (c *CustomClient) CloseCustomSession(ctx context.Context, kfAccount, openid
 	}
 
 	var result CloseCustomSessionResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APICloseCustomSessionURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLCloseCustomSession, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -586,7 +586,7 @@ func (c *CustomClient) GetCustomSession(ctx context.Context, openid string) (*Ge
 	}
 
 	var result GetCustomSessionResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetCustomSessionURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCustomSession, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -611,7 +611,7 @@ func (c *CustomClient) GetCustomSessionList(ctx context.Context, kfAccount strin
 	}
 
 	var result GetCustomSessionListResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetCustomSessionListURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCustomSessionList, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -632,7 +632,7 @@ func (c *CustomClient) GetWaitCase(ctx context.Context) (*GetWaitCaseResponse, e
 	}
 
 	var result GetWaitCaseResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetWaitCaseURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetWaitCase, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
@@ -676,7 +676,7 @@ func (c *CustomClient) Typing(ctx context.Context, toUser, command string) (*Typ
 	}
 
 	var result TypingResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APITypingURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTyping, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -720,7 +720,7 @@ func (c *CustomClient) GetMsgRecord(ctx context.Context, startTime, endTime int6
 	}
 
 	var result GetMsgRecordResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetMsgRecordURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetMsgRecord, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err

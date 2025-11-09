@@ -131,8 +131,8 @@ func (c *SubscribeClient) GetCategory(ctx context.Context) (*GetCategoryResponse
 	}
 
 	var result GetCategoryResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetCategoryURL, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
+	apiURL := fmt.Sprintf("%s?access_token=%s", "https://api.weixin.qq.com/cgi-bin/template/get_category", url.QueryEscape(accessToken))
+err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func (c *SubscribeClient) GetPubNewTemplateTitles(ctx context.Context, categoryI
 
 	var result GetPubNewTemplateTitlesResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s&ids=%d&start=%d&limit=%d",
-		APIGetPubNewTemplateTitlesURL, url.QueryEscape(accessToken), categoryID, start, limit)
+		"https://api.weixin.qq.com/cgi-bin/template/get_pub_template_titles", url.QueryEscape(accessToken), categoryID, start, limit)
 	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
@@ -181,7 +181,7 @@ func (c *SubscribeClient) GetPubNewTemplateKeywords(ctx context.Context, tid int
 
 	var result GetPubNewTemplateKeywordsResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s&tid=%d",
-		APIGetPubNewTemplateKeywordsURL, url.QueryEscape(accessToken), tid)
+		URLGetPubTemplateKeywords, url.QueryEscape(accessToken), tid)
 	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
@@ -205,8 +205,8 @@ func (c *SubscribeClient) GetWxaPubNewTemplate(ctx context.Context) (*GetWxaPubN
 	}
 
 	var result GetWxaPubNewTemplateResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIGetWxaPubNewTemplateURL, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetWxaPubTemplate, url.QueryEscape(accessToken))
+err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func (c *SubscribeClient) AddWxaNewTemplate(ctx context.Context, tid int, kidLis
 	}
 
 	var result AddWxaNewTemplateResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIAddWxaNewTemplateURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddWxaNewTemplate, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -263,7 +263,7 @@ func (c *SubscribeClient) DelWxaNewTemplate(ctx context.Context, priTmplID strin
 	}
 
 	var result DelWxaNewTemplateResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APIDelWxaNewTemplateURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLDelWxaNewTemplate, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -287,7 +287,7 @@ func (c *SubscribeClient) SendNewSubscribeMsg(ctx context.Context, request *Send
 	}
 
 	var result SendNewSubscribeMsgResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APISendNewSubscribeMsgURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLSendNewSubscribeMsg, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
@@ -311,7 +311,7 @@ type TemplateSubscribeData struct {
 // 功能：发送一次性订阅消息
 // 请求方式：POST
 // 注意：一次性订阅消息只能发送给已经授权订阅的用户
-// 用户授权订阅的URL格式：https://mp.weixin.qq.com/mp/subscribemsg?action=get_confirm&appid=APPID&scene=SCENE&template_id=TEMPLATE_ID&redirect_url=REDIRECT_URL&reserved=RESERVED#wechat_redirect
+// 用户授权订阅的URL格式：%s?action=get_confirm&appid=APPID&scene=SCENE&template_id=TEMPLATE_ID&redirect_url=REDIRECT_URL&reserved=RESERVED#wechat_redirect
 type TemplateSubscribeRequest struct {
 	Touser     string                           `json:"touser"`
 	TemplateID string                           `json:"template_id"`
@@ -338,7 +338,7 @@ func (c *SubscribeClient) TemplateSubscribe(ctx context.Context, request *Templa
 	}
 
 	var result TemplateSubscribeResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", APITemplateSubscribeURL, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateSubscribe, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
 	if err != nil {
 		return nil, err
