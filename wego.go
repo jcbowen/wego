@@ -25,8 +25,8 @@ type WeGo struct {
 // New 创建新的WeGo实例，支持多种客户端配置和可选参数
 // 同类型的客户端只能初始化一个，比如第一个参数是微信公众号，后面的不管还有几个公众号配置都忽略掉
 // @param configParams ...any 配置参数，支持以下类型：
-//   - *openplatform.Config: 开放平台配置
-//   - *officialaccount.Config: 公众号配置
+//   - openplatform.Config 或 *openplatform.Config: 开放平台配置
+//   - official_account.Config 或 *official_account.Config: 公众号配置
 //
 // @param optParams ...any 可选参数，支持以下类型：
 //   - debugger.LoggerInterface: 自定义日志器
@@ -42,25 +42,41 @@ func New(params ...any) *WeGo {
 	var optParams []any
 
 	for _, param := range params {
-		switch param.(type) {
-		case *openplatform.Config, *official_account.Config:
+		// 检查是否为配置参数（支持指针和非指针类型）
+		if isConfigParam(param) {
 			configParams = append(configParams, param)
-		default:
+		} else {
 			optParams = append(optParams, param)
 		}
 	}
 
 	for _, config := range configParams {
 		switch cfg := config.(type) {
-		case *openplatform.Config:
+		case openplatform.Config, *openplatform.Config:
 			// 如果还没有初始化过开放平台客户端，则初始化
 			if wego.OpenPlatformClient == nil {
-				wego.OpenPlatformClient = openplatform.NewClient(cfg, optParams...)
+				// 统一转换为指针类型
+				var openPlatformConfig *openplatform.Config
+				if ptr, ok := cfg.(*openplatform.Config); ok {
+					openPlatformConfig = ptr
+				} else {
+					configCopy := cfg.(openplatform.Config)
+					openPlatformConfig = &configCopy
+				}
+				wego.OpenPlatformClient = openplatform.NewClient(openPlatformConfig, optParams...)
 			}
-		case *official_account.Config:
+		case official_account.Config, *official_account.Config:
 			// 如果还没有初始化过公众号客户端，则初始化
 			if wego.OfficialAccountClient == nil {
-				wego.OfficialAccountClient = official_account.NewClient(cfg, optParams...)
+				// 统一转换为指针类型
+				var officialAccountConfig *official_account.Config
+				if ptr, ok := cfg.(*official_account.Config); ok {
+					officialAccountConfig = ptr
+				} else {
+					configCopy := cfg.(official_account.Config)
+					officialAccountConfig = &configCopy
+				}
+				wego.OfficialAccountClient = official_account.NewClient(officialAccountConfig, optParams...)
 			}
 		default:
 			log.Printf("警告：不支持的配置类型 %T", cfg)
@@ -72,12 +88,25 @@ func New(params ...any) *WeGo {
 	return wego
 }
 
+// isConfigParam 检查参数是否为配置参数（支持指针和非指针类型）
+// @param param any 待检查的参数
+// @return bool 如果是配置参数返回true，否则返回false
+func isConfigParam(param any) bool {
+	switch param.(type) {
+	case openplatform.Config, *openplatform.Config,
+		official_account.Config, *official_account.Config:
+		return true
+	default:
+		return false
+	}
+}
+
 // NewWithStorage 创建新的WeGo实例（使用自定义存储），支持可选参数
 // 同类型的客户端只能初始化一个，比如第一个参数是微信公众号，后面的不管还有几个公众号配置都忽略掉
 // @param storage storage.TokenStorage 自定义存储实例
 // @param configParams ...any 配置参数，支持以下类型：
-//   - *openplatform.Config: 开放平台配置
-//   - *officialaccount.Config: 公众号配置
+//   - openplatform.Config 或 *openplatform.Config: 开放平台配置
+//   - official_account.Config 或 *official_account.Config: 公众号配置
 //
 // @param optParams ...any 可选参数，支持以下类型：
 //   - debugger.LoggerInterface: 自定义日志器
@@ -93,25 +122,41 @@ func NewWithStorage(storage storage.TokenStorage, params ...any) *WeGo {
 	var optParams []any
 
 	for _, param := range params {
-		switch param.(type) {
-		case *openplatform.Config, *official_account.Config:
+		// 检查是否为配置参数（支持指针和非指针类型）
+		if isConfigParam(param) {
 			configParams = append(configParams, param)
-		default:
+		} else {
 			optParams = append(optParams, param)
 		}
 	}
 
 	for _, config := range configParams {
 		switch cfg := config.(type) {
-		case *openplatform.Config:
+		case openplatform.Config, *openplatform.Config:
 			// 如果还没有初始化过开放平台客户端，则初始化
 			if wego.OpenPlatformClient == nil {
-				wego.OpenPlatformClient = openplatform.NewClientWithStorage(cfg, storage, optParams...)
+				// 统一转换为指针类型
+				var openPlatformConfig *openplatform.Config
+				if ptr, ok := cfg.(*openplatform.Config); ok {
+					openPlatformConfig = ptr
+				} else {
+					configCopy := cfg.(openplatform.Config)
+					openPlatformConfig = &configCopy
+				}
+				wego.OpenPlatformClient = openplatform.NewClientWithStorage(openPlatformConfig, storage, optParams...)
 			}
-		case *official_account.Config:
+		case official_account.Config, *official_account.Config:
 			// 如果还没有初始化过公众号客户端，则初始化
 			if wego.OfficialAccountClient == nil {
-				wego.OfficialAccountClient = official_account.NewMPClientWithStorage(cfg, storage, optParams...)
+				// 统一转换为指针类型
+				var officialAccountConfig *official_account.Config
+				if ptr, ok := cfg.(*official_account.Config); ok {
+					officialAccountConfig = ptr
+				} else {
+					configCopy := cfg.(official_account.Config)
+					officialAccountConfig = &configCopy
+				}
+				wego.OfficialAccountClient = official_account.NewMPClientWithStorage(officialAccountConfig, storage, optParams...)
 			}
 		default:
 			// 忽略不支持的配置类型
