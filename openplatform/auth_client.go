@@ -1075,22 +1075,8 @@ func (mpc *MiniProgramClient) GetWXACode(ctx context.Context, request *WXACodeRe
 	return &result, nil
 }
 
-// OAuthUserInfo 网页授权用户信息
-type OAuthUserInfo struct {
-	core.APIResponse
-	OpenID     string   `json:"openid"`
-	Nickname   string   `json:"nickname"`
-	Sex        int      `json:"sex"`
-	Province   string   `json:"province"`
-	City       string   `json:"city"`
-	Country    string   `json:"country"`
-	HeadImgURL string   `json:"headimgurl"`
-	Privilege  []string `json:"privilege"`
-	UnionID    string   `json:"unionid"`
-}
-
 // GetUserInfo 获取用户信息
-func (oc *OAuthClient) GetUserInfo(ctx context.Context, accessToken, openID string) (*OAuthUserInfo, error) {
+func (oc *OAuthClient) GetUserInfo(ctx context.Context, accessToken, openID string) (*official_account.OAuthUserInfoResponse, error) {
 	// 验证参数
 	if accessToken == "" {
 		return nil, fmt.Errorf("accessToken不能为空")
@@ -1109,7 +1095,7 @@ func (oc *OAuthClient) GetUserInfo(ctx context.Context, accessToken, openID stri
 		"lang":         "zh_CN",
 	}
 
-	var userInfo OAuthUserInfo
+	var userInfo official_account.OAuthUserInfoResponse
 	err := oc.authorizerClient.authClient.client.req.Make(ctx, "GET", apiURL, params, &userInfo)
 	if err != nil {
 		return nil, err
