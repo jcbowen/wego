@@ -863,6 +863,14 @@ func (oc *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthT
 		return nil, fmt.Errorf("获取ComponentAccessToken失败: %v", err)
 	}
 
+	// 检查组件令牌是否为空
+	if componentToken == nil {
+		oc.authorizerClient.authClient.client.logger.Error("ComponentAccessToken为空，请先获取有效的组件令牌")
+		return nil, fmt.Errorf("ComponentAccessToken为空，请先获取有效的组件令牌")
+	}
+
+	oc.authorizerClient.authClient.client.logger.Debug(fmt.Sprintf("获取到ComponentAccessToken: %s", componentToken.AccessToken))
+
 	// 严格按照微信官方文档要求的参数格式
 	params := map[string]interface{}{
 		"appid":                  oc.authorizerClient.authorizerAppID,
@@ -1123,6 +1131,14 @@ func (oc *OAuthClient) RefreshToken(ctx context.Context, refreshToken string) (*
 	if err != nil {
 		return nil, fmt.Errorf("获取ComponentAccessToken失败: %v", err)
 	}
+
+	// 检查组件令牌是否为空
+	if componentToken == nil {
+		oc.authorizerClient.authClient.client.logger.Error("ComponentAccessToken为空，请先获取有效的组件令牌")
+		return nil, fmt.Errorf("ComponentAccessToken为空，请先获取有效的组件令牌")
+	}
+
+	oc.authorizerClient.authClient.client.logger.Debug(fmt.Sprintf("获取到ComponentAccessToken: %s", componentToken.AccessToken))
 
 	// 使用微信官方文档指定的URL
 	apiURL := URLRefreshComponentAccessToken
