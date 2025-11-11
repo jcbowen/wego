@@ -854,12 +854,18 @@ func (oc *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthT
 		return nil, fmt.Errorf("授权码不能为空")
 	}
 	if oc.authorizerClient.authorizerAppID == "" {
+		oc.authorizerClient.authClient.client.logger.Error("授权方AppID为空，无法进行网页授权")
 		return nil, fmt.Errorf("授权方AppID不能为空")
 	}
+
+	// 记录关键参数信息用于调试
+	oc.authorizerClient.authClient.client.logger.Debug(fmt.Sprintf("网页授权参数验证 - 授权方AppID: %s, Code长度: %d",
+		oc.authorizerClient.authorizerAppID, len(code)))
 
 	// 需要先获取组件令牌
 	componentToken, err := oc.authorizerClient.authClient.client.GetComponentToken(ctx)
 	if err != nil {
+		oc.authorizerClient.authClient.client.logger.Error(fmt.Sprintf("获取ComponentAccessToken失败: %v", err))
 		return nil, fmt.Errorf("获取ComponentAccessToken失败: %v", err)
 	}
 
@@ -879,6 +885,15 @@ func (oc *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthT
 		"component_appid":        oc.authorizerClient.authClient.client.GetConfig().ComponentAppID,
 		"component_access_token": componentToken.AccessToken,
 	}
+
+	// 记录完整的请求参数用于调试
+	oc.authorizerClient.authClient.client.logger.Debug(fmt.Sprintf("网页授权请求参数详情:"), map[string]interface{}{
+		"appid":                  oc.authorizerClient.authorizerAppID,
+		"code_length":            len(code),
+		"component_appid":        oc.authorizerClient.authClient.client.GetConfig().ComponentAppID,
+		"component_access_token": "[REDACTED]", // 出于安全考虑隐藏token内容
+		"grant_type":             core.GrantTypeAuthorizationCode,
+	})
 
 	var oauthToken OAuthToken
 	err = oc.authorizerClient.authClient.client.req.Make(ctx, "POST", URLComponentOAuth2AccessToken, params, &oauthToken)

@@ -32,6 +32,14 @@ func (request *Request) Make(ctx context.Context, method, url string, body inter
 		if err != nil {
 			return fmt.Errorf("序列化请求体失败: %v", err)
 		}
+
+		// 添加详细的参数调试日志
+		request.logger.Debug(fmt.Sprintf("请求参数详情 - URL: %s, Method: %s", url, method), map[string]interface{}{
+			"client": "OpenPlatform",
+			"method": "MakeRequest",
+			"source": "request.params",
+			"params": body,
+		})
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(reqBody))
@@ -52,8 +60,23 @@ func (request *Request) Make(ctx context.Context, method, url string, body inter
 		"source": "request.body",
 	})
 
+	// 发送请求前记录完整URL和参数
+	request.logger.Debug(fmt.Sprintf("发送HTTP请求 - URL: %s, Method: %s", req.URL.String(), req.Method), map[string]interface{}{
+		"client":   "OpenPlatform",
+		"method":   "MakeRequest",
+		"source":   "request.send",
+		"full_url": req.URL.String(),
+		"headers":  req.Header,
+	})
+
 	resp, err := request.httpClient.Do(req)
 	if err != nil {
+		request.logger.Error(fmt.Sprintf("发送请求失败: %v", err), map[string]interface{}{
+			"client": "OpenPlatform",
+			"method": "MakeRequest",
+			"source": "request.error",
+			"url":    req.URL.String(),
+		})
 		return fmt.Errorf("发送请求失败: %v", err)
 	}
 	defer func(Body io.ReadCloser) {
@@ -65,8 +88,22 @@ func (request *Request) Make(ctx context.Context, method, url string, body inter
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
+		request.logger.Error(fmt.Sprintf("读取响应体失败: %v", err), map[string]interface{}{
+			"client": "OpenPlatform",
+			"method": "MakeRequest",
+			"source": "response.read_error",
+		})
 		return fmt.Errorf("读取响应体失败: %v", err)
 	}
+
+	// 记录响应状态和完整响应内容
+	request.logger.Debug(fmt.Sprintf("HTTP响应 - 状态码: %d, 内容长度: %d", resp.StatusCode, len(respBody)), map[string]interface{}{
+		"client":          "OpenPlatform",
+		"method":          "MakeRequest",
+		"source":          "response.status",
+		"status_code":     resp.StatusCode,
+		"response_length": len(respBody),
+	})
 
 	request.logger.Debug(string(respBody), map[string]interface{}{
 		"client": "OpenPlatform",
