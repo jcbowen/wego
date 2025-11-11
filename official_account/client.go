@@ -3,11 +3,13 @@ package official_account
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/jcbowen/jcbaseGo/component/debugger"
 	"github.com/jcbowen/wego/core"
+	"github.com/jcbowen/wego/logger"
 	"github.com/jcbowen/wego/storage"
 )
 
@@ -16,7 +18,7 @@ type Client struct {
 	config     *Config
 	httpClient core.HTTPClient
 	storage    storage.TokenStorage
-	logger     debugger.LoggerInterface
+	logger     logger.LoggerInterface
 	req        *core.Request
 
 	stableTokenClient *StableTokenClient // 稳定版access_token客户端
@@ -34,8 +36,7 @@ func NewClient(config *Config, opts ...any) *Client {
 	fileStorage, err := storage.NewFileStorage("./runtime/wego_storage")
 	if err != nil {
 		// 如果文件存储创建失败，回退到内存存储并输出日志
-		logger := &debugger.DefaultLogger{}
-		logger.Warn("文件存储创建失败，回退到内存存储: " + err.Error())
+		log.Println("文件存储创建失败，回退到内存存储: " + err.Error())
 		return NewMPClientWithStorage(config, storage.NewMemoryStorage(), opts...)
 	}
 	return NewMPClientWithStorage(config, fileStorage, opts...)
@@ -54,7 +55,7 @@ func NewMPClientWithStorage(config *Config, storage storage.TokenStorage, opts .
 		config:     config,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		storage:    storage,
-		logger:     &debugger.DefaultLogger{},
+		logger:     logger.NewDefaultLoggerInterface(),
 	}
 
 	// 遍历所有可选参数，根据类型进行相应设置
@@ -86,11 +87,17 @@ func (c *Client) GetStableTokenClient() *StableTokenClient {
 }
 
 // SetLogger 设置自定义日志器
-func (c *Client) SetLogger(logger debugger.LoggerInterface) {
-	c.logger = logger
+func (c *Client) SetLogger(log debugger.LoggerInterface) {
+	// 如果传入的logger为nil，则使用默认logger
+	if log == nil {
+		c.logger = logger.NewDefaultLoggerInterface()
+	} else {
+		// 使用适配器将debugger logger转换为wego logger
+		c.logger = logger.NewDebuggerLoggerAdapter(log)
+	}
 	// 同时更新请求对象中的日志器
 	if c.req != nil {
-		c.req = core.NewRequest(c.httpClient, logger)
+		c.req = core.NewRequest(c.httpClient, c.logger)
 	}
 }
 
@@ -186,7 +193,7 @@ func (c *Client) GetConfig() *Config {
 }
 
 // GetLogger 获取日志器
-func (c *Client) GetLogger() debugger.LoggerInterface {
+func (c *Client) GetLogger() logger.LoggerInterface {
 	return c.logger
 }
 

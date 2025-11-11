@@ -168,12 +168,12 @@ func NewWithStorage(storage storage.TokenStorage, params ...any) *WeGo {
 }
 
 // SetLogger 设置日志记录器
-func (w *WeGo) SetLogger(logger debugger.LoggerInterface) {
+func (w *WeGo) SetLogger(log debugger.LoggerInterface) {
 	if w.OpenPlatformClient != nil {
-		w.OpenPlatformClient.SetLogger(logger)
+		w.OpenPlatformClient.SetLogger(log)
 	}
 	if w.OfficialAccountClient != nil {
-		w.OfficialAccountClient.SetLogger(logger)
+		w.OfficialAccountClient.SetLogger(log)
 	}
 }
 

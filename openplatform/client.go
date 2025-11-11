@@ -12,6 +12,7 @@ import (
 	"github.com/jcbowen/jcbaseGo/component/debugger"
 	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/crypto"
+	"github.com/jcbowen/wego/logger"
 	"github.com/jcbowen/wego/storage"
 )
 
@@ -20,7 +21,7 @@ type Client struct {
 	config       *Config
 	httpClient   core.HTTPClient
 	storage      storage.TokenStorage
-	logger       debugger.LoggerInterface
+	logger       logger.LoggerInterface
 	eventHandler EventHandler          // 事件处理器
 	crypt        *crypto.WXBizMsgCrypt // 消息加解密实例
 	req          *core.Request
@@ -39,7 +40,7 @@ func NewClient(config *Config, opt ...any) (apiClient *Client) {
 	fileStorage, err := storage.NewFileStorage("./runtime/wego_storage")
 	if err != nil {
 		// 如果文件存储创建失败，回退到内存存储并输出日志
-		logger := &debugger.DefaultLogger{}
+		logger := logger.NewDefaultLoggerInterface()
 		logger.Warn(fmt.Sprintf("文件存储创建失败，回退到内存存储: %v", err))
 		apiClient = NewClientWithStorage(config, storage.NewMemoryStorage(), opt...)
 	}
@@ -53,7 +54,7 @@ func NewClientWithStorage(config *Config, storage storage.TokenStorage, opt ...a
 		config:     config,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		storage:    storage,
-		logger:     &debugger.DefaultLogger{},
+		logger:     logger.NewDefaultLoggerInterface(),
 		crypt:      crypto.NewWXBizMsgCrypt(config.ComponentToken, config.EncodingAESKey, config.ComponentAppID),
 	}
 
@@ -62,7 +63,7 @@ func NewClientWithStorage(config *Config, storage storage.TokenStorage, opt ...a
 		for _, option := range opt {
 			switch v := option.(type) {
 			case debugger.LoggerInterface:
-				// 设置自定义日志器
+				// 设置自定义日志器（支持debugger logger和wego logger）
 				client.SetLogger(v)
 			case core.HTTPClient:
 				// 设置自定义HTTP客户端
@@ -82,12 +83,23 @@ func NewClientWithStorage(config *Config, storage storage.TokenStorage, opt ...a
 	return client
 }
 
-// SetLogger 设置自定义日志器
-func (c *Client) SetLogger(logger debugger.LoggerInterface) {
-	c.logger = logger
+// SetLogger 设置日志器
+func (c *Client) SetLogger(log any) {
+	if log == nil {
+		c.logger = logger.NewDefaultLoggerInterface()
+	} else {
+		switch v := log.(type) {
+		case debugger.LoggerInterface:
+			// 如果是debugger logger，创建适配器
+			c.logger = logger.NewDebuggerLoggerAdapter(v)
+		default:
+			// 未知类型，使用默认logger
+			c.logger = logger.NewDefaultLoggerInterface()
+		}
+	}
 	// 同时更新请求对象中的日志器
 	if c.req != nil {
-		c.req = core.NewRequest(c.httpClient, logger)
+		c.req = core.NewRequest(c.httpClient, c.logger)
 	}
 }
 
@@ -119,7 +131,7 @@ func (c *Client) GetConfig() *Config {
 }
 
 // GetLogger 获取日志器
-func (c *Client) GetLogger() debugger.LoggerInterface {
+func (c *Client) GetLogger() logger.LoggerInterface {
 	return c.logger
 }
 

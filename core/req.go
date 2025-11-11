@@ -8,15 +8,15 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/jcbowen/jcbaseGo/component/debugger"
+	"github.com/jcbowen/wego/logger"
 )
 
 type Request struct {
 	httpClient HTTPClient
-	logger     debugger.LoggerInterface
+	logger     logger.LoggerInterface
 }
 
-func NewRequest(httpClient HTTPClient, logger debugger.LoggerInterface) *Request {
+func NewRequest(httpClient HTTPClient, logger logger.LoggerInterface) *Request {
 	return &Request{
 		httpClient: httpClient,
 		logger:     logger,
