@@ -141,8 +141,29 @@ func (c *Client) SetComponentToken(token *storage.ComponentAccessToken) error {
 }
 
 // GetComponentToken 获取开放平台令牌
+// @param ctx context.Context 上下文
+// @return *storage.ComponentAccessToken 组件访问令牌，包含令牌内容和有效期信息
+// @return error 错误信息，如果令牌获取失败或自动刷新失败则返回错误
 func (c *Client) GetComponentToken(ctx context.Context) (*storage.ComponentAccessToken, error) {
-	return c.storage.GetComponentToken(ctx)
+	// 从存储获取令牌
+	token, err := c.storage.GetComponentToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 如果令牌存在且未过期，直接返回
+	if token != nil && token.ExpiresAt.After(time.Now()) {
+		return token, nil
+	}
+
+	// 令牌不存在或已过期，自动获取新令牌
+	c.logger.Info("ComponentAccessToken不存在或已过期，自动获取新令牌...")
+	newToken, err := c.GetComponentAccessToken(ctx, "")
+	if err != nil {
+		return nil, fmt.Errorf("自动获取ComponentAccessToken失败: %w", err)
+	}
+	
+	return newToken, nil
 }
 
 // SetPreAuthCode 设置预授权码
@@ -317,8 +338,14 @@ type GetAuthorizerListResponse struct {
 
 // GetComponentAccessToken 获取第三方平台access_token
 func (c *Client) GetComponentAccessToken(ctx context.Context, verifyTicket string) (*storage.ComponentAccessToken, error) {
-	// 先从存储中获取
-	if token, err := c.GetComponentToken(ctx); err == nil && token != nil && token.ExpiresAt.After(time.Now()) {
+	// 直接从存储中获取令牌，不调用GetComponentToken避免递归
+	token, err := c.storage.GetComponentToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 如果令牌存在且未过期，直接返回
+	if token != nil && token.ExpiresAt.After(time.Now()) {
 		return token, nil
 	}
 
@@ -346,7 +373,7 @@ func (c *Client) GetComponentAccessToken(ctx context.Context, verifyTicket strin
 		ExpiresIn            int    `json:"expires_in"`
 	}
 
-	err := core.NewRequest(c.httpClient, c.logger).Make(ctx, "POST", URLComponentToken, request, &result)
+	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, "POST", URLComponentToken, request, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +382,7 @@ func (c *Client) GetComponentAccessToken(ctx context.Context, verifyTicket strin
 		return nil, &result.APIResponse
 	}
 
-	token := &storage.ComponentAccessToken{
+	token = &storage.ComponentAccessToken{
 		AccessToken: result.ComponentAccessToken,
 		ExpiresIn:   result.ExpiresIn,
 		ExpiresAt:   time.Now().Add(time.Duration(result.ExpiresIn) * time.Second),
