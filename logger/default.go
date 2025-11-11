@@ -12,8 +12,8 @@ import (
 // 提供简单的控制台输出，不依赖debugger组件
 // 支持不同日志级别和字段附加功能
 type DefaultLogger struct {
-	level  string                    // 日志级别：debug, info, warn, error
-	fields map[string]interface{}   // 附加字段
+	level  string                 // 日志级别：debug, info, warn, error
+	fields map[string]interface{} // 附加字段
 }
 
 // NewDefaultLogger 创建默认日志记录器实例
@@ -77,7 +77,7 @@ func (l *DefaultLogger) WithFields(fields map[string]interface{}) LoggerInterfac
 	for k, v := range fields {
 		newFields[k] = v
 	}
-	
+
 	return &DefaultLogger{
 		level:  l.level,
 		fields: newFields,
@@ -106,17 +106,17 @@ func (l *DefaultLogger) shouldLog(level string) bool {
 		"warn":  3,
 		"error": 4,
 	}
-	
+
 	currentLevel, ok := levelOrder[strings.ToLower(l.level)]
 	if !ok {
 		currentLevel = 2 // 默认info级别
 	}
-	
+
 	logLevel, ok := levelOrder[strings.ToLower(level)]
 	if !ok {
 		return false
 	}
-	
+
 	return logLevel >= currentLevel
 }
 
@@ -126,10 +126,10 @@ func (l *DefaultLogger) shouldLog(level string) bool {
 // @param fields 附加字段
 func (l *DefaultLogger) log(level string, msg any, fields []map[string]interface{}) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	
+
 	// 构建日志消息
 	logMsg := fmt.Sprintf("[%s] %s %s", timestamp, level, l.formatMessage(msg))
-	
+
 	// 合并所有字段
 	allFields := make(map[string]interface{})
 	for k, v := range l.fields {
@@ -140,12 +140,12 @@ func (l *DefaultLogger) log(level string, msg any, fields []map[string]interface
 			allFields[k] = v
 		}
 	}
-	
+
 	// 如果有附加字段，添加到日志消息中
 	if len(allFields) > 0 {
 		logMsg += " " + l.formatFields(allFields)
 	}
-	
+
 	// 根据级别输出到不同的标准输出
 	switch strings.ToUpper(level) {
 	case "ERROR", "WARN":
@@ -176,11 +176,11 @@ func (l *DefaultLogger) formatFields(fields map[string]interface{}) string {
 	if len(fields) == 0 {
 		return ""
 	}
-	
+
 	var parts []string
 	for k, v := range fields {
 		parts = append(parts, fmt.Sprintf("%s=%v", k, v))
 	}
-	
+
 	return "[" + strings.Join(parts, " ") + "]"
 }
