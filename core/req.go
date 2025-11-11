@@ -61,7 +61,7 @@ func (request *Request) Make(ctx context.Context, method, url string, body inter
 	})
 
 	// 发送请求前记录完整URL和参数
-	request.logger.Debug(fmt.Sprintf("发送HTTP请求 - URL: %s, Method: %s", req.URL.String(), req.Method), map[string]interface{}{
+	request.logger.Debug(fmt.Sprintf("发送HTTP请求 - URL: %s Method: %s", req.URL.String(), req.Method), map[string]interface{}{
 		"client":   "OpenPlatform",
 		"method":   "MakeRequest",
 		"source":   "request.send",
