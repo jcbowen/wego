@@ -1149,8 +1149,8 @@ func (oc *OAuthClient) GetUserInfo(ctx context.Context, accessToken, openID stri
 		return nil, fmt.Errorf("openID不能为空")
 	}
 
-	// 使用微信官方文档指定的URL
-	apiURL := URLGetUserInfo
+	// 使用开放平台OAuth2用户信息的正确URL - 注意这里需要使用sns/userinfo而不是cgi-bin/user/info
+	apiURL := URLComponentOAuth2UserInfo
 
 	// 严格按照微信官方文档要求的参数格式
 	params := map[string]interface{}{

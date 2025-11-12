@@ -8,6 +8,7 @@ import (
 const (
 	// 组件OAuth
 	URLComponentOAuth2AccessToken = core.BaseAPIURL + "/sns/oauth2/component/access_token"
+	URLComponentOAuth2UserInfo    = core.BaseAPIURL + "/sns/userinfo"
 
 	// 组件基础接口
 	URLComponentToken      = core.BaseAPIURL + "/cgi-bin/component/api_component_token"
