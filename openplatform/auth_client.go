@@ -896,7 +896,7 @@ func (oc *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthT
 	})
 
 	var oauthToken OAuthToken
-	err = oc.authorizerClient.authClient.client.req.Make(ctx, "POST", URLComponentOAuth2AccessToken, params, &oauthToken)
+	err = oc.authorizerClient.authClient.client.req.Make(ctx, "GET", URLComponentOAuth2AccessToken, params, &oauthToken)
 	if err != nil {
 		return nil, err
 	}

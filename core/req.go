@@ -34,7 +34,7 @@ func (request *Request) Make(ctx context.Context, method, url string, body inter
 		}
 
 		// 添加详细的参数调试日志
-		request.logger.Debug(fmt.Sprintf("请求参数详情 - URL: %s, Method: %s", url, method), map[string]interface{}{
+		request.logger.Debug(fmt.Sprintf("请求参数详情 - URL: %s Method: %s", url, method), map[string]interface{}{
 			"client": "OpenPlatform",
 			"method": "MakeRequest",
 			"source": "request.params",
