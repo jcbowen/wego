@@ -904,7 +904,7 @@ func (oc *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthT
 	oc.authorizerClient.authClient.client.logger.Debug(fmt.Sprintf("获取到ComponentAccessToken: %s", componentToken.AccessToken))
 
 	// 严格按照微信官方文档要求的参数格式
-	params := map[string]interface{}{
+	params := map[string]string{
 		"appid":                  oc.authorizerClient.authorizerAppID,
 		"code":                   code,
 		"grant_type":             core.GrantTypeAuthorizationCode,
@@ -913,7 +913,7 @@ func (oc *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthT
 	}
 
 	// 记录完整的请求参数用于调试
-	oc.authorizerClient.authClient.client.logger.Debug(fmt.Sprintf("网页授权请求参数详情:"), map[string]interface{}{
+	oc.authorizerClient.authClient.client.logger.Debug("网页授权请求参数详情:", map[string]interface{}{
 		"appid":                  oc.authorizerClient.authorizerAppID,
 		"code_length":            len(code),
 		"component_appid":        oc.authorizerClient.authClient.client.GetConfig().ComponentAppID,
@@ -1205,7 +1205,7 @@ func (oc *OAuthClient) RefreshToken(ctx context.Context, refreshToken string) (*
 	apiURL := URLRefreshComponentAccessToken
 
 	// 严格按照微信官方文档要求的参数格式
-	params := map[string]interface{}{
+	params := map[string]string{
 		"appid":                  oc.authorizerClient.authorizerAppID,
 		"grant_type":             core.GrantTypeRefreshToken,
 		"refresh_token":          refreshToken,
@@ -1215,9 +1215,9 @@ func (oc *OAuthClient) RefreshToken(ctx context.Context, refreshToken string) (*
 
 	var oauthToken OAuthToken
 	err = oc.authorizerClient.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "POST",
+		Method: "GET",
 		URL:    apiURL,
-		Body:   params,
+		Query:  params,
 		Result: &oauthToken,
 	})
 	if err != nil {
