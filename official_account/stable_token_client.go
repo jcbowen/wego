@@ -54,7 +54,12 @@ func (c *StableTokenClient) getStableAccessTokenWithMode(ctx context.Context, mo
 
 	// 调用API获取稳定版access_token
 	var result StableAccessTokenResponse
-	err := c.client.req.Make(ctx, "POST", URLStableAccessToken, request, &result)
+	err := c.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    URLStableAccessToken,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("获取稳定版access_token失败: %v", err)
 	}
@@ -137,5 +142,10 @@ func (c *StableTokenClient) MakeRequestWithStableToken(ctx context.Context, meth
 	fullURL := fmt.Sprintf("%s?access_token=%s", url, token)
 
 	// 发送请求
-	return c.client.req.Make(ctx, method, fullURL, body, result)
+	return c.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: method,
+		URL:    fullURL,
+		Body:   body,
+		Result: result,
+	})
 }

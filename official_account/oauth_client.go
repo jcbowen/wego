@@ -79,7 +79,12 @@ func (o *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthAc
 	}
 
 	var resp OAuthAccessTokenResponse
-	err := o.client.req.Make(ctx, "GET", URLSnsOAuth2AccessToken, req, &resp)
+	err := o.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    URLSnsOAuth2AccessToken,
+		Body:   req,
+		Result: &resp,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("获取网页授权access_token失败: %v", err)
 	}
@@ -110,7 +115,12 @@ func (o *OAuthClient) RefreshAccessToken(ctx context.Context, refreshToken strin
 	}
 
 	var resp OAuthAccessTokenResponse
-	err := o.client.req.Make(ctx, "GET", URLSnsOAuth2RefreshToken, req, &resp)
+	err := o.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    URLSnsOAuth2RefreshToken,
+		Body:   req,
+		Result: &resp,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("刷新网页授权access_token失败: %v", err)
 	}
@@ -149,7 +159,12 @@ func (o *OAuthClient) GetUserInfo(ctx context.Context, accessToken, openID, lang
 	}
 
 	var resp OAuthUserInfoResponse
-	err := o.client.req.Make(ctx, "GET", URLSnsUserInfo, req, &resp)
+	err := o.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    URLSnsUserInfo,
+		Query:  req,
+		Result: &resp,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("获取用户信息失败: %v", err)
 	}
@@ -182,7 +197,12 @@ func (o *OAuthClient) ValidateAccessToken(ctx context.Context, accessToken, open
 	}
 
 	var resp core.APIResponse
-	err := o.client.req.Make(ctx, "GET", URLSnsAuth, req, &resp)
+	err := o.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    URLSnsAuth,
+		Body:   req,
+		Result: &resp,
+	})
 	if err != nil {
 		return false, fmt.Errorf("检验access_token失败: %v", err)
 	}

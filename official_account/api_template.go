@@ -69,7 +69,12 @@ func (c *Template) SendTemplateMessage(ctx context.Context, template *TemplateMe
 	var result SendTemplateMessageResponse
 
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLMessageTemplateSend, url.QueryEscape(accessToken))
-	err := c.req.Make(ctx, "POST", apiURL, template, &result)
+	err := c.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   template,
+		Result: &result,
+	})
 
 	if err != nil {
 		return nil, err

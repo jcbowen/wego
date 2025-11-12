@@ -132,7 +132,11 @@ func (c *SubscribeClient) GetCategory(ctx context.Context) (*GetCategoryResponse
 
 	var result GetCategoryResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", "https://api.weixin.qq.com/cgi-bin/template/get_category", url.QueryEscape(accessToken))
-err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +161,11 @@ func (c *SubscribeClient) GetPubNewTemplateTitles(ctx context.Context, categoryI
 	var result GetPubNewTemplateTitlesResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s&ids=%d&start=%d&limit=%d",
 		"https://api.weixin.qq.com/cgi-bin/template/get_pub_template_titles", url.QueryEscape(accessToken), categoryID, start, limit)
-	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +190,11 @@ func (c *SubscribeClient) GetPubNewTemplateKeywords(ctx context.Context, tid int
 	var result GetPubNewTemplateKeywordsResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s&tid=%d",
 		URLGetPubTemplateKeywords, url.QueryEscape(accessToken), tid)
-	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +218,11 @@ func (c *SubscribeClient) GetWxaPubNewTemplate(ctx context.Context) (*GetWxaPubN
 
 	var result GetWxaPubNewTemplateResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetWxaPubTemplate, url.QueryEscape(accessToken))
-err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +252,12 @@ func (c *SubscribeClient) AddWxaNewTemplate(ctx context.Context, tid int, kidLis
 
 	var result AddWxaNewTemplateResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddWxaNewTemplate, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +285,12 @@ func (c *SubscribeClient) DelWxaNewTemplate(ctx context.Context, priTmplID strin
 
 	var result DelWxaNewTemplateResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLDelWxaNewTemplate, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +314,12 @@ func (c *SubscribeClient) SendNewSubscribeMsg(ctx context.Context, request *Send
 
 	var result SendNewSubscribeMsgResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLSendNewSubscribeMsg, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +370,12 @@ func (c *SubscribeClient) TemplateSubscribe(ctx context.Context, request *Templa
 
 	var result TemplateSubscribeResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateSubscribe, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}

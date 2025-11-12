@@ -163,7 +163,11 @@ func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
 		ExpiresIn   int    `json:"expires_in"`
 	}
 
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, "GET", apiURL, nil, &result)
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Result: &result,
+	})
 	if err != nil {
 		return "", err
 	}
@@ -219,7 +223,12 @@ func (c *Client) ClearQuota(ctx context.Context) error {
 	}
 
 	var response ClearQuotaResponse
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, "POST", url, request, &response)
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    url,
+		Body:   request,
+		Result: &response,
+	})
 	if err != nil {
 		return fmt.Errorf("清空API调用次数失败: %v", err)
 	}

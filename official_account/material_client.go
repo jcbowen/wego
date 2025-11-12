@@ -235,7 +235,12 @@ func (c *MaterialClient) GetMaterial(ctx context.Context, mediaID string) ([]byt
 
 	// 使用MakeRequest获取原始响应数据
 	var respData []byte
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &respData)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &respData,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +261,12 @@ func (c *MaterialClient) DeleteMaterial(ctx context.Context, mediaID string) (*D
 
 	var result DeleteMaterialResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteMaterial, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +293,12 @@ func (c *MaterialClient) UpdateMaterial(ctx context.Context, mediaID string, ind
 
 	var result UpdateNewsResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLUpdateNews, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +319,11 @@ func (c *MaterialClient) GetMaterialCount(ctx context.Context) (*GetMaterialCoun
 
 	var result GetMaterialCountResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetMaterialCount, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +350,12 @@ func (c *MaterialClient) BatchGetMaterial(ctx context.Context, materialType Mate
 
 	var result BatchGetMaterialResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLBatchGetMaterial, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -356,7 +380,12 @@ func (c *MaterialClient) AddNews(ctx context.Context, articles []NewsArticle) (*
 
 	var result AddNewsResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddNews, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -536,7 +565,12 @@ func (c *MaterialClient) UploadVideo(ctx context.Context, mediaID, title, descri
 
 	var result UploadVideoResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLUploadVideo, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -811,7 +845,12 @@ func (c *MaterialClient) AddDraft(ctx context.Context, articles []DraftArticle) 
 
 	var result AddDraftResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddDraft, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -841,7 +880,12 @@ func (c *MaterialClient) GetDraft(ctx context.Context, mediaID string) (*GetDraf
 
 	var result GetDraftResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetDraft, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -871,7 +915,12 @@ func (c *MaterialClient) DeleteDraft(ctx context.Context, mediaID string) (*Dele
 
 	var result DeleteDraftResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteDraft, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -896,7 +945,11 @@ func (c *MaterialClient) GetDraftCount(ctx context.Context) (*GetDraftCountRespo
 
 	var result GetDraftCountResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetDraftCount, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -929,7 +982,12 @@ func (c *MaterialClient) BatchGetDraft(ctx context.Context, offset, count, noCon
 
 	var result BatchGetDraftResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLBatchGetDraft, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -961,7 +1019,12 @@ func (c *MaterialClient) UpdateDraft(ctx context.Context, mediaID string, index 
 
 	var result UpdateDraftResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLUpdateDraft, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}

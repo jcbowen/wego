@@ -117,7 +117,12 @@ func (c *AuthorizerClient) SendCustomMessage(ctx context.Context, toUser string,
 	}
 
 	var result core.APIResponse
-	err = c.authClient.client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return err
 	}
@@ -173,7 +178,12 @@ func (c *AuthorizerClient) CreateMenu(ctx context.Context, menu *Menu) error {
 	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLCreateMenu, url.QueryEscape(accessToken))
 
 	var result core.APIResponse
-	err = c.authClient.client.req.Make(ctx, "POST", apiURL, menu, &result)
+	err = c.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   menu,
+		Result: &result,
+	})
 	if err != nil {
 		return err
 	}
@@ -199,7 +209,11 @@ func (c *AuthorizerClient) GetMenu(ctx context.Context) (*Menu, error) {
 		Menu Menu `json:"menu"`
 	}
 
-	err = c.authClient.client.req.Make(ctx, "GET", apiURL, nil, &result)
+	err = c.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +235,11 @@ func (c *AuthorizerClient) DeleteMenu(ctx context.Context) error {
 	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLDeleteMenu, url.QueryEscape(accessToken))
 
 	var result core.APIResponse
-	err = c.authClient.client.req.Make(ctx, "GET", apiURL, nil, &result)
+	err = c.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Result: &result,
+	})
 	if err != nil {
 		return err
 	}
@@ -558,7 +576,11 @@ func (c *AuthorizerClient) GetUserInfo(ctx context.Context, openID string) (*Use
 		official_account.URLUserInfo, url.QueryEscape(accessToken), url.QueryEscape(openID))
 
 	var result UserInfo
-	err = c.authClient.client.req.Make(ctx, "GET", apiURL, nil, &result)
+	err = c.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -594,7 +616,11 @@ func (c *AuthorizerClient) GetUserList(ctx context.Context, nextOpenID string) (
 	}
 
 	var result UserList
-	err = c.authClient.client.req.Make(ctx, "GET", apiURL, nil, &result)
+	err = c.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -896,7 +922,12 @@ func (oc *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthT
 	})
 
 	var oauthToken OAuthToken
-	err = oc.authorizerClient.authClient.client.req.Make(ctx, "GET", URLComponentOAuth2AccessToken, params, &oauthToken)
+	err = oc.authorizerClient.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    URLComponentOAuth2AccessToken,
+		Query:  params,
+		Result: &oauthToken,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -978,7 +1009,12 @@ func (jm *JSSDKManager) getJSAPITicket(ctx context.Context, accessToken string) 
 		ExpiresIn int    `json:"expires_in"`
 	}
 
-	err := jm.authorizerClient.authClient.client.req.Make(ctx, "GET", apiURL, params, &result)
+	err := jm.authorizerClient.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Query:  params,
+		Result: &result,
+	})
 	if err != nil {
 		return "", err
 	}
@@ -1086,7 +1122,12 @@ func (mpc *MiniProgramClient) GetWXACode(ctx context.Context, request *WXACodeRe
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetWxaCode, url.QueryEscape(accessToken))
 
 	var result WXACodeResponse
-	err = mpc.authorizerClient.authClient.client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = mpc.authorizerClient.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -1119,7 +1160,12 @@ func (oc *OAuthClient) GetUserInfo(ctx context.Context, accessToken, openID stri
 	}
 
 	var userInfo official_account.OAuthUserInfoResponse
-	err := oc.authorizerClient.authClient.client.req.Make(ctx, "GET", apiURL, params, &userInfo)
+	err := oc.authorizerClient.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Query:  params,
+		Result: &userInfo,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -1168,7 +1214,12 @@ func (oc *OAuthClient) RefreshToken(ctx context.Context, refreshToken string) (*
 	}
 
 	var oauthToken OAuthToken
-	err = oc.authorizerClient.authClient.client.req.Make(ctx, "POST", apiURL, params, &oauthToken)
+	err = oc.authorizerClient.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   params,
+		Result: &oauthToken,
+	})
 	if err != nil {
 		return nil, err
 	}

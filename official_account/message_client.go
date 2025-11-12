@@ -220,7 +220,12 @@ func (c *MessageClient) DeleteMassMsg(ctx context.Context, msgID int64, articleI
 
 	var result DeleteMassMsgResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteMassMsg, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +246,11 @@ func (c *MessageClient) GetSpeed(ctx context.Context) (*GetSpeedResponse, error)
 
 	var result GetSpeedResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetSpeed, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +275,12 @@ func (c *MessageClient) MassMsgGet(ctx context.Context, msgID int64) (*MassMsgGe
 
 	var result MassMsgGetResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLMassMsgGet, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +307,12 @@ func (c *MessageClient) MassSend(ctx context.Context, touser []string, msgType s
 
 	var result MassSendResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLMassSend, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +339,12 @@ func (c *MessageClient) Preview(ctx context.Context, touser, msgType string, con
 
 	var result PreviewResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLPreview, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +371,12 @@ func (c *MessageClient) SendAll(ctx context.Context, filter Filter, msgType stri
 
 	var result SendAllResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLSendAll, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +401,12 @@ func (c *MessageClient) SetSpeed(ctx context.Context, speed int) (*SetSpeedRespo
 
 	var result SetSpeedResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLSetSpeed, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +431,12 @@ func (c *MessageClient) UploadNewsMsg(ctx context.Context, articles []Article) (
 
 	var result UploadNewsMsgResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLUploadNewsMsg, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "POST", apiURL, request, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "POST",
+		URL:    apiURL,
+		Body:   request,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -463,7 +502,11 @@ func (c *MessageClient) GetCurrentAutoreplyInfo(ctx context.Context) (*GetCurren
 
 	var result GetCurrentAutoreplyInfoResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCurrentAutoreplyInfo, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, "GET", apiURL, nil, &result)
+	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
+		Method: "GET",
+		URL:    apiURL,
+		Result: &result,
+	})
 	if err != nil {
 		return nil, err
 	}
