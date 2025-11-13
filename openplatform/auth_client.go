@@ -297,14 +297,14 @@ func (c *AuthorizerClient) CallAPI(ctx context.Context, apiURL string, params in
 		return nil, fmt.Errorf("读取响应失败: %v", err)
 	}
 
-	// 6. 解析响应
+	// 6. 解析响应并统一返回错误类型
 	var apiResp core.APIResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
 		return nil, fmt.Errorf("响应解析失败: %v", err)
 	}
 
 	// 7. 检查错误码
-	if apiResp.ErrCode != 0 {
+	if !apiResp.IsSuccess() {
 		return nil, fmt.Errorf("API返回错误: %d - %s", apiResp.ErrCode, apiResp.ErrMsg)
 	}
 
