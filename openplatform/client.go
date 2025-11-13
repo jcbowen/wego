@@ -466,7 +466,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 	}
 
 	// 记录接收到的参数用于调试
-	c.logger.Debug(fmt.Sprintf("处理授权事件，参数 - timestamp: %s, nonce: %s, encrypt_type: %s, msg_signature: %s",
+    c.logger.Info(fmt.Sprintf("处理授权事件，参数 - timestamp: %s, nonce: %s, encrypt_type: %s, msg_signature: %s",
 		timestamp, nonce, encryptType, msgSignature))
 
 	// 判断消息类型：根据encrypt_type参数或XML内容检测
@@ -474,7 +474,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 
 	// 如果URL参数表明是加密消息，或者XML内容包含Encrypt字段，则进行解密
 	if isEncrypted {
-		c.logger.Debug("URL参数表明是加密消息，开始解密处理")
+    c.logger.Info("URL参数表明是加密消息，开始解密处理")
 
 		// 尝试解析XML获取加密内容
 		if err := xml.Unmarshal(xmlData, &encryptedMsg); err != nil {
@@ -487,7 +487,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 			return "success", nil
 		}
 
-		c.logger.Debug(fmt.Sprintf("检测到加密消息，开始解密处理，AppId: %s", encryptedMsg.AppId))
+    c.logger.Info(fmt.Sprintf("检测到加密消息，开始解密处理，AppId: %s", encryptedMsg.AppId))
 
 		// 解密消息
 		decryptedData, err := c.DecryptMessage(encryptedMsg.Encrypt, msgSignature, timestamp, nonce)
@@ -496,7 +496,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 			return "success", nil // 即使解密失败也返回success
 		}
 
-		c.logger.Debug(fmt.Sprintf("解密成功，解密后内容: %s", string(decryptedData)))
+    c.logger.Info(fmt.Sprintf("解密成功，解密后内容: %s", string(decryptedData)))
 
 		// 使用解密后的数据继续处理
 		xmlData = decryptedData
@@ -531,7 +531,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 			c.logger.Error(fmt.Sprintf("解析授权成功事件失败: %v", err))
 			break
 		}
-		c.logger.Debug(fmt.Sprintf("解析授权成功事件成功，事件内容: %+v", event))
+    c.logger.Info(fmt.Sprintf("解析授权成功事件成功，事件内容: %+v", event))
 		if err := c.GetEventHandler().HandleAuthorized(ctx, &event); err != nil {
 			c.logger.Error(fmt.Sprintf("处理授权成功事件失败: %v", err))
 		}
@@ -543,7 +543,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 			c.logger.Error(fmt.Sprintf("解析取消授权事件失败: %v", err))
 			break
 		}
-		c.logger.Debug(fmt.Sprintf("解析取消授权事件成功，事件内容: %+v", event))
+    c.logger.Info(fmt.Sprintf("解析取消授权事件成功，事件内容: %+v", event))
 		if err := c.GetEventHandler().HandleUnauthorized(ctx, &event); err != nil {
 			c.logger.Error(fmt.Sprintf("处理取消授权事件失败: %v", err))
 		}
@@ -555,7 +555,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 			c.logger.Error(fmt.Sprintf("解析授权更新事件失败: %v", err))
 			break
 		}
-		c.logger.Debug(fmt.Sprintf("解析授权更新事件成功，事件内容: %+v", event))
+    c.logger.Info(fmt.Sprintf("解析授权更新事件成功，事件内容: %+v", event))
 		if err = c.GetEventHandler().HandleUpdateAuthorized(ctx, &event); err != nil {
 			c.logger.Error(fmt.Sprintf("处理授权更新事件失败: %v", err))
 		}
@@ -568,7 +568,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 			// 根据微信官方文档要求，即使解析失败也必须返回success
 			break
 		}
-		c.logger.Debug(fmt.Sprintf("解析验证票据事件成功，事件内容: %+v", event))
+    c.logger.Info(fmt.Sprintf("解析验证票据事件成功，事件内容: %+v", event))
 		// 存储验证票据
 		if err := c.storage.SaveComponentVerifyTicket(ctx, event.ComponentVerifyTicket); err != nil {
 			c.logger.Error(fmt.Sprintf("存储验证票据失败: %v", err))
@@ -587,7 +587,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 			c.logger.Error(fmt.Sprintf("解析EncodingAESKey变更事件失败: %v", err))
 			break
 		}
-		c.logger.Debug(fmt.Sprintf("解析EncodingAESKey变更事件成功，事件内容: %+v", event))
+    c.logger.Info(fmt.Sprintf("解析EncodingAESKey变更事件成功，事件内容: %+v", event))
 		// 保存上一次的EncodingAESKey
 		if c.crypt != nil {
 			err2 := c.crypt.SetPrevEncodingAESKey(c.config.EncodingAESKey)

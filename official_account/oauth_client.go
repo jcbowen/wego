@@ -56,7 +56,7 @@ func (o *OAuthClient) GenerateAuthorizeURL(ctx context.Context, req *OAuthAuthor
 
 	authorizeURL := URLConnectOAuth2Authorize + "?" + params.Encode() + "#wechat_redirect"
 
-	o.logger.Debug("生成网页授权URL", map[string]interface{}{"url": authorizeURL})
+    o.logger.Info("生成网页授权URL", map[string]interface{}{"url": authorizeURL})
 	return authorizeURL, nil
 }
 
@@ -93,7 +93,7 @@ func (o *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthAc
 		return nil, &resp.APIResponse
 	}
 
-	o.logger.Debug("获取网页授权access_token成功", map[string]interface{}{"openid": resp.OpenID, "scope": resp.Scope})
+    o.logger.Info("获取网页授权access_token成功", map[string]interface{}{"openid": resp.OpenID, "scope": resp.Scope})
 	return &resp, nil
 }
 
@@ -129,7 +129,7 @@ func (o *OAuthClient) RefreshAccessToken(ctx context.Context, refreshToken strin
 		return nil, &resp.APIResponse
 	}
 
-	o.logger.Debug("刷新网页授权access_token成功", map[string]interface{}{"openid": resp.OpenID})
+    o.logger.Info("刷新网页授权access_token成功", map[string]interface{}{"openid": resp.OpenID})
 	return &resp, nil
 }
 
@@ -173,7 +173,7 @@ func (o *OAuthClient) GetUserInfo(ctx context.Context, accessToken, openID, lang
 		return nil, &resp.APIResponse
 	}
 
-	o.logger.Debug("获取用户信息成功", map[string]interface{}{"openid": resp.OpenID, "nickname": resp.Nickname})
+    o.logger.Info("获取用户信息成功", map[string]interface{}{"openid": resp.OpenID, "nickname": resp.Nickname})
 	return &resp, nil
 }
 
@@ -209,11 +209,11 @@ func (o *OAuthClient) ValidateAccessToken(ctx context.Context, accessToken, open
 
 	// 如果返回的错误码为0，则表示有效
 	if resp.ErrCode == 0 {
-		o.logger.Debug("检验access_token有效", map[string]interface{}{"openid": openID})
+        o.logger.Info("检验access_token有效", map[string]interface{}{"openid": openID})
 		return true, nil
 	}
 
-	o.logger.Debug("检验access_token无效", map[string]interface{}{"openid": openID, "errcode": resp.ErrCode, "errmsg": resp.ErrMsg})
+    o.logger.Warn("检验access_token无效", map[string]interface{}{"openid": openID, "errcode": resp.ErrCode, "errmsg": resp.ErrMsg})
 	return false, nil
 }
 

@@ -94,7 +94,7 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 	}
 
 	// 记录请求日志
-	r.logger.Debug(fmt.Sprintf("发送HTTP请求 - Method: %s URL: %s", req.Method, req.URL.String()), map[string]interface{}{
+    r.logger.Info(fmt.Sprintf("发送HTTP请求 - Method: %s URL: %s", req.Method, req.URL.String()), map[string]interface{}{
 		"request_method":  req.Method,
 		"request_url":     req.URL.String(),
 		"request_headers": req.Header,
@@ -123,7 +123,7 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 	}
 
 	// 记录响应日志
-	r.logger.Debug(fmt.Sprintf("HTTP响应 - 状态码: %d, 内容长度: %d", resp.StatusCode, len(respBody)), map[string]interface{}{
+    r.logger.Info(fmt.Sprintf("HTTP响应 - 状态码: %d, 内容长度: %d", resp.StatusCode, len(respBody)), map[string]interface{}{
 		"status_code":     resp.StatusCode,
 		"response_length": len(respBody),
 		"response_body":   string(respBody),
@@ -140,7 +140,7 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 	// 处理空响应
 	if len(respBody) == 0 {
 		if result != nil {
-			r.logger.Debug("响应体为空，跳过JSON解析")
+            r.logger.Info("响应体为空，跳过JSON解析")
 		}
 		return nil
 	}
