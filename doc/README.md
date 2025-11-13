@@ -70,7 +70,7 @@ func main() {
     }
 
     // 创建WeGo实例
-    wegoClient := wego.NewWeGo(config)
+    wegoClient := wego.New(config)
 
     // 使用各个功能模块
     openPlatformAuth := wegoClient.OpenPlatformAuth()
@@ -85,10 +85,10 @@ func main() {
 ### 3. 配置存储
 
 WeGo库支持多种存储方式：
-- **内存存储**（默认）- 通过`storage.NewStorageClient().NewMemoryStorage()`创建
-- **文件存储** - 通过`storage.NewStorageClient().NewFileStorage("path/to/storage.json")`创建
-- **数据库存储** - 通过`storage.NewStorageClient().NewDBStorage(db)`创建，需要传入GORM数据库实例
-- **自定义存储** - 需要实现`storage.TokenStorage`接口，并通过`wego.NewWeGoWithStorage()`使用
+- 文件存储（默认）：使用`./runtime/wego_storage`目录持久化Token
+- 内存存储：用于开发/测试，重启后数据丢失
+- 数据库存储：基于GORM的持久化存储
+- 自定义存储：实现`storage.TokenStorage`接口，并通过`wego.NewWithStorage()`使用
 
 ### 4. 处理消息和事件
 

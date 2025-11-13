@@ -30,50 +30,50 @@ wego/
 
 ## 导出类型
 
-WeGo库导出了以下常用结构体类型，方便开发者直接使用：
-
 ```go
-// 开放平台相关类型
 type (
-	// 开放平台相关类型
-	OpenPlatformConfig    = openplatform.OpenPlatformConfig
-	APIResponse           = openplatform.APIResponse
-	AuthorizationInfo     = openplatform.AuthorizationInfo
-	AuthorizerInfo        = openplatform.AuthorizerInfo
-	TokenStorage          = storage.TokenStorage
-	MemoryStorage         = storage.MemoryStorage
-	DBStorage             = storage.DBStorage
-	FileStorage           = storage.FileStorage
-	ComponentAccessToken  = storage.ComponentAccessToken
-	PreAuthCode           = storage.PreAuthCode
-	AuthorizerAccessToken = storage.AuthorizerAccessToken
+    // API通用响应
+    APIResponse = core.APIResponse
 
-	// 微信公众号开发相关类型
-	MPConfig       = officialaccount.MPConfig
-	MPClient       = officialaccount.MPClient
-	MPAPIClient    = officialaccount.MPAPIClient
-	MenuClient     = officialaccount.MenuClient
-	MessageClient  = officialaccount.MessageClient
-	TemplateClient = officialaccount.TemplateClient
-	CustomClient   = officialaccount.CustomClient
-	MaterialClient = officialaccount.MaterialClient
+    // 存储相关类型
+    TokenStorage          = storage.TokenStorage
+    MemoryStorage         = storage.MemoryStorage
+    DBStorage             = storage.DBStorage
+    FileStorage           = storage.FileStorage
+    ComponentAccessToken  = storage.ComponentAccessToken
+    PreAuthCode           = storage.PreAuthCode
+    AuthorizerAccessToken = storage.AuthorizerAccessToken
 
-	// 微信公众号数据结构体
-	Menu                   = officialaccount.Menu
-	Button                 = officialaccount.Button
-	SendTemplateMsgRequest = officialaccount.SendTemplateMsgRequest
-	TemplateData           = officialaccount.TemplateData
-	MPTextMessage          = officialaccount.TextMessage
-	MPImageMessage         = officialaccount.ImageMessage
-	VoiceMessage           = officialaccount.VoiceMessage
-	VideoMessage           = officialaccount.VideoMessage
-	MusicMessage           = officialaccount.MusicMessage
-	NewsMessage            = officialaccount.NewsMessage
-	MPNewsMessage          = officialaccount.MPNewsMessage
-	WXCardMessage          = officialaccount.WXCardMessage
-	MiniProgramPageMessage = officialaccount.MiniProgramPageMessage
-	NewsArticle            = officialaccount.NewsArticle
-	UserInfo               = types.OAuthUserInfoResponse
+    // 开放平台相关类型
+    OpenPlatformConfig            = openplatform.Config
+    OpenPlatformAuthorizationInfo = openplatform.AuthorizationInfo
+    OpenPlatformAuthorizerInfo    = openplatform.AuthorizerInfo
+
+    // 微信公众号相关类型
+    OfficialAccountConfig         = official_account.Config
+    OfficialAccountClient         = official_account.Client
+    OfficialAccountAPIClient      = official_account.APIClient
+    OfficialAccountMenuClient     = official_account.MenuClient
+    OfficialAccountMessageClient  = official_account.MessageClient
+    OfficialAccountTemplateClient = official_account.TemplateClient
+    OfficialAccountCustomClient   = official_account.CustomClient
+    OfficialAccountMaterialClient = official_account.MaterialClient
+
+    // 微信公众号消息与数据结构
+    OfficialAccountMenu                   = official_account.Menu
+    OfficialAccountButton                 = official_account.Button
+    OfficialAccountTemplateMessageRequest = official_account.TemplateMessageRequest
+    OfficialAccountTemplateMessageData    = official_account.TemplateMessageData
+    OfficialAccountMessageText            = official_account.MessageText
+    OfficialAccountMessageImage           = official_account.MessageImage
+    OfficialAccountMessageVoice           = official_account.MessageVoice
+    OfficialAccountMessageVideo           = official_account.MessageVideo
+    OfficialAccountMusicMessage           = official_account.MessageMusic
+    OfficialAccountNewsMessage            = official_account.MessageNews
+    OfficialAccountWXCardMessage          = official_account.MessageWXCard
+    OfficialAccountMiniProgramPageMessage = official_account.MessageMiniProgramPage
+    OfficialAccountNewsArticle            = official_account.NewsArticle
+    UserInfo                              = types.OAuthUserInfoResponse
 )
 ```
 
@@ -130,13 +130,14 @@ func main() {
 		RedirectURI:        "your_redirect_uri",
 	}
 
-	// 创建WeGo实例（只初始化开放平台）
-	wegoClient := wego.NewWeGo(openPlatformConfig)
+    // 创建WeGo实例（只初始化开放平台）
+    wegoClient := wego.New(openPlatformConfig)
 
-	// 使用开放平台功能
-	apiClient := wegoClient.OpenPlatformAPI()
-	authClient := wegoClient.OpenPlatformAuth()
-	messageClient := wegoClient.OpenPlatformMessage()
+    // 使用开放平台功能
+    authClient := wegoClient.OpenPlatformAuth()
+    messageClient := wegoClient.OpenPlatformMessage()
+    // 需要直接调用开放平台API时可使用底层客户端：
+    // wegoClient.OpenPlatformClient.GetComponentAccessToken(ctx, "...")
 
 	fmt.Println("开放平台客户端初始化成功！")
 }
@@ -161,8 +162,8 @@ func main() {
 		AESKey:    "your_mp_aes_key",
 	}
 
-	// 创建WeGo实例（只初始化公众号）
-	wegoClient := wego.NewWeGo(officialAccountConfig)
+    // 创建WeGo实例（只初始化公众号）
+    wegoClient := wego.New(officialAccountConfig)
 
 	// 使用公众号功能
 	apiClient := wegoClient.OfficialAccountAPI()
@@ -201,16 +202,17 @@ func main() {
 		AESKey:    "your_mp_aes_key",
 	}
 
-	// 创建WeGo实例（同时初始化开放平台和公众号）
-	wegoClient := wego.NewWeGo(openPlatformConfig, officialAccountConfig)
+    // 创建WeGo实例（同时初始化开放平台和公众号）
+    wegoClient := wego.New(openPlatformConfig, officialAccountConfig)
 
 	// 检查客户端是否初始化
 	fmt.Printf("开放平台已初始化: %v\n", wegoClient.OpenPlatformClient != nil)
 	fmt.Printf("公众号已初始化: %v\n", wegoClient.OfficialAccountClient != nil)
 
-	// 使用开放平台功能
-	openPlatformAPI := wegoClient.OpenPlatformAPI()
-	
+    // 使用开放平台功能
+    openPlatformAuth := wegoClient.OpenPlatformAuth()
+    openPlatformMessage := wegoClient.OpenPlatformMessage()
+
 	// 使用公众号功能
 	officialAccountAPI := wegoClient.OfficialAccountAPI()
 	
@@ -242,27 +244,27 @@ func main() {
 		AESKey:    "your_mp_aes_key",
 	}
 
-	// 创建WeGo实例
-	wegoClient := wego.NewWeGo(config)
+    // 创建WeGo实例
+    wegoClient := wego.New(config)
 
-	// 获取公众号API客户端
-	apiClient := wegoClient.OfficialAccountAPI()
+    // 获取公众号API客户端
+    apiClient := wegoClient.OfficialAccountAPI()
 
-	// 使用稳定版token发送请求
+    // 使用稳定版token发送请求
 	ctx := context.Background()
 	
-	// 普通模式获取稳定版token
-	tokenInfo, err := apiClient.GetStableTokenClient().GetStableAccessTokenNormal(ctx)
+    // 普通模式获取稳定版token（通过底层Client访问稳定版客户端）
+    tokenInfo, err := apiClient.Client.GetStableTokenClient().GetStableAccessTokenNormal(ctx)
 	if err != nil {
 		fmt.Printf("获取稳定版token失败: %v\n", err)
 		return
 	}
 	fmt.Printf("稳定版token: %s, 过期时间: %v\n", tokenInfo.AccessToken, tokenInfo.ExpiresAt)
 
-	// 使用稳定版token发送API请求
+    // 使用稳定版token发送API请求
 	var result map[string]interface{}
-	err = apiClient.GetStableTokenClient().MakeRequestWithStableToken(ctx, "GET", 
-		"https://api.weixin.qq.com/cgi-bin/user/get", nil, &result)
+    err = apiClient.Client.GetStableTokenClient().MakeRequestWithStableToken(ctx, "GET", 
+        "https://api.weixin.qq.com/cgi-bin/user/get", nil, &result)
 	if err != nil {
 		fmt.Printf("API请求失败: %v\n", err)
 		return
@@ -389,18 +391,18 @@ func main() {
 
 **默认存储策略**：
 - 默认存储为文件存储
-- 文件存储使用`wego_storage`目录保存Token数据
+- 文件存储使用`./runtime/wego_storage`目录保存Token数据
 - 如果文件存储创建失败，会自动回退到内存存储并记录警告日志
-- 可通过`NewWeGoWithStorage`方法指定自定义存储
-- **注意**：当前存储接口主要支持开放平台和公众号的常规token存储，稳定版token的持久化存储支持正在扩展中
+- 可通过`NewWithStorage`方法指定自定义存储
+- 稳定版token的持久化存储支持后续扩展
 
 ## 示例
 
 查看 `doc/` 目录获取完整的使用示例和技术文档：
 
 - [微信公众号开发库使用指南](doc/officialaccount/README.md)
-- [授权流程技术说明](doc/01-授权流程技术说明.md)
-- [消息加解密技术介绍](doc/06-消息加解密技术介绍.md)
+- [授权流程技术说明](doc/openplatform/01-授权流程技术说明.md)
+- [消息加解密技术介绍](doc/openplatform/06-消息加解密技术介绍.md)
 
 ## 文档
 
@@ -415,7 +417,7 @@ func main() {
 
 - Go 1.23.0+
 - gorm.io/gorm v1.31.0
-- github.com/jcbowen/jcbaseGo v0.13.1
+- github.com/jcbowen/jcbaseGo v0.13.6
 
 ## 许可证
 

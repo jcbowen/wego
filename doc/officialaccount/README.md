@@ -20,7 +20,7 @@ WeGo 是一个 Go 语言编写的微信公众号开发库，提供了完整的�
 ### 安装
 
 ```bash
-go get github.com/jcbowen/wego/officialaccount
+go get github.com/jcbowen/wego
 ```
 
 ### 基本使用
@@ -45,8 +45,8 @@ func main() {
 		AESKey:    "your_aes_key",
 	}
 
-	// 2. 创建WeGo客户端
-	client := wego.NewWeGo(config)
+    // 2. 创建WeGo客户端
+    client := wego.New(config)
 
 	// 3. 使用各种功能客户端
 	ctx := context.Background()
@@ -97,12 +97,11 @@ config := &wego.MPConfig{
 
 ```go
 // 创建WeGo客户端
-client := wego.NewWeGo(config)
+client := wego.New(config)
 
 // 如果需要使用自定义存储（推荐）
-storage := wego.NewMemoryStorage() // 内存存储
-// storage, _ := wego.NewDBStorage(db) // 数据库存储
-clientWithStorage := wego.NewWeGoWithStorage(storage, config)
+// 使用自定义存储实现 TokenStorage 接口
+clientWithStorage := wego.NewWithStorage(customStorage, config)
 ```
 
 ### 各功能模块使用
@@ -198,7 +197,7 @@ addResp, err := customClient.AddCustomAccount(ctx, "test@test", "客服昵称")
 #### 5. 素材管理
 
 ```go
-materialClient := officialaccount.NewMaterialClient(client)
+materialClient := client.OfficialAccountMaterial()
 
 // 获取素材总数
 countResp, err := materialClient.GetMaterialCount(ctx)
@@ -213,7 +212,7 @@ uploadResp, err := materialClient.UploadTempMedia(ctx, "image", "image.jpg", fil
 #### 6. 消息管理
 
 ```go
-messageClient := officialaccount.NewMessageClient(client)
+messageClient := client.OfficialAccountMessage()
 
 // 群发消息
 massMsg := &officialaccount.MassMessage{
@@ -232,7 +231,7 @@ resp, err := messageClient.SendMassMessage(ctx, massMsg)
 
 ```go
 // 获取OAuth客户端
-oauthClient := officialaccount.NewOAuthClient(client)
+oauthClient := client.OfficialAccountOAuth()
 
 // 生成授权URL
 authURL, err := oauthClient.GenerateAuthorizeURL(
@@ -281,39 +280,11 @@ fmt.Printf("API服务器IP: %v", resp.IPList)
 
 ## 存储支持
 
-WeGo支持多种存储后端用于access_token缓存：
-
-### 内存存储（默认）
-
-```go
-storage := core.NewMemoryStorage()
-client.SetStorage(storage)
-```
-
-### 文件存储
-
-```go
-storage := core.NewFileStorage("/path/to/token.json")
-client.SetStorage(storage)
-```
-
-### Redis存储
-
-```go
-storage := core.NewRedisStorage("redis://localhost:6379")
-client.SetStorage(storage)
-```
-
-### 数据库存储
-
-```go
-storage := core.NewDBStorage(db, "access_tokens")
-client.SetStorage(storage)
-```
+默认使用文件存储（路径 `./runtime/wego_storage`），创建失败时回退内存存储。需要自定义存储时，通过 `wego.NewWithStorage(storage, config)` 传入实现了 `storage.TokenStorage` 的实例。
 
 ## 示例代码
 
-完整的示例代码请参考 `examples/mp/` 目录。
+更多用法可参考源代码中的对应模块及方法名。
 
 ## 许可证
 
