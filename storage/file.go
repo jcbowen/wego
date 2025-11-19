@@ -36,7 +36,7 @@ func NewFileStorage(baseDir string) (*FileStorage, error) {
 		baseDir:                   baseDir,
 		componentTokenFile:        filepath.Join(baseDir, "component_token.json"),
 		preAuthCodeFile:           filepath.Join(baseDir, "pre_auth_code.json"),
-		componentVerifyTicketFile: filepath.Join(baseDir, "component_verify_ticket.txt"),
+		componentVerifyTicketFile: filepath.Join(baseDir, "component_verify_ticket.json"),
 		authorizerTokensDir:       filepath.Join(baseDir, "authorizer_tokens"),
 		prevEncodingAESKeysDir:    filepath.Join(baseDir, "prev_encoding_aes_keys"),
 	}
@@ -75,11 +75,6 @@ func (s *FileStorage) GetComponentToken(ctx context.Context) (*ComponentAccessTo
 		return nil, err
 	}
 
-	// 检查是否过期
-	if time.Now().After(token.ExpiresAt) {
-		return nil, nil
-	}
-
 	return &token, nil
 }
 
@@ -110,11 +105,6 @@ func (s *FileStorage) GetPreAuthCode(ctx context.Context) (*PreAuthCode, error) 
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	// 检查是否过期
-	if time.Now().After(code.ExpiresAt) {
-		return nil, nil
 	}
 
 	return &code, nil
@@ -154,11 +144,6 @@ func (s *FileStorage) GetComponentVerifyTicket(ctx context.Context) (*ComponentV
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	// 检查票据是否过期
-	if time.Now().After(verifyTicket.ExpiresAt) {
-		return nil, nil
 	}
 
 	return &verifyTicket, nil

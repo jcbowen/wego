@@ -352,7 +352,7 @@ func (c *Client) GetComponentAccessToken(ctx context.Context, verifyTicket strin
 		if err != nil {
 			return nil, fmt.Errorf("获取验证票据失败: %v", err)
 		}
-		if verifyTicketObj == nil {
+		if verifyTicketObj == nil || time.Now().After(verifyTicketObj.ExpiresAt) {
 			return nil, fmt.Errorf("验证票据不存在或已过期")
 		}
 		verifyTicket = verifyTicketObj.Ticket

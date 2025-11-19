@@ -178,13 +178,6 @@ func (s *DBStorage) GetPreAuthCode(ctx context.Context) (*PreAuthCode, error) {
 		return nil, err
 	}
 
-	// 检查是否过期
-	if time.Now().After(dbCode.ExpiresAt) {
-		// 自动删除过期预授权码
-		s.db.Delete(&dbCode)
-		return nil, nil
-	}
-
 	return &PreAuthCode{
 		PreAuthCode: dbCode.PreAuthCode,
 		ExpiresIn:   dbCode.ExpiresIn,
@@ -335,13 +328,6 @@ func (s *DBStorage) GetComponentVerifyTicket(ctx context.Context) (*ComponentVer
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	// 检查是否过期
-	if time.Now().After(dbTicket.ExpiresAt) {
-		// 自动删除过期票据
-		s.db.Delete(&dbTicket)
-		return nil, nil
 	}
 
 	return &ComponentVerifyTicket{
