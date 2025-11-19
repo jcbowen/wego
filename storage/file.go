@@ -23,9 +23,13 @@ type FileStorage struct {
 
 // NewFileStorage 创建文件存储实例
 func NewFileStorage(baseDir string) (*FileStorage, error) {
-	// 确保基础目录存在
+	// 确保基础目录存在；如果创建失败，回退到系统临时目录
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
-		return nil, err
+		fallback := filepath.Join(os.TempDir(), "wego_storage")
+		if err2 := os.MkdirAll(fallback, 0755); err2 != nil {
+			return nil, err
+		}
+		baseDir = fallback
 	}
 
 	storage := &FileStorage{

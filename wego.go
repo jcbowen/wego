@@ -324,7 +324,6 @@ type (
 
 	// 存储相关类型
 	TokenStorage          = storage.TokenStorage
-	MemoryStorage         = storage.MemoryStorage
 	DBStorage             = storage.DBStorage
 	FileStorage           = storage.FileStorage
 	ComponentAccessToken  = storage.ComponentAccessToken
