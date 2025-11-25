@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/jcbowen/jcbaseGo/component/debugger"
@@ -350,10 +351,12 @@ func (c *Client) GetComponentAccessToken(ctx context.Context, verifyTicket strin
 	if verifyTicket == "" {
 		verifyTicketObj, err := c.storage.GetComponentVerifyTicket(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("获取验证票据失败: %v", err)
+			wd, _ := os.Getwd()
+			return nil, fmt.Errorf("获取验证票据失败: %v [storage=%T wd=%s]", err, c.storage, wd)
 		}
 		if verifyTicketObj == nil || time.Now().After(verifyTicketObj.ExpiresAt) {
-			return nil, fmt.Errorf("验证票据不存在或已过期")
+			wd, _ := os.Getwd()
+			return nil, fmt.Errorf("验证票据不存在或已过期 [storage=%T wd=%s]", c.storage, wd)
 		}
 		verifyTicket = verifyTicketObj.Ticket
 	}
