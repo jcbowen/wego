@@ -325,6 +325,7 @@ type (
 	// 存储相关类型
 	TokenStorage          = storage.TokenStorage
 	DBStorage             = storage.DBStorage
+	SqliteStorage         = storage.SqliteStorage
 	FileStorage           = storage.FileStorage
 	ComponentAccessToken  = storage.ComponentAccessToken
 	PreAuthCode           = storage.PreAuthCode

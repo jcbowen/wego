@@ -13,8 +13,8 @@ func NewStorageClient() *StorageClient {
 }
 
 // NewDBStorage 创建新的数据库存储实例
-func (c *StorageClient) NewDBStorage(dbConfig jcbaseGo.DbStruct) (*DBStorage, error) {
-	return NewDBStorage(dbConfig)
+func (c *StorageClient) NewDBStorage(dbConfig jcbaseGo.DbStruct, opts ...string) (*DBStorage, error) {
+	return NewDBStorage(dbConfig, opts...)
 }
 
 // NewFileStorage 创建新的文件存储实例
@@ -28,4 +28,9 @@ func (c *StorageClient) NewFileStorage(baseDir string) (*FileStorage, error) {
 // @return error 错误信息
 func (c *StorageClient) NewRedisStorage(config *RedisConfig) (*RedisStorage, error) {
 	return NewRedisStorage(config)
+}
+
+// NewSqliteStorage 创建新的SQLite存储实例
+func (c *StorageClient) NewSqliteStorage(conf jcbaseGo.SqlLiteStruct, opts ...string) (*SqliteStorage, error) {
+	return NewSqliteStorage(conf, opts...)
 }
