@@ -23,11 +23,15 @@ type DBStorage struct {
 // @return *DBStorage 数据库存储实例
 // @return error 错误信息
 func NewDBStorage(dbConfig jcbaseGo.DbStruct, opts ...string) (*DBStorage, error) {
-	// 创建mysql实例
-	mysqlInstance := mysql.New(dbConfig, opts...)
+	mysqlInstance, err := mysql.New(dbConfig, opts...)
+	if err != nil {
+		return nil, err
+	}
 
-	// 获取GORM数据库连接
 	db := mysqlInstance.GetDb()
+	if db == nil {
+		return nil, errors.New("mysql GetDb returned nil")
+	}
 
 	// 自动迁移数据库表
 	if err := db.AutoMigrate(
