@@ -74,35 +74,53 @@ JS-SDK是微信公众平台面向网页开发者提供的基于微信内网页�
 ```go
 // JSSDKConfig JS-SDK配置结构
 type JSSDKConfig struct {
-    AppID     string   `json:"appId"`
-    Timestamp int64    `json:"timestamp"`
-    NonceStr  string   `json:"nonceStr"`
-    Signature string   `json:"signature"`
-    JSAPIList []string `json:"jsApiList"`
+    AppID     string   `json:"appId" ini:"app_id"`          // 公众号appid
+    Timestamp int64    `json:"timestamp" ini:"timestamp"`   // 时间戳
+    NonceStr  string   `json:"nonceStr" ini:"nonce_str"`    // 随机字符串
+    Signature string   `json:"signature" ini:"signature"`   // 签名
+    JSAPIList []string `json:"jsApiList" ini:"js_api_list"` // JS-SDK调用权限列表
 }
 
 // JSSDKManager JS-SDK管理器
 type JSSDKManager struct {
     authorizerClient *AuthorizerClient
+    cacher           *JSSDKCacher
 }
 
 // 创建JS-SDK管理器
 func (ac *AuthorizerClient) GetJSSDKManager() *JSSDKManager {
     return &JSSDKManager{
         authorizerClient: ac,
+        cacher:           &JSSDKCacher{},
     }
 }
 
 // 生成JS-SDK配置
-func (jm *JSSDKManager) GetConfig(url string, jsAPIList []string) (*JSSDKConfig, error) {
+func (jm *JSSDKManager) GetConfig(ctx context.Context, url string, jsAPIList []string) (*JSSDKConfig, error) {
+    // 验证参数
+    if url == "" {
+        return nil, fmt.Errorf("URL不能为空")
+    }
+    if len(jsAPIList) == 0 {
+        return nil, fmt.Errorf("JSAPI列表不能为空")
+    }
+    if jm.authorizerClient.authorizerAppID == "" {
+        return nil, fmt.Errorf("授权方AppID不能为空")
+    }
+    
+    // 验证URL
+    if err := jm.validateURL(url); err != nil {
+        return nil, err
+    }
+
     // 获取授权方AccessToken
-    accessToken, _, err := jm.authorizerClient.GetAccessToken()
+    accessToken, err := jm.authorizerClient.authClient.client.GetAuthorizerAccessToken(ctx, jm.authorizerClient.authorizerAppID)
     if err != nil {
         return nil, fmt.Errorf("获取AccessToken失败: %v", err)
     }
     
     // 获取JSAPI Ticket
-    ticket, err := jm.getJSAPITicket(accessToken)
+    ticket, err := jm.getJSAPITicket(ctx, accessToken)
     if err != nil {
         return nil, fmt.Errorf("获取JSAPI Ticket失败: %v", err)
     }
@@ -114,35 +132,59 @@ func (jm *JSSDKManager) GetConfig(url string, jsAPIList []string) (*JSSDKConfig,
 }
 
 // 获取JSAPI Ticket
-func (jm *JSSDKManager) getJSAPITicket(accessToken string) (string, error) {
-    apiURL := "https://api.weixin.qq.com/cgi-bin/ticket/getticket"
-    
+func (jm *JSSDKManager) getJSAPITicket(ctx context.Context, accessToken string) (string, error) {
+    apiURL := official_account.URLGetTicket
+
     params := map[string]interface{}{
         "access_token": accessToken,
         "type":         "jsapi",
     }
-    
-    respBody, err := jm.authorizerClient.CallAPI(apiURL, params)
-    if err != nil {
-        return "", err
-    }
-    
+
     var result struct {
         ErrCode   int    `json:"errcode"`
         ErrMsg    string `json:"errmsg"`
         Ticket    string `json:"ticket"`
         ExpiresIn int    `json:"expires_in"`
     }
-    
-    if err := json.Unmarshal(respBody, &result); err != nil {
-        return "", err
+
+    err := jm.authorizerClient.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
+        Method: "GET",
+        URL:    apiURL,
+        Query:  params,
+        Result: &result,
+    })
+    if err != nil {
+        return "", fmt.Errorf("调用微信API获取JSAPI Ticket失败: %v", err)
     }
-    
+
     if result.ErrCode != 0 {
-        return "", fmt.Errorf("获取JSAPI Ticket失败: %s", result.ErrMsg)
+        return "", fmt.Errorf("获取JSAPI Ticket失败，错误码: %d, 错误信息: %s", result.ErrCode, result.ErrMsg)
+    }
+
+    if result.Ticket == "" {
+        return "", fmt.Errorf("获取JSAPI Ticket失败，返回票据为空")
+    }
+
+    return result.Ticket, nil
+}
+
+// 验证URL
+func (jm *JSSDKManager) validateURL(url string) error {
+    // 验证URL格式
+    parsedURL, err := url.Parse(url)
+    if err != nil {
+        return fmt.Errorf("URL格式错误: %v", err)
     }
     
-    return result.Ticket, nil
+    if parsedURL.Host == "" {
+        return fmt.Errorf("URL缺少主机名")
+    }
+    
+    // 验证协议
+    // 注意：这里没有硬编码强制HTTPS，因为开发环境可能使用HTTP
+    // 生产环境建议在配置中设置强制HTTPS
+    
+    return nil
 }
 
 // 生成签名
@@ -158,7 +200,7 @@ func (jm *JSSDKManager) generateSignature(url, ticket string, jsAPIList []string
     signatureHex := hex.EncodeToString(signature[:])
     
     return &JSSDKConfig{
-        AppID:     jm.authorizerClient.appID,
+        AppID:     jm.authorizerClient.authorizerAppID,
         Timestamp: timestamp,
         NonceStr:  nonceStr,
         Signature: signatureHex,
@@ -185,41 +227,38 @@ type JSSDKCacher struct {
     cache sync.Map
 }
 
-// 获取缓存的配置
+// GetCachedConfig 获取缓存的JS-SDK配置
 func (c *JSSDKCacher) GetCachedConfig(url string, jsAPIList []string) (*JSSDKConfig, error) {
-    // 生成缓存key
     cacheKey := c.generateCacheKey(url, jsAPIList)
-    
-    // 从缓存中获取
+
     if cached, exists := c.cache.Load(cacheKey); exists {
         if config, ok := cached.(*JSSDKConfig); ok {
-            // 检查是否过期（2小时有效期）
+            // 检查配置是否过期（7200秒有效期）
             if time.Now().Unix()-config.Timestamp < 7200 {
                 return config, nil
             }
         }
     }
-    
-    return nil, nil // 缓存不存在或已过期
+
+    return nil, fmt.Errorf("缓存未命中或已过期")
 }
 
-// 缓存配置
+// CacheConfig 缓存JS-SDK配置
 func (c *JSSDKCacher) CacheConfig(url string, jsAPIList []string, config *JSSDKConfig) {
     cacheKey := c.generateCacheKey(url, jsAPIList)
     c.cache.Store(cacheKey, config)
 }
 
-// 生成缓存key
+// generateCacheKey 生成缓存键
 func (c *JSSDKCacher) generateCacheKey(url string, jsAPIList []string) string {
-    // 对URL和JSAPI列表进行规范化
-    normalizedURL := strings.Split(url, "#")[0] // 去除hash部分
-    sortedAPIList := make([]string, len(jsAPIList))
-    copy(sortedAPIList, jsAPIList)
-    sort.Strings(sortedAPIList)
-    
-    apiListStr := strings.Join(sortedAPIList, ",")
-    
-    return fmt.Sprintf("%s|%s", normalizedURL, apiListStr)
+    sortedAPIs := make([]string, len(jsAPIList))
+    copy(sortedAPIs, jsAPIList)
+    sort.Strings(sortedAPIs)
+
+    keyData := url + "|" + strings.Join(sortedAPIs, ",")
+
+    hash := sha1.Sum([]byte(keyData))
+    return hex.EncodeToString(hash[:])
 }
 ```
 
@@ -296,7 +335,8 @@ func main() {
         jsSDKManager := authorizerClient.GetJSSDKManager()
         
         // 生成JS-SDK配置
-        jsConfig, err := jsSDKManager.GetConfig(url, jsAPIList)
+        ctx := context.Background()
+        jsConfig, err := jsSDKManager.GetConfig(ctx, url, jsAPIList)
         if err != nil {
             http.Error(w, "生成JS-SDK配置失败: "+err.Error(), http.StatusInternalServerError)
             return
@@ -556,14 +596,14 @@ function showMenuItems() {
 
 ```go
 // 优化后的JS-SDK配置获取
-func (jm *JSSDKManager) GetConfigOptimized(url string, jsAPIList []string) (*JSSDKConfig, error) {
+func (jm *JSSDKManager) GetConfigOptimized(ctx context.Context, url string, jsAPIList []string) (*JSSDKConfig, error) {
     // 先检查缓存
     if cachedConfig, err := jm.cacher.GetCachedConfig(url, jsAPIList); err == nil && cachedConfig != nil {
         return cachedConfig, nil
     }
     
     // 缓存不存在或已过期，重新生成
-    config, err := jm.GetConfig(url, jsAPIList)
+    config, err := jm.GetConfig(ctx, url, jsAPIList)
     if err != nil {
         return nil, err
     }
@@ -579,46 +619,67 @@ func (jm *JSSDKManager) GetConfigOptimized(url string, jsAPIList []string) (*JSS
 
 ```go
 // 带重试的JS-SDK配置获取
-func (jm *JSSDKManager) GetConfigWithRetry(url string, jsAPIList []string, maxRetries int) (*JSSDKConfig, error) {
+func (jm *JSSDKManager) GetConfigWithRetry(ctx context.Context, url string, jsAPIList []string, maxRetries int) (*JSSDKConfig, error) {
     var lastErr error
     
     for i := 0; i < maxRetries; i++ {
-        config, err := jm.GetConfigOptimized(url, jsAPIList)
+        config, err := jm.GetConfigOptimized(ctx, url, jsAPIList)
         if err == nil {
             return config, nil
         }
         
         lastErr = err
         
-        // 等待一段时间后重试
-        time.Sleep(time.Duration(i+1) * time.Second)
+        // 检查context是否取消
+        select {
+        case <-ctx.Done():
+            return nil, fmt.Errorf("context cancelled: %v, last error: %v", ctx.Err(), lastErr)
+        case <-time.After(time.Duration(i+1) * time.Second):
+            continue // 指数退避重试
+        }
     }
     
     return nil, fmt.Errorf("获取JS-SDK配置失败，重试%d次后仍然失败: %v", maxRetries, lastErr)
 }
 ```
 
-### 3. 安全考虑
+### 3. 缓存统计和监控
 
 ```go
-// URL验证
-func (jm *JSSDKManager) validateURL(url string) error {
-    parsedURL, err := url.Parse(url)
-    if err != nil {
-        return fmt.Errorf("URL格式错误: %v", err)
-    }
+// 获取缓存统计信息
+stats := jsSDKManager.cacher.GetStats()
+fmt.Printf("缓存命中率: %.2f%%\n", float64(stats.Hits)/float64(stats.Hits+stats.Misses)*100)
+fmt.Printf("总缓存项: %d\n", stats.TotalItems)
+fmt.Printf("缓存淘汰: %d\n", stats.Evictions)
+
+// 定期清理过期缓存
+go func() {
+    ticker := time.NewTicker(1 * time.Hour)
+    defer ticker.Stop()
     
-    // 验证域名是否在白名单中
-    if !isDomainInWhitelist(parsedURL.Hostname()) {
-        return fmt.Errorf("域名不在白名单中: %s", parsedURL.Hostname())
+    for range ticker.C {
+        jsSDKManager.cacher.CleanupExpired()
+        log.Printf("缓存清理完成，当前统计: %+v", jsSDKManager.cacher.GetStats())
     }
-    
-    // 验证协议是否为HTTPS（生产环境）
-    if parsedURL.Scheme != "https" && !isDevelopmentEnvironment() {
-        return fmt.Errorf("生产环境必须使用HTTPS协议")
+}()
+```
+
+### 4. 错误处理增强
+
+```go
+// 使用标准错误类型进行错误判断
+config, err := jsSDKManager.GetConfig(ctx, url, jsAPIList)
+if err != nil {
+    switch {
+    case errors.Is(err, ErrInvalidURL):
+        log.Printf("URL格式错误: %v", err)
+    case errors.Is(err, ErrEmptyJSAPIList):
+        log.Printf("JSAPI列表为空")
+    case errors.Is(err, ErrCacheMiss):
+        log.Printf("缓存未命中，重新获取")
+    default:
+        log.Printf("获取配置失败: %v", err)
     }
-    
-    return nil
 }
 ```
 

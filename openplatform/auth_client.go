@@ -7,6 +7,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -20,6 +21,17 @@ import (
 
 	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/official_account"
+)
+
+// 标准错误定义
+var (
+	ErrInvalidURL        = errors.New("invalid URL format")
+	ErrEmptyJSAPIList    = errors.New("JSAPI list cannot be empty")
+	ErrEmptyAppID        = errors.New("authorizer AppID cannot be empty")
+	ErrCacheMiss         = errors.New("cache miss or expired")
+	ErrInvalidMaxRetries = errors.New("max retries must be greater than 0")
+	ErrTicketFetchFailed = errors.New("failed to fetch JSAPI ticket")
+	ErrAccessTokenFailed = errors.New("failed to get authorizer access token")
 )
 
 // AuthClient 授权相关客户端
@@ -417,53 +429,123 @@ func (c *AuthorizerClient) CallAPIWithRetry(ctx context.Context, apiURL string, 
 	return nil, fmt.Errorf("API调用重试%d次后失败", maxRetries)
 }
 
+// CacheStats 缓存统计信息
+type CacheStats struct {
+	Hits       int64 // 缓存命中次数
+	Misses     int64 // 缓存未命中次数
+	Evictions  int64 // 缓存淘汰次数
+	TotalItems int64 // 总缓存项数
+}
+
 // JSSDKCacher JS-SDK配置缓存器
 type JSSDKCacher struct {
 	cache sync.Map
+	stats CacheStats
+	mu    sync.RWMutex
 }
 
-// GetCachedConfig 获取缓存的JS-SDK配置
+// GetCachedConfig 获取缓存的JS-SDK配置 - 带统计功能
 func (c *JSSDKCacher) GetCachedConfig(url string, jsAPIList []string) (*JSSDKConfig, error) {
 	cacheKey := c.generateCacheKey(url, jsAPIList)
 
 	if cached, exists := c.cache.Load(cacheKey); exists {
 		if config, ok := cached.(*JSSDKConfig); ok {
-			return config, nil
+			// 检查配置是否过期（7200秒有效期）
+			if time.Now().Unix()-config.Timestamp < 7200 {
+				c.mu.Lock()
+				c.stats.Hits++
+				c.mu.Unlock()
+				return config, nil
+			}
 		}
 	}
 
-	return nil, fmt.Errorf("缓存未命中")
+	c.mu.Lock()
+	c.stats.Misses++
+	c.mu.Unlock()
+	return nil, fmt.Errorf("%w: 缓存未命中或已过期", ErrCacheMiss)
 }
 
-// CacheConfig 缓存JS-SDK配置
+// CacheConfig 缓存JS-SDK配置 - 带统计功能
 func (c *JSSDKCacher) CacheConfig(url string, jsAPIList []string, config *JSSDKConfig) {
 	cacheKey := c.generateCacheKey(url, jsAPIList)
 	c.cache.Store(cacheKey, config)
+
+	c.mu.Lock()
+	c.stats.TotalItems++
+	c.mu.Unlock()
 }
 
-// generateCacheKey 生成缓存键
+// GetStats 获取缓存统计信息
+func (c *JSSDKCacher) GetStats() CacheStats {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.stats
+}
+
+// CleanupExpired 清理过期缓存
+func (c *JSSDKCacher) CleanupExpired() {
+	expiredCount := 0
+	now := time.Now().Unix()
+
+	c.cache.Range(func(key, value interface{}) bool {
+		if config, ok := value.(*JSSDKConfig); ok {
+			if now-config.Timestamp >= 7200 { // 7200秒有效期
+				c.cache.Delete(key)
+				expiredCount++
+			}
+		}
+		return true
+	})
+
+	c.mu.Lock()
+	c.stats.Evictions += int64(expiredCount)
+	c.stats.TotalItems -= int64(expiredCount)
+	if c.stats.TotalItems < 0 {
+		c.stats.TotalItems = 0
+	}
+	c.mu.Unlock()
+}
+
+// generateCacheKey 生成缓存键 - 性能优化版本
 func (c *JSSDKCacher) generateCacheKey(url string, jsAPIList []string) string {
+	var builder strings.Builder
+	builder.Grow(len(url) + len(jsAPIList)*20 + 1)
+
+	builder.WriteString(url)
+	builder.WriteString("|")
+
 	sortedAPIs := make([]string, len(jsAPIList))
 	copy(sortedAPIs, jsAPIList)
 	sort.Strings(sortedAPIs)
 
-	keyData := url + "|" + strings.Join(sortedAPIs, ",")
+	for i, api := range sortedAPIs {
+		if i > 0 {
+			builder.WriteString(",")
+		}
+		builder.WriteString(api)
+	}
 
-	hash := sha1.Sum([]byte(keyData))
+	hash := sha1.Sum([]byte(builder.String()))
 	return hex.EncodeToString(hash[:])
 }
 
 // GetConfigOptimized 优化后的JS-SDK配置获取
-func (jm *JSSDKManager) GetConfigOptimized(url string, jsAPIList []string) (*JSSDKConfig, error) {
+func (jm *JSSDKManager) GetConfigOptimized(ctx context.Context, url string, jsAPIList []string) (*JSSDKConfig, error) {
 	// 验证参数
 	if url == "" {
-		return nil, fmt.Errorf("URL不能为空")
+		return nil, fmt.Errorf("%w: URL不能为空", ErrInvalidURL)
 	}
 	if len(jsAPIList) == 0 {
-		return nil, fmt.Errorf("JSAPI列表不能为空")
+		return nil, fmt.Errorf("%w: JSAPI列表不能为空", ErrEmptyJSAPIList)
 	}
 	if jm.authorizerClient.authorizerAppID == "" {
-		return nil, fmt.Errorf("授权方AppID不能为空")
+		return nil, fmt.Errorf("%w: 授权方AppID不能为空", ErrEmptyAppID)
+	}
+
+	// 验证URL
+	if err := jm.validateURL(url); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidURL, err)
 	}
 
 	// 先尝试从缓存获取
@@ -472,15 +554,14 @@ func (jm *JSSDKManager) GetConfigOptimized(url string, jsAPIList []string) (*JSS
 	}
 
 	// 缓存未命中，重新生成配置
-	ctx := context.Background()
 	accessToken, err := jm.authorizerClient.authClient.client.GetAuthorizerAccessToken(ctx, jm.authorizerClient.authorizerAppID)
 	if err != nil {
-		return nil, fmt.Errorf("获取AccessToken失败: %v", err)
+		return nil, fmt.Errorf("%w: %v", ErrAccessTokenFailed, err)
 	}
 
 	ticket, err := jm.getJSAPITicket(ctx, accessToken)
 	if err != nil {
-		return nil, fmt.Errorf("获取JSAPI Ticket失败: %v", err)
+		return nil, fmt.Errorf("%w: %v", ErrTicketFetchFailed, err)
 	}
 
 	config := jm.generateSignature(url, ticket, jsAPIList)
@@ -492,44 +573,65 @@ func (jm *JSSDKManager) GetConfigOptimized(url string, jsAPIList []string) (*JSS
 }
 
 // GetConfigWithRetry 带重试的JS-SDK配置获取
-func (jm *JSSDKManager) GetConfigWithRetry(url string, jsAPIList []string, maxRetries int) (*JSSDKConfig, error) {
+func (jm *JSSDKManager) GetConfigWithRetry(ctx context.Context, url string, jsAPIList []string, maxRetries int) (*JSSDKConfig, error) {
 	// 验证参数
 	if url == "" {
-		return nil, fmt.Errorf("URL不能为空")
+		return nil, fmt.Errorf("%w: URL不能为空", ErrInvalidURL)
 	}
 	if len(jsAPIList) == 0 {
-		return nil, fmt.Errorf("JSAPI列表不能为空")
+		return nil, fmt.Errorf("%w: JSAPI列表不能为空", ErrEmptyJSAPIList)
 	}
 	if jm.authorizerClient.authorizerAppID == "" {
-		return nil, fmt.Errorf("授权方AppID不能为空")
+		return nil, fmt.Errorf("%w: 授权方AppID不能为空", ErrEmptyAppID)
 	}
 	if maxRetries <= 0 {
-		return nil, fmt.Errorf("重试次数必须大于0")
+		return nil, fmt.Errorf("%w: 重试次数必须大于0", ErrInvalidMaxRetries)
+	}
+
+	// 验证URL
+	if err := jm.validateURL(url); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidURL, err)
 	}
 
 	var lastErr error
 
 	for i := 0; i < maxRetries; i++ {
-		config, err := jm.GetConfigOptimized(url, jsAPIList)
+		config, err := jm.GetConfigOptimized(ctx, url, jsAPIList)
 		if err == nil {
 			return config, nil
 		}
 
 		lastErr = err
-		time.Sleep(time.Duration(i+1) * time.Second) // 指数退避
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("%w: %v", ctx.Err(), lastErr)
+		case <-time.After(time.Duration(i+1) * time.Second): // 指数退避
+			continue
+		}
 	}
 
-	return nil, fmt.Errorf("获取JS-SDK配置失败，重试%d次后仍然失败: %v", maxRetries, lastErr)
+	return nil, fmt.Errorf("%w: 重试%d次后仍然失败: %v", ErrTicketFetchFailed, maxRetries, lastErr)
 }
 
-// validateURL 验证URL格式
-func (jm *JSSDKManager) validateURL(url string) error {
-	if url == "" {
+// validateURL 验证URL
+func (jm *JSSDKManager) validateURL(urlStr string) error {
+	if urlStr == "" {
 		return fmt.Errorf("URL不能为空")
 	}
 
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		return fmt.Errorf("URL必须以http://或https://开头")
+	// 验证URL格式
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("URL格式错误: %v", err)
+	}
+
+	if parsedURL.Host == "" {
+		return fmt.Errorf("URL缺少主机名")
+	}
+
+	// 验证协议
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("URL必须使用http或https协议")
 	}
 
 	return nil
@@ -966,25 +1068,30 @@ type JSSDKConfig struct {
 func (jm *JSSDKManager) GetConfig(ctx context.Context, url string, jsAPIList []string) (*JSSDKConfig, error) {
 	// 验证参数
 	if url == "" {
-		return nil, fmt.Errorf("URL不能为空")
+		return nil, fmt.Errorf("%w: URL不能为空", ErrInvalidURL)
 	}
 	if len(jsAPIList) == 0 {
-		return nil, fmt.Errorf("JSAPI列表不能为空")
+		return nil, fmt.Errorf("%w: JSAPI列表不能为空", ErrEmptyJSAPIList)
 	}
 	if jm.authorizerClient.authorizerAppID == "" {
-		return nil, fmt.Errorf("授权方AppID不能为空")
+		return nil, fmt.Errorf("%w: 授权方AppID不能为空", ErrEmptyAppID)
+	}
+
+	// 验证URL
+	if err := jm.validateURL(url); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidURL, err)
 	}
 
 	// 获取授权方AccessToken
 	accessToken, err := jm.authorizerClient.authClient.client.GetAuthorizerAccessToken(ctx, jm.authorizerClient.authorizerAppID)
 	if err != nil {
-		return nil, fmt.Errorf("获取AccessToken失败: %v", err)
+		return nil, fmt.Errorf("%w: %v", ErrAccessTokenFailed, err)
 	}
 
 	// 获取JSAPI Ticket
 	ticket, err := jm.getJSAPITicket(ctx, accessToken)
 	if err != nil {
-		return nil, fmt.Errorf("获取JSAPI Ticket失败: %v", err)
+		return nil, fmt.Errorf("%w: %v", ErrTicketFetchFailed, err)
 	}
 
 	// 生成签名
@@ -1016,11 +1123,15 @@ func (jm *JSSDKManager) getJSAPITicket(ctx context.Context, accessToken string) 
 		Result: &result,
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("调用微信API获取JSAPI Ticket失败: %v", err)
 	}
 
 	if result.ErrCode != 0 {
-		return "", fmt.Errorf("获取JSAPI Ticket失败: %s", result.ErrMsg)
+		return "", fmt.Errorf("获取JSAPI Ticket失败，错误码: %d, 错误信息: %s", result.ErrCode, result.ErrMsg)
+	}
+
+	if result.Ticket == "" {
+		return "", fmt.Errorf("获取JSAPI Ticket失败，返回票据为空")
 	}
 
 	return result.Ticket, nil
@@ -1047,13 +1158,23 @@ func (jm *JSSDKManager) generateSignature(url, ticket string, jsAPIList []string
 	}
 }
 
-// generateNonceStr 生成随机字符串
+var (
+	randSrc = rand.NewSource(time.Now().UnixNano())
+	randGen = rand.New(randSrc)
+	randMu  sync.Mutex
+)
+
+// generateNonceStr 生成随机字符串 - 线程安全版本
 func generateNonceStr() string {
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	bts := make([]byte, 16)
+
+	randMu.Lock()
 	for i := range bts {
-		bts[i] = letters[rand.Intn(len(letters))]
+		bts[i] = letters[randGen.Intn(len(letters))]
 	}
+	randMu.Unlock()
+
 	return string(bts)
 }
 
