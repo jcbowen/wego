@@ -60,7 +60,18 @@ func (a *DebuggerLoggerAdapter) WithFields(fields map[string]interface{}) Logger
 }
 
 func (a *DebuggerLoggerAdapter) GetLevel() debugger.LogLevel {
-    return a.debuggerLogger.GetLevel()
+	return a.debuggerLogger.GetLevel()
+}
+
+// GetLogs 获取收集的日志信息
+// @return []debugger.LoggerLog 日志记录列表
+func (a *DebuggerLoggerAdapter) GetLogs() []debugger.LoggerLog {
+	return a.debuggerLogger.GetLogs()
+}
+
+// ClearLogs 清空收集的日志信息
+func (a *DebuggerLoggerAdapter) ClearLogs() {
+	a.debuggerLogger.ClearLogs()
 }
 
 // IsDebuggerLogger 检查是否为debugger logger实例
@@ -127,5 +138,13 @@ func (a *wegoLoggerToDebuggerAdapter) WithFields(fields map[string]interface{}) 
 }
 
 func (a *wegoLoggerToDebuggerAdapter) GetLevel() debugger.LogLevel {
-    return a.wegoLogger.GetLevel()
+	return a.wegoLogger.GetLevel()
+}
+
+func (a *wegoLoggerToDebuggerAdapter) GetLogs() []debugger.LoggerLog {
+	return a.wegoLogger.GetLogs()
+}
+
+func (a *wegoLoggerToDebuggerAdapter) ClearLogs() {
+	a.wegoLogger.ClearLogs()
 }
