@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jcbowen/jcbaseGo"
@@ -27,6 +28,7 @@ func NewSqliteStorage(conf jcbaseGo.SqlLiteStruct, opts ...string) (*SqliteStora
 		&DBAuthorizerTokenSqlite{},
 		&DBPrevEncodingAESKeySqlite{},
 		&DBComponentVerifyTicketSqlite{},
+		&DBWechatPayCertificateSqlite{},
 	); err != nil {
 		return nil, err
 	}
@@ -67,8 +69,8 @@ type DBAuthorizerTokenSqlite struct {
 
 type DBPrevEncodingAESKeySqlite struct {
 	base.SqliteBaseModel
-	ID              uint      `gorm:"primaryKey"`
-	AppID           string    `gorm:"type:varchar(64);not null;uniqueIndex"`
+	ID              uint      `gorm:"column:id;primaryKey;autoIncrement"`
+	AppID           string    `gorm:"column:app_id;type:varchar(64);not null;uniqueIndex"`
 	PrevEncodingKey string    `gorm:"column:prev_encoding_key;type:varchar(256);not null" json:"prev_encoding_key"`
 	CreatedAt       time.Time `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt       time.Time `gorm:"column:updated_at" json:"updated_at"`
@@ -80,6 +82,17 @@ type DBComponentVerifyTicketSqlite struct {
 	Ticket    string    `gorm:"column:ticket;type:varchar(512);not null" json:"ticket"`
 	ExpiresAt time.Time `gorm:"column:expires_at" json:"expires_at"`
 	CreatedAt time.Time `gorm:"column:created_at" json:"created_at"`
+}
+
+type DBWechatPayCertificateSqlite struct {
+	base.SqliteBaseModel
+	ID          uint      `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	MchID       string    `gorm:"column:mch_id;type:varchar(64);not null;uniqueIndex:idx_mch_serial" json:"mch_id"`
+	SerialNo    string    `gorm:"column:serial_no;type:varchar(64);not null;uniqueIndex:idx_mch_serial" json:"serial_no"`
+	Certificate string    `gorm:"column:certificate;type:TEXT;not null" json:"certificate"`
+	ExpiresAt   time.Time `gorm:"column:expires_at;not null;index" json:"expires_at"`
+	CreatedAt   time.Time `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"column:updated_at" json:"updated_at"`
 }
 
 func (s *SqliteStorage) SaveComponentToken(ctx context.Context, token *ComponentAccessToken) error {
@@ -219,9 +232,9 @@ func (s *SqliteStorage) GetPrevEncodingAESKey(ctx context.Context, appID string)
 		return nil, err
 	}
 	return &PrevEncodingAESKey{
-		AppID:              appID,
+		AppID:              dbKey.AppID,
 		PrevEncodingAESKey: dbKey.PrevEncodingKey,
-		UpdatedAt:          time.Now(),
+		UpdatedAt:          dbKey.UpdatedAt,
 	}, nil
 }
 
@@ -261,4 +274,87 @@ func (s *SqliteStorage) GetComponentVerifyTicket(ctx context.Context) (*Componen
 
 func (s *SqliteStorage) DeleteComponentVerifyTicket(ctx context.Context) error {
 	return s.db.Where("1 = 1").Delete(&DBComponentVerifyTicketSqlite{}).Error
+}
+
+func (s *SqliteStorage) SaveWechatPayCert(ctx context.Context, mchID string, cert *WechatPayCertificate) error {
+	if mchID == "" {
+		return fmt.Errorf("mchID cannot be empty")
+	}
+	if cert == nil {
+		return fmt.Errorf("cert cannot be nil")
+	}
+
+	return s.db.Where(DBWechatPayCertificateSqlite{MchID: mchID, SerialNo: cert.SerialNo}).
+		Assign(DBWechatPayCertificateSqlite{
+			Certificate: cert.Certificate,
+			ExpiresAt:   cert.ExpiresAt,
+		}).
+		FirstOrCreate(&DBWechatPayCertificateSqlite{}, DBWechatPayCertificateSqlite{MchID: mchID, SerialNo: cert.SerialNo}).Error
+}
+
+func (s *SqliteStorage) GetWechatPayCert(ctx context.Context, mchID, serialNo string) (*WechatPayCertificate, error) {
+	if mchID == "" || serialNo == "" {
+		return nil, fmt.Errorf("mchID and serialNo cannot be empty")
+	}
+
+	var dbCert DBWechatPayCertificateSqlite
+	if err := s.db.Where("mch_id = ? AND serial_no = ?", mchID, serialNo).First(&dbCert).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &WechatPayCertificate{
+		MchID:       dbCert.MchID,
+		SerialNo:    dbCert.SerialNo,
+		Certificate: dbCert.Certificate,
+		ExpiresAt:   dbCert.ExpiresAt,
+	}, nil
+}
+
+func (s *SqliteStorage) GetLatestWechatPayCert(ctx context.Context, mchID string) (*WechatPayCertificate, error) {
+	if mchID == "" {
+		return nil, fmt.Errorf("mchID cannot be empty")
+	}
+
+	var dbCert DBWechatPayCertificateSqlite
+	if err := s.db.Where("mch_id = ?", mchID).Order("expires_at DESC").First(&dbCert).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &WechatPayCertificate{
+		MchID:       dbCert.MchID,
+		SerialNo:    dbCert.SerialNo,
+		Certificate: dbCert.Certificate,
+		ExpiresAt:   dbCert.ExpiresAt,
+	}, nil
+}
+
+func (s *SqliteStorage) DeleteWechatPayCert(ctx context.Context, mchID, serialNo string) error {
+	if mchID == "" || serialNo == "" {
+		return fmt.Errorf("mchID and serialNo cannot be empty")
+	}
+
+	return s.db.Where("mch_id = ? AND serial_no = ?", mchID, serialNo).Delete(&DBWechatPayCertificateSqlite{}).Error
+}
+
+func (s *SqliteStorage) ListWechatPayCertSerialNos(ctx context.Context, mchID string) ([]string, error) {
+	if mchID == "" {
+		return nil, fmt.Errorf("mchID cannot be empty")
+	}
+
+	var certs []DBWechatPayCertificateSqlite
+	if err := s.db.Where("mch_id = ?", mchID).Select("serial_no").Find(&certs).Error; err != nil {
+		return nil, err
+	}
+
+	serialNos := make([]string, len(certs))
+	for i, cert := range certs {
+		serialNos[i] = cert.SerialNo
+	}
+	return serialNos, nil
 }

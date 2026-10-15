@@ -1,7 +1,7 @@
 package logger
 
 import (
-    "github.com/jcbowen/jcbaseGo/component/debugger"
+	"github.com/jcbowen/jcbaseGo/component/debugger"
 )
 
 // NewLogger 创建日志记录器实例
@@ -25,10 +25,10 @@ import (
 //
 // 注意：此函数设计用于支持平滑迁移，可以逐步替换debugger依赖
 func NewLogger(logger debugger.LoggerInterface) LoggerInterface {
-    if logger != nil {
-        return logger // 直接使用传入的debugger logger
-    }
-    return NewDefaultLoggerInterface() // 否则使用独立的默认实现
+	if logger != nil {
+		return logger // 直接使用传入的debugger logger
+	}
+	return NewDefaultLoggerInterface() // 否则使用独立的默认实现
 }
 
 // NewDefaultLoggerInterface 创建默认日志记录器接口实例
@@ -41,10 +41,10 @@ func NewLogger(logger debugger.LoggerInterface) LoggerInterface {
 //	logger := logger.NewDefaultLoggerInterface()
 //	logger.Info("应用启动")
 func NewDefaultLoggerInterface() LoggerInterface {
-    return &DefaultLogger{
-        level:  debugger.LevelInfo,
-        fields: make(map[string]interface{}),
-    }
+	return &DefaultLogger{
+		level:  debugger.LevelInfo,
+		fields: make(map[string]interface{}),
+	}
 }
 
 // NewLoggerWithLevel 创建指定级别的日志记录器实例
@@ -57,9 +57,9 @@ func NewDefaultLoggerInterface() LoggerInterface {
 //	logger := logger.NewLoggerWithLevel(debugger.LevelInfo)
 //	logger.Info("调试信息")
 func NewLoggerWithLevel(level debugger.LogLevel) *DefaultLogger {
-    logger := NewDefaultLogger()
-    logger.SetLevel(level)
-    return logger
+	logger := NewDefaultLogger()
+	logger.SetLevel(level)
+	return logger
 }
 
 // NewLoggerWithFields 创建带有初始字段的日志记录器实例
@@ -72,7 +72,7 @@ func NewLoggerWithLevel(level debugger.LogLevel) *DefaultLogger {
 //	logger := logger.NewLoggerWithFields(map[string]interface{}{"app": "wego"})
 //	logger.Info("应用启动")
 func NewLoggerWithFields(fields map[string]interface{}) *DefaultLogger {
-    logger := NewDefaultLogger()
-    logger.fields = fields
-    return logger
+	logger := NewDefaultLogger()
+	logger.fields = fields
+	return logger
 }

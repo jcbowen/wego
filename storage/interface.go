@@ -42,6 +42,14 @@ type PrevEncodingAESKey struct {
 	UpdatedAt          time.Time `json:"updated_at"`            // 更新时间
 }
 
+// WechatPayCertificate 微信支付平台证书存储结构
+type WechatPayCertificate struct {
+	MchID       string    `json:"mch_id"`      // 商户号
+	SerialNo    string    `json:"serial_no"`   // 证书序列号
+	Certificate string    `json:"certificate"` // 证书内容（PEM 格式）
+	ExpiresAt   time.Time `json:"expires_at"`  // 证书过期时间
+}
+
 // TokenStorage 令牌存储接口
 type TokenStorage interface {
 	// 组件令牌相关方法
@@ -70,6 +78,13 @@ type TokenStorage interface {
 	SavePrevEncodingAESKey(ctx context.Context, appID string, prevKey string) error
 	GetPrevEncodingAESKey(ctx context.Context, appID string) (*PrevEncodingAESKey, error)
 	DeletePrevEncodingAESKey(ctx context.Context, appID string) error
+
+	// 微信支付平台证书相关方法
+	SaveWechatPayCert(ctx context.Context, mchID string, cert *WechatPayCertificate) error
+	GetWechatPayCert(ctx context.Context, mchID, serialNo string) (*WechatPayCertificate, error)
+	GetLatestWechatPayCert(ctx context.Context, mchID string) (*WechatPayCertificate, error)
+	DeleteWechatPayCert(ctx context.Context, mchID, serialNo string) error
+	ListWechatPayCertSerialNos(ctx context.Context, mchID string) ([]string, error)
 
 	// 存储健康检查
 	Ping(ctx context.Context) error

@@ -13,12 +13,26 @@ import (
 	"github.com/jcbowen/wego/logger"
 )
 
+// VerifyResponseFunc 响应验证回调函数类型
+type VerifyResponseFunc func(ctx context.Context, statusCode int, headers http.Header, body []byte) error
+
+// ErrorParserFunc 非 2xx 响应的错误解析回调类型
+//
+// 说明:
+//   - 返回 nil 表示响应体不是该服务的错误格式，由调用方回退到通用错误
+//   - 微信支付 V3 等接口在 4xx/5xx 时会返回结构化错误 JSON，需解析后供业务判断
+type ErrorParserFunc func(statusCode int, headers http.Header, body []byte) error
+
 type ReqMakeOpt struct {
-	Method string      // HTTP方法，如GET、POST等
-	URL    string      // 请求URL
-	Query  interface{} // 查询参数，支持map[string]string或结构体
-	Body   interface{} // 请求体
-	Result interface{} // 响应体，需要传入指针
+	Method         string             // HTTP方法，如GET、POST等
+	URL            string             // 请求URL
+	Query          interface{}        // 查询参数，支持map[string]string或结构体
+	Body           interface{}        // 请求体
+	Result         interface{}        // 响应体，需要传入指针
+	RawResult      *[]byte            // 原始响应体接收器，非 nil 时跳过 JSON 解析（如下载账单文件）
+	Headers        map[string]string  // 自定义请求头，可选
+	VerifyResponse VerifyResponseFunc // 响应验证回调，可选
+	ErrorParser    ErrorParserFunc    // 非 2xx 响应的错误解析回调，可选
 }
 
 type Request struct {
@@ -61,7 +75,7 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 		if len(queryMap) > 0 {
 			parsedURL, err := url.Parse(requestURL)
 			if err != nil {
-				return fmt.Errorf("解析URL失败: %v", err)
+				return fmt.Errorf("解析URL失败: %w", err)
 			}
 
 			// 构建查询参数
@@ -76,25 +90,41 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 
 	var reqBody []byte
 	if body != nil {
-		var err error
-		reqBody, err = json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("序列化请求体失败: %v", err)
+		switch v := body.(type) {
+		case []byte:
+			reqBody = v
+		case io.Reader:
+			var err error
+			reqBody, err = io.ReadAll(v)
+			if err != nil {
+				return fmt.Errorf("读取请求体失败: %w", err)
+			}
+		default:
+			var err error
+			reqBody, err = json.Marshal(body)
+			if err != nil {
+				return fmt.Errorf("序列化请求体失败: %w", err)
+			}
 		}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, requestURL, bytes.NewReader(reqBody))
 	if err != nil {
-		return fmt.Errorf("创建请求失败: %v", err)
+		return fmt.Errorf("创建请求失败: %w", err)
 	}
 
-	// 设置请求头
+	// 设置默认 Content-Type（有请求体时）
 	if len(reqBody) > 0 {
 		req.Header.Set("Content-Type", "application/json")
 	}
 
+	// 设置自定义请求头（覆盖默认值）
+	for key, value := range options.Headers {
+		req.Header.Set(key, value)
+	}
+
 	// 记录请求日志
-    r.logger.Info(fmt.Sprintf("发送HTTP请求 - Method: %s URL: %s", req.Method, req.URL.String()), map[string]interface{}{
+	r.logger.Info(fmt.Sprintf("发送HTTP请求 - Method: %s URL: %s", req.Method, req.URL.String()), map[string]interface{}{
 		"request_method":  req.Method,
 		"request_url":     req.URL.String(),
 		"request_headers": req.Header,
@@ -106,7 +136,7 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 		r.logger.Error(fmt.Sprintf("发送请求失败: %v", err), map[string]interface{}{
 			"url": requestURL,
 		})
-		return fmt.Errorf("发送请求失败: %v", err)
+		return fmt.Errorf("发送请求失败: %w", err)
 	}
 	defer func(Body io.ReadCloser) {
 		if closeErr := Body.Close(); closeErr != nil {
@@ -119,11 +149,11 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 		r.logger.Error(fmt.Sprintf("读取响应体失败: %v", err), map[string]interface{}{
 			"status_code": resp.StatusCode,
 		})
-		return fmt.Errorf("读取响应体失败: %v", err)
+		return fmt.Errorf("读取响应体失败: %w", err)
 	}
 
 	// 记录响应日志
-    r.logger.Info(fmt.Sprintf("HTTP响应 - 状态码: %d, 内容长度: %d", resp.StatusCode, len(respBody)), map[string]interface{}{
+	r.logger.Info(fmt.Sprintf("HTTP响应 - 状态码: %d, 内容长度: %d", resp.StatusCode, len(respBody)), map[string]interface{}{
 		"status_code":     resp.StatusCode,
 		"response_length": len(respBody),
 		"response_body":   string(respBody),
@@ -134,13 +164,32 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 		r.logger.Error(fmt.Sprintf("HTTP请求失败 - 状态码: %d, 响应: %s", resp.StatusCode, string(respBody)), map[string]interface{}{
 			"status_code": resp.StatusCode,
 		})
+		// 优先使用业务方提供的错误解析，便于区分错误码（如微信支付 ORDER_PAID）
+		if options.ErrorParser != nil {
+			if parsed := options.ErrorParser(resp.StatusCode, resp.Header, respBody); parsed != nil {
+				return parsed
+			}
+		}
 		return fmt.Errorf("HTTP请求失败 - 状态码: %d, 响应: %s", resp.StatusCode, string(respBody))
+	}
+
+	// 执行响应验证
+	if options.VerifyResponse != nil {
+		if err := options.VerifyResponse(ctx, resp.StatusCode, resp.Header, respBody); err != nil {
+			return fmt.Errorf("响应验证失败: %w", err)
+		}
+	}
+
+	// 原始响应体优先，供非 JSON 响应（如账单文件流）使用
+	if options.RawResult != nil {
+		*options.RawResult = respBody
+		return nil
 	}
 
 	// 处理空响应
 	if len(respBody) == 0 {
 		if result != nil {
-            r.logger.Info("响应体为空，跳过JSON解析")
+			r.logger.Info("响应体为空，跳过JSON解析")
 		}
 		return nil
 	}
@@ -149,7 +198,7 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 	if result != nil {
 		if err = json.Unmarshal(respBody, result); err != nil {
 			r.logger.Error(fmt.Sprintf("解析响应失败: %v, 响应内容: %s", err, string(respBody)))
-			return fmt.Errorf("解析响应失败: %v", err)
+			return fmt.Errorf("解析响应失败: %w", err)
 		}
 	}
 
@@ -160,7 +209,7 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 func (r *Request) MakeRaw(req *http.Request) (*http.Response, error) {
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("发送请求失败: %v", err)
+		return nil, fmt.Errorf("发送请求失败: %w", err)
 	}
 	return resp, nil
 }

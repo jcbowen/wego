@@ -45,9 +45,9 @@ func TestInfoLogging(t *testing.T) {
 	out := captureStdout(func() {
 		l.Info("hello", map[string]interface{}{"k": "v"})
 	})
-    if !strings.Contains(out, "info") || !strings.Contains(out, "hello") {
-        t.Fatalf("expected INFO log with message, got: %s", out)
-    }
+	if !strings.Contains(out, "info") || !strings.Contains(out, "hello") {
+		t.Fatalf("expected INFO log with message, got: %s", out)
+	}
 }
 
 func TestWarnFilter(t *testing.T) {
@@ -58,18 +58,18 @@ func TestWarnFilter(t *testing.T) {
 		t.Fatalf("expected no info output at warn level, got: %s", outInfo)
 	}
 	outWarn := captureStderr(func() { l.Warn("w") })
-    if !strings.Contains(outWarn, "warn") {
-        t.Fatalf("expected WARN output, got: %s", outWarn)
-    }
+	if !strings.Contains(outWarn, "warn") {
+		t.Fatalf("expected WARN output, got: %s", outWarn)
+	}
 }
 
 func TestErrorToStderr(t *testing.T) {
 	l := NewDefaultLogger()
 	l.SetLevel(debugger.LevelError)
 	outErr := captureStderr(func() { l.Error("e") })
-    if !strings.Contains(outErr, "error") {
-        t.Fatalf("expected ERROR output, got: %s", outErr)
-    }
+	if !strings.Contains(outErr, "error") {
+		t.Fatalf("expected ERROR output, got: %s", outErr)
+	}
 	outInfo := captureStdout(func() { l.Info("i") })
 	if outInfo != "" {
 		t.Fatalf("expected no info output at error level, got: %s", outInfo)

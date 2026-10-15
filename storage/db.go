@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jcbowen/jcbaseGo"
@@ -40,6 +41,7 @@ func NewDBStorage(dbConfig jcbaseGo.DbStruct, opts ...string) (*DBStorage, error
 		&DBAuthorizerToken{},
 		&DBPrevEncodingAESKey{},
 		&DBComponentVerifyTicket{},
+		&DBWechatPayCertificate{},
 	); err != nil {
 		return nil, err
 	}
@@ -89,8 +91,8 @@ type DBAuthorizerToken struct {
 type DBPrevEncodingAESKey struct {
 	base.MysqlBaseModel
 
-	ID              uint      `gorm:"primaryKey"`
-	AppID           string    `gorm:"type:varchar(64);not null;uniqueIndex"`
+	ID              uint      `gorm:"column:id;type:INT(11) UNSIGNED;primaryKey;autoIncrement"`
+	AppID           string    `gorm:"column:app_id;type:varchar(64);not null;uniqueIndex"`
 	PrevEncodingKey string    `gorm:"column:prev_encoding_key;type:varchar(256);not null;comment:上一次EncodingAESKey" json:"prev_encoding_key"`
 	CreatedAt       time.Time `gorm:"column:created_at;type:DATETIME;default:NULL;comment:创建时间" json:"created_at"`
 	UpdatedAt       time.Time `gorm:"column:updated_at;type:DATETIME;default:NULL;comment:更新时间" json:"updated_at"`
@@ -104,6 +106,19 @@ type DBComponentVerifyTicket struct {
 	Ticket    string    `gorm:"column:ticket;type:varchar(512);not null;comment:票据内容" json:"ticket"`                    // 票据内容
 	ExpiresAt time.Time `gorm:"column:expires_at;type:DATETIME;default:NULL;comment:过期时间（创建时间+12小时）" json:"expires_at"` // 过期时间（创建时间+12小时）
 	CreatedAt time.Time `gorm:"column:created_at;type:DATETIME;default:NULL;comment:创建时间" json:"created_at"`            // 创建时间
+}
+
+// DBWechatPayCertificate 微信支付平台证书数据库模型
+type DBWechatPayCertificate struct {
+	base.MysqlBaseModel
+
+	ID          uint      `gorm:"column:id;type:INT(11) UNSIGNED;primaryKey;autoIncrement" json:"id"`
+	MchID       string    `gorm:"column:mch_id;type:varchar(64);not null;uniqueIndex:idx_mch_serial;comment:商户号" json:"mch_id"`
+	SerialNo    string    `gorm:"column:serial_no;type:varchar(64);not null;uniqueIndex:idx_mch_serial;comment:证书序列号" json:"serial_no"`
+	Certificate string    `gorm:"column:certificate;type:LONGTEXT;not null;comment:证书PEM内容" json:"certificate"`
+	ExpiresAt   time.Time `gorm:"column:expires_at;not null;index;comment:证书过期时间" json:"expires_at"`
+	CreatedAt   time.Time `gorm:"column:created_at;type:DATETIME;default:NULL;comment:创建时间" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;type:DATETIME;default:NULL;comment:更新时间" json:"updated_at"`
 }
 
 // SaveComponentToken 保存组件令牌到数据库
@@ -283,9 +298,9 @@ func (s *DBStorage) GetPrevEncodingAESKey(ctx context.Context, appID string) (*P
 	}
 
 	return &PrevEncodingAESKey{
-		AppID:              appID,
+		AppID:              dbKey.AppID,
 		PrevEncodingAESKey: dbKey.PrevEncodingKey,
-		UpdatedAt:          time.Now(),
+		UpdatedAt:          dbKey.UpdatedAt,
 	}, nil
 }
 
@@ -346,4 +361,133 @@ func (s *DBStorage) GetComponentVerifyTicket(ctx context.Context) (*ComponentVer
 // @return error 错误信息
 func (s *DBStorage) DeleteComponentVerifyTicket(ctx context.Context) error {
 	return s.db.Where("1 = 1").Delete(&DBComponentVerifyTicket{}).Error
+}
+
+// SaveWechatPayCert 保存微信支付平台证书到数据库
+//
+// 参数:
+//   - ctx: 上下文
+//   - mchID: 商户号
+//   - cert: 微信支付平台证书信息
+//
+// 返回:
+//   - error: 保存失败时返回错误
+func (s *DBStorage) SaveWechatPayCert(ctx context.Context, mchID string, cert *WechatPayCertificate) error {
+	if mchID == "" {
+		return fmt.Errorf("mchID cannot be empty")
+	}
+	if cert == nil {
+		return fmt.Errorf("cert cannot be nil")
+	}
+
+	return s.db.Where(DBWechatPayCertificate{MchID: mchID, SerialNo: cert.SerialNo}).
+		Assign(DBWechatPayCertificate{
+			Certificate: cert.Certificate,
+			ExpiresAt:   cert.ExpiresAt,
+		}).
+		FirstOrCreate(&DBWechatPayCertificate{}, DBWechatPayCertificate{MchID: mchID, SerialNo: cert.SerialNo}).Error
+}
+
+// GetWechatPayCert 从数据库读取指定序列号的微信支付平台证书
+//
+// 参数:
+//   - ctx: 上下文
+//   - mchID: 商户号
+//   - serialNo: 证书序列号
+//
+// 返回:
+//   - *WechatPayCertificate: 证书信息，不存在返回 nil
+//   - error: 查询失败时返回错误
+func (s *DBStorage) GetWechatPayCert(ctx context.Context, mchID, serialNo string) (*WechatPayCertificate, error) {
+	if mchID == "" || serialNo == "" {
+		return nil, fmt.Errorf("mchID and serialNo cannot be empty")
+	}
+
+	var dbCert DBWechatPayCertificate
+	if err := s.db.Where("mch_id = ? AND serial_no = ?", mchID, serialNo).First(&dbCert).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &WechatPayCertificate{
+		MchID:       dbCert.MchID,
+		SerialNo:    dbCert.SerialNo,
+		Certificate: dbCert.Certificate,
+		ExpiresAt:   dbCert.ExpiresAt,
+	}, nil
+}
+
+// GetLatestWechatPayCert 从数据库读取最新的微信支付平台证书
+//
+// 参数:
+//   - ctx: 上下文
+//   - mchID: 商户号
+//
+// 返回:
+//   - *WechatPayCertificate: 最新的证书信息，不存在返回 nil
+//   - error: 查询失败时返回错误
+func (s *DBStorage) GetLatestWechatPayCert(ctx context.Context, mchID string) (*WechatPayCertificate, error) {
+	if mchID == "" {
+		return nil, fmt.Errorf("mchID cannot be empty")
+	}
+
+	var dbCert DBWechatPayCertificate
+	if err := s.db.Where("mch_id = ?", mchID).Order("expires_at DESC").First(&dbCert).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &WechatPayCertificate{
+		MchID:       dbCert.MchID,
+		SerialNo:    dbCert.SerialNo,
+		Certificate: dbCert.Certificate,
+		ExpiresAt:   dbCert.ExpiresAt,
+	}, nil
+}
+
+// DeleteWechatPayCert 从数据库删除指定微信支付平台证书
+//
+// 参数:
+//   - ctx: 上下文
+//   - mchID: 商户号
+//   - serialNo: 证书序列号
+//
+// 返回:
+//   - error: 删除失败时返回错误
+func (s *DBStorage) DeleteWechatPayCert(ctx context.Context, mchID, serialNo string) error {
+	if mchID == "" || serialNo == "" {
+		return fmt.Errorf("mchID and serialNo cannot be empty")
+	}
+
+	return s.db.Where("mch_id = ? AND serial_no = ?", mchID, serialNo).Delete(&DBWechatPayCertificate{}).Error
+}
+
+// ListWechatPayCertSerialNos 列出数据库中指定商户的所有微信支付平台证书序列号
+//
+// 参数:
+//   - ctx: 上下文
+//   - mchID: 商户号
+//
+// 返回:
+//   - []string: 证书序列号列表
+//   - error: 查询失败时返回错误
+func (s *DBStorage) ListWechatPayCertSerialNos(ctx context.Context, mchID string) ([]string, error) {
+	if mchID == "" {
+		return nil, fmt.Errorf("mchID cannot be empty")
+	}
+
+	var certs []DBWechatPayCertificate
+	if err := s.db.Where("mch_id = ?", mchID).Select("serial_no").Find(&certs).Error; err != nil {
+		return nil, err
+	}
+
+	serialNos := make([]string, len(certs))
+	for i, cert := range certs {
+		serialNos[i] = cert.SerialNo
+	}
+	return serialNos, nil
 }

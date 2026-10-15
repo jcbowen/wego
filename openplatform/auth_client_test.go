@@ -9,13 +9,13 @@ import (
 func TestJSSDKNonceStr(t *testing.T) {
 	// 并发测试随机字符串生成
 	results := make(chan string, 100)
-	
+
 	for i := 0; i < 100; i++ {
 		go func() {
 			results <- generateNonceStr()
 		}()
 	}
-	
+
 	// 收集结果并检查唯一性
 	uniqueResults := make(map[string]bool)
 	for i := 0; i < 100; i++ {
@@ -25,7 +25,7 @@ func TestJSSDKNonceStr(t *testing.T) {
 				t.Errorf("发现重复的nonce字符串: %s", nonce)
 			}
 			uniqueResults[nonce] = true
-			
+
 			// 检查长度
 			if len(nonce) != 16 {
 				t.Errorf("nonce字符串长度不正确: got %d, want 16", len(nonce))
@@ -39,7 +39,7 @@ func TestJSSDKNonceStr(t *testing.T) {
 // TestJSSDKCacher 测试缓存功能
 func TestJSSDKCacher(t *testing.T) {
 	cacher := &JSSDKCacher{}
-	
+
 	// 测试缓存未命中
 	config := &JSSDKConfig{
 		AppID:     "test_appid",
@@ -48,10 +48,10 @@ func TestJSSDKCacher(t *testing.T) {
 		Signature: "test_signature",
 		JSAPIList: []string{"api1", "api2"},
 	}
-	
+
 	// 缓存配置
 	cacher.CacheConfig("http://test.com", []string{"api1", "api2"}, config)
-	
+
 	// 验证缓存命中
 	cached, err := cacher.GetCachedConfig("http://test.com", []string{"api1", "api2"})
 	if err != nil {
@@ -60,7 +60,7 @@ func TestJSSDKCacher(t *testing.T) {
 	if cached.AppID != config.AppID {
 		t.Errorf("缓存配置不匹配: got %s, want %s", cached.AppID, config.AppID)
 	}
-	
+
 	// 验证缓存统计
 	stats := cacher.GetStats()
 	if stats.Hits != 1 {
@@ -72,7 +72,7 @@ func TestJSSDKCacher(t *testing.T) {
 	if stats.TotalItems != 1 {
 		t.Errorf("缓存项统计不正确: got %d, want 1", stats.TotalItems)
 	}
-	
+
 	// 测试缓存过期
 	oldConfig := &JSSDKConfig{
 		AppID:     "old_appid",
@@ -82,12 +82,12 @@ func TestJSSDKCacher(t *testing.T) {
 		JSAPIList: []string{"api3"},
 	}
 	cacher.CacheConfig("http://old.com", []string{"api3"}, oldConfig)
-	
+
 	_, err = cacher.GetCachedConfig("http://old.com", []string{"api3"})
 	if err == nil {
 		t.Error("过期缓存应该返回错误")
 	}
-	
+
 	// 验证缓存未命中统计更新
 	stats = cacher.GetStats()
 	if stats.Misses != 1 {
@@ -98,20 +98,20 @@ func TestJSSDKCacher(t *testing.T) {
 // TestJSSDKCacheKey 测试缓存键生成
 func TestJSSDKCacheKey(t *testing.T) {
 	cacher := &JSSDKCacher{}
-	
+
 	// 相同参数应该生成相同的缓存键
 	key1 := cacher.generateCacheKey("http://test.com", []string{"api1", "api2"})
 	key2 := cacher.generateCacheKey("http://test.com", []string{"api1", "api2"})
 	if key1 != key2 {
 		t.Error("相同参数应该生成相同的缓存键")
 	}
-	
+
 	// 不同参数应该生成不同的缓存键
 	key3 := cacher.generateCacheKey("http://other.com", []string{"api1", "api2"})
 	if key1 == key3 {
 		t.Error("不同URL应该生成不同的缓存键")
 	}
-	
+
 	// API列表顺序不影响缓存键（排序后应该相同）
 	key4 := cacher.generateCacheKey("http://test.com", []string{"api2", "api1"})
 	if key1 != key4 {
@@ -129,7 +129,7 @@ func TestJSSDKConfig(t *testing.T) {
 		Signature: "test_signature_hash",
 		JSAPIList: []string{"updateAppMessageShareData", "chooseImage"},
 	}
-	
+
 	// 验证JSON标签
 	if config.AppID != "wx1234567890" {
 		t.Errorf("AppID不匹配: got %s", config.AppID)

@@ -83,6 +83,24 @@ func (s *RedisStorage) buildKey(parts ...string) string {
 	return s.keyPrefix + strings.Join(parts, ":")
 }
 
+// ttlUntil 计算 Redis 过期时间
+//
+// 参数:
+//
+//	expiresAt: 数据过期时间
+//
+// 返回:
+//
+//	time.Duration: 剩余有效时长
+//	error: 数据已过期时返回错误
+func (s *RedisStorage) ttlUntil(expiresAt time.Time) (time.Duration, error) {
+	ttl := time.Until(expiresAt)
+	if ttl <= 0 {
+		return 0, fmt.Errorf("token already expired")
+	}
+	return ttl, nil
+}
+
 // Ping 检查Redis连接状态
 //
 // 参数:
@@ -118,7 +136,10 @@ func (s *RedisStorage) SaveComponentToken(ctx context.Context, token *ComponentA
 	}
 
 	key := s.buildKey("component_token")
-	expireAt := time.Until(token.ExpiresAt)
+	expireAt, err := s.ttlUntil(token.ExpiresAt)
+	if err != nil {
+		return fmt.Errorf("failed to save component token: %w", err)
+	}
 
 	if err := s.client.Set(key, string(data), expireAt); err != nil {
 		return fmt.Errorf("failed to save component token: %w", err)
@@ -196,7 +217,10 @@ func (s *RedisStorage) SavePreAuthCode(ctx context.Context, code *PreAuthCode) e
 	}
 
 	key := s.buildKey("pre_auth_code")
-	expireAt := time.Until(code.ExpiresAt)
+	expireAt, err := s.ttlUntil(code.ExpiresAt)
+	if err != nil {
+		return fmt.Errorf("failed to save pre auth code: %w", err)
+	}
 
 	if err := s.client.Set(key, string(data), expireAt); err != nil {
 		return fmt.Errorf("failed to save pre auth code: %w", err)
@@ -280,7 +304,10 @@ func (s *RedisStorage) SaveComponentVerifyTicket(ctx context.Context, ticket str
 	}
 
 	key := s.buildKey("verify_ticket")
-	expireAt := time.Until(ticketData.ExpiresAt)
+	expireAt, err := s.ttlUntil(ticketData.ExpiresAt)
+	if err != nil {
+		return fmt.Errorf("failed to save verify ticket: %w", err)
+	}
 
 	if err := s.client.Set(key, string(data), expireAt); err != nil {
 		return fmt.Errorf("failed to save verify ticket: %w", err)
@@ -363,7 +390,10 @@ func (s *RedisStorage) SaveAuthorizerToken(ctx context.Context, authorizerAppID 
 
 	// 保存令牌
 	tokenKey := s.buildKey("authorizer_token", authorizerAppID)
-	expireAt := time.Until(token.ExpiresAt)
+	expireAt, err := s.ttlUntil(token.ExpiresAt)
+	if err != nil {
+		return fmt.Errorf("failed to save authorizer token: %w", err)
+	}
 
 	if err := s.client.Set(tokenKey, string(data), expireAt); err != nil {
 		return fmt.Errorf("failed to save authorizer token: %w", err)
@@ -593,4 +623,123 @@ func (s *RedisStorage) DeletePrevEncodingAESKey(ctx context.Context, appID strin
 	}
 
 	return nil
+}
+
+// SaveWechatPayCert 保存微信支付平台证书到Redis
+func (s *RedisStorage) SaveWechatPayCert(ctx context.Context, mchID string, cert *WechatPayCertificate) error {
+	if mchID == "" {
+		return fmt.Errorf("mchID cannot be empty")
+	}
+	if cert == nil {
+		return fmt.Errorf("cert cannot be nil")
+	}
+
+	data, err := json.Marshal(cert)
+	if err != nil {
+		return fmt.Errorf("failed to marshal wechat pay cert: %w", err)
+	}
+
+	key := s.buildKey("wechat_pay_cert", mchID, cert.SerialNo)
+	expireAt, err := s.ttlUntil(cert.ExpiresAt)
+	if err != nil {
+		return fmt.Errorf("failed to save wechat pay cert: %w", err)
+	}
+
+	if err := s.client.Set(key, string(data), expireAt); err != nil {
+		return fmt.Errorf("failed to save wechat pay cert: %w", err)
+	}
+
+	setKey := s.buildKey("wechat_pay_certs", mchID)
+	if _, err := s.client.SAdd(setKey, cert.SerialNo); err != nil {
+		return fmt.Errorf("failed to add wechat pay cert serial to set: %w", err)
+	}
+
+	if _, err := s.client.Expire(setKey, expireAt); err != nil {
+		return fmt.Errorf("failed to set wechat pay cert set expiration: %w", err)
+	}
+
+	return nil
+}
+
+// GetWechatPayCert 从Redis读取指定序列号的微信支付平台证书
+func (s *RedisStorage) GetWechatPayCert(ctx context.Context, mchID, serialNo string) (*WechatPayCertificate, error) {
+	if mchID == "" || serialNo == "" {
+		return nil, fmt.Errorf("mchID and serialNo cannot be empty")
+	}
+
+	key := s.buildKey("wechat_pay_cert", mchID, serialNo)
+	data, err := s.client.GetString(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get wechat pay cert: %w", err)
+	}
+	if data == "" {
+		return nil, nil
+	}
+
+	var cert WechatPayCertificate
+	if err := json.Unmarshal([]byte(data), &cert); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal wechat pay cert: %w", err)
+	}
+
+	return &cert, nil
+}
+
+// GetLatestWechatPayCert 从Redis读取最新的微信支付平台证书
+func (s *RedisStorage) GetLatestWechatPayCert(ctx context.Context, mchID string) (*WechatPayCertificate, error) {
+	if mchID == "" {
+		return nil, fmt.Errorf("mchID cannot be empty")
+	}
+
+	serialNos, err := s.ListWechatPayCertSerialNos(ctx, mchID)
+	if err != nil {
+		return nil, err
+	}
+
+	var latest *WechatPayCertificate
+	for _, serialNo := range serialNos {
+		cert, err := s.GetWechatPayCert(ctx, mchID, serialNo)
+		if err != nil || cert == nil {
+			continue
+		}
+		if latest == nil || cert.ExpiresAt.After(latest.ExpiresAt) {
+			latest = cert
+		}
+	}
+
+	return latest, nil
+}
+
+// DeleteWechatPayCert 从Redis删除指定微信支付平台证书
+func (s *RedisStorage) DeleteWechatPayCert(ctx context.Context, mchID, serialNo string) error {
+	if mchID == "" || serialNo == "" {
+		return fmt.Errorf("mchID and serialNo cannot be empty")
+	}
+
+	key := s.buildKey("wechat_pay_cert", mchID, serialNo)
+	setKey := s.buildKey("wechat_pay_certs", mchID)
+
+	if err := s.client.Del(key); err != nil {
+		return fmt.Errorf("failed to delete wechat pay cert: %w", err)
+	}
+
+	if _, err := s.client.SRem(setKey, serialNo); err != nil {
+		return fmt.Errorf("failed to remove wechat pay cert serial from set: %w", err)
+	}
+
+	return nil
+}
+
+// ListWechatPayCertSerialNos 列出Redis中指定商户的所有微信支付平台证书序列号
+func (s *RedisStorage) ListWechatPayCertSerialNos(ctx context.Context, mchID string) ([]string, error) {
+	if mchID == "" {
+		return nil, fmt.Errorf("mchID cannot be empty")
+	}
+
+	setKey := s.buildKey("wechat_pay_certs", mchID)
+	serialNos, err := s.client.SMembers(setKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get wechat pay cert serials: %w", err)
+	}
+
+	return serialNos, nil
 }

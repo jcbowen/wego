@@ -7,8 +7,10 @@ import (
 	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/message"
+	"github.com/jcbowen/wego/miniprogram"
 	"github.com/jcbowen/wego/official_account"
 	"github.com/jcbowen/wego/openplatform"
+	"github.com/jcbowen/wego/payment"
 	"github.com/jcbowen/wego/storage"
 	"github.com/jcbowen/wego/types"
 )
@@ -20,6 +22,12 @@ type WeGo struct {
 
 	// 公众号客户端
 	OfficialAccountClient *official_account.Client
+
+	// 微信小程序客户端
+	MiniProgramClient *miniprogram.Client
+
+	// 微信支付客户端
+	PaymentClient *payment.Client
 }
 
 // New 创建新的WeGo实例，支持多种客户端配置和可选参数
@@ -27,6 +35,8 @@ type WeGo struct {
 // @param configParams ...any 配置参数，支持以下类型：
 //   - openplatform.Config 或 *openplatform.Config: 开放平台配置
 //   - official_account.Config 或 *official_account.Config: 公众号配置
+//   - miniprogram.Config 或 *miniprogram.Config: 微信小程序配置
+//   - payment.Config 或 *payment.Config: 微信支付配置
 //
 // @param optParams ...any 可选参数，支持以下类型：
 //   - debugger.LoggerInterface: 自定义日志器
@@ -78,6 +88,30 @@ func New(params ...any) *WeGo {
 				}
 				wego.OfficialAccountClient = official_account.NewClient(officialAccountConfig, optParams...)
 			}
+		case miniprogram.Config, *miniprogram.Config:
+			// 如果还没有初始化过小程序客户端，则初始化
+			if wego.MiniProgramClient == nil {
+				var miniProgramConfig *miniprogram.Config
+				if ptr, ok := cfg.(*miniprogram.Config); ok {
+					miniProgramConfig = ptr
+				} else {
+					configCopy := cfg.(miniprogram.Config)
+					miniProgramConfig = &configCopy
+				}
+				wego.MiniProgramClient = miniprogram.NewClient(miniProgramConfig, optParams...)
+			}
+		case payment.Config, *payment.Config:
+			// 如果还没有初始化过支付客户端，则初始化
+			if wego.PaymentClient == nil {
+				var paymentConfig *payment.Config
+				if ptr, ok := cfg.(*payment.Config); ok {
+					paymentConfig = ptr
+				} else {
+					configCopy := cfg.(payment.Config)
+					paymentConfig = &configCopy
+				}
+				wego.PaymentClient = payment.NewClient(paymentConfig, optParams...)
+			}
 		default:
 			log.Printf("警告：不支持的配置类型 %T", cfg)
 			// 忽略不支持的配置类型
@@ -94,7 +128,9 @@ func New(params ...any) *WeGo {
 func isConfigParam(param any) bool {
 	switch param.(type) {
 	case openplatform.Config, *openplatform.Config,
-		official_account.Config, *official_account.Config:
+		official_account.Config, *official_account.Config,
+		miniprogram.Config, *miniprogram.Config,
+		payment.Config, *payment.Config:
 		return true
 	default:
 		return false
@@ -107,6 +143,8 @@ func isConfigParam(param any) bool {
 // @param configParams ...any 配置参数，支持以下类型：
 //   - openplatform.Config 或 *openplatform.Config: 开放平台配置
 //   - official_account.Config 或 *official_account.Config: 公众号配置
+//   - miniprogram.Config 或 *miniprogram.Config: 微信小程序配置
+//   - payment.Config 或 *payment.Config: 微信支付配置
 //
 // @param optParams ...any 可选参数，支持以下类型：
 //   - debugger.LoggerInterface: 自定义日志器
@@ -158,6 +196,30 @@ func NewWithStorage(storage storage.TokenStorage, params ...any) *WeGo {
 				}
 				wego.OfficialAccountClient = official_account.NewMPClientWithStorage(officialAccountConfig, storage, optParams...)
 			}
+		case miniprogram.Config, *miniprogram.Config:
+			// 如果还没有初始化过小程序客户端，则初始化
+			if wego.MiniProgramClient == nil {
+				var miniProgramConfig *miniprogram.Config
+				if ptr, ok := cfg.(*miniprogram.Config); ok {
+					miniProgramConfig = ptr
+				} else {
+					configCopy := cfg.(miniprogram.Config)
+					miniProgramConfig = &configCopy
+				}
+				wego.MiniProgramClient = miniprogram.NewClientWithStorage(miniProgramConfig, storage, optParams...)
+			}
+		case payment.Config, *payment.Config:
+			// 如果还没有初始化过支付客户端，则初始化
+			if wego.PaymentClient == nil {
+				var paymentConfig *payment.Config
+				if ptr, ok := cfg.(*payment.Config); ok {
+					paymentConfig = ptr
+				} else {
+					configCopy := cfg.(payment.Config)
+					paymentConfig = &configCopy
+				}
+				wego.PaymentClient = payment.NewClientWithStorage(paymentConfig, storage, optParams...)
+			}
 		default:
 			// 忽略不支持的配置类型
 			continue
@@ -175,6 +237,12 @@ func (w *WeGo) SetLogger(log debugger.LoggerInterface) {
 	if w.OfficialAccountClient != nil {
 		w.OfficialAccountClient.SetLogger(log)
 	}
+	if w.MiniProgramClient != nil {
+		w.MiniProgramClient.SetLogger(log)
+	}
+	if w.PaymentClient != nil {
+		w.PaymentClient.SetLogger(log)
+	}
 }
 
 // SetHTTPClient 设置自定义HTTP客户端
@@ -184,6 +252,12 @@ func (w *WeGo) SetHTTPClient(client core.HTTPClient) {
 	}
 	if w.OfficialAccountClient != nil {
 		w.OfficialAccountClient.SetHTTPClient(client)
+	}
+	if w.MiniProgramClient != nil {
+		w.MiniProgramClient.SetHTTPClient(client)
+	}
+	if w.PaymentClient != nil {
+		w.PaymentClient.SetHTTPClient(client)
 	}
 }
 
@@ -280,6 +354,28 @@ func (w *WeGo) OfficialAccountSubscribe() *official_account.SubscribeClient {
 	return apiClient.GetSubscribeClient()
 }
 
+// MiniProgram 返回微信小程序客户端
+//
+// 返回:
+//   - *miniprogram.Client: 小程序客户端
+func (w *WeGo) MiniProgram() *miniprogram.Client {
+	if w.MiniProgramClient == nil {
+		panic("未初始化小程序客户端")
+	}
+	return w.MiniProgramClient
+}
+
+// Payment 返回微信支付客户端
+//
+// 返回:
+//   - *payment.Client: 支付客户端
+func (w *WeGo) Payment() *payment.Client {
+	if w.PaymentClient == nil {
+		panic("未初始化支付客户端")
+	}
+	return w.PaymentClient
+}
+
 // Crypto 返回加密解密相关功能
 func (w *WeGo) Crypto() *crypto.CryptoClient {
 	return crypto.NewCryptoClient()
@@ -361,4 +457,49 @@ type (
 	OfficialAccountMiniProgramPageMessage = official_account.MessageMiniProgramPage
 	OfficialAccountNewsArticle            = official_account.NewsArticle
 	UserInfo                              = types.OAuthUserInfoResponse
+
+	// 微信小程序相关类型
+	MiniProgramConfig                 = miniprogram.Config
+	MiniProgramClient                 = miniprogram.Client
+	MiniProgramCode2SessionResponse   = miniprogram.Code2SessionResponse
+	MiniProgramGetPhoneNumberResponse = miniprogram.GetPhoneNumberResponse
+	MiniProgramPhoneInfo              = miniprogram.PhoneInfo
+	MiniProgramUserInfo               = miniprogram.UserInfo
+
+	// 微信支付相关类型
+	PaymentConfig                       = payment.Config
+	PaymentClient                       = payment.Client
+	PaymentAmount                       = payment.Amount
+	PaymentRefundAmount                 = payment.RefundAmount
+	PaymentPayer                        = payment.Payer
+	PaymentSceneInfo                    = payment.SceneInfo
+	PaymentH5Info                       = payment.H5Info
+	PaymentJSAPIRequest                 = payment.JSAPIRequest
+	PaymentH5Request                    = payment.H5Request
+	PaymentPrepayResponse               = payment.PrepayResponse
+	PaymentH5Response                   = payment.H5Response
+	PaymentOrder                        = payment.Order
+	PaymentRefundRequest                = payment.RefundRequest
+	PaymentRefundResponse               = payment.RefundResponse
+	PaymentCloseOrderRequest            = payment.CloseOrderRequest
+	PaymentJSAPIPayParams               = payment.JSAPIPayParams
+	PaymentNativeRequest                = payment.NativeRequest
+	PaymentNativeResponse               = payment.NativeResponse
+	PaymentAppRequest                   = payment.AppRequest
+	PaymentAppPayParams                 = payment.AppPayParams
+	PaymentBillRequest                  = payment.BillRequest
+	PaymentBillResponse                 = payment.BillResponse
+	PaymentProfitSharingRequest         = payment.ProfitSharingRequest
+	PaymentProfitSharingReceiver        = payment.ProfitSharingReceiver
+	PaymentProfitSharingResponse        = payment.ProfitSharingResponse
+	PaymentProfitSharingReceiverResult  = payment.ProfitSharingReceiverResult
+	PaymentProfitSharingReturnRequest   = payment.ProfitSharingReturnRequest
+	PaymentProfitSharingReturnResponse  = payment.ProfitSharingReturnResponse
+	PaymentProfitSharingUnfreezeRequest = payment.ProfitSharingUnfreezeRequest
+	PaymentProfitSharingAmountsResponse = payment.ProfitSharingAmountsResponse
+	PaymentNotification                 = payment.Notification
+	PaymentResource                     = payment.Resource
+	PaymentNotificationHeaders          = payment.NotificationHeaders
+	PaymentAPIError                     = payment.APIError
+	PaymentAPIErrorDetail               = payment.APIErrorDetail
 )

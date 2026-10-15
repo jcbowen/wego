@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -19,6 +20,7 @@ type FileStorage struct {
 	componentVerifyTicketFile string
 	authorizerTokensDir       string
 	prevEncodingAESKeysDir    string // 上一次EncodingAESKey存储目录
+	wechatPayCertsDir         string // 微信支付平台证书存储目录
 }
 
 // NewFileStorage 创建文件存储实例
@@ -39,6 +41,7 @@ func NewFileStorage(baseDir string) (*FileStorage, error) {
 		componentVerifyTicketFile: filepath.Join(baseDir, "component_verify_ticket.json"),
 		authorizerTokensDir:       filepath.Join(baseDir, "authorizer_tokens"),
 		prevEncodingAESKeysDir:    filepath.Join(baseDir, "prev_encoding_aes_keys"),
+		wechatPayCertsDir:         filepath.Join(baseDir, "wechat_pay_certs"),
 	}
 
 	// 确保授权方令牌目录存在
@@ -48,6 +51,11 @@ func NewFileStorage(baseDir string) (*FileStorage, error) {
 
 	// 确保上一次EncodingAESKey存储目录存在
 	if err := os.MkdirAll(storage.prevEncodingAESKeysDir, 0755); err != nil {
+		return nil, err
+	}
+
+	// 确保微信支付平台证书目录存在
+	if err := os.MkdirAll(storage.wechatPayCertsDir, 0755); err != nil {
 		return nil, err
 	}
 
@@ -83,7 +91,7 @@ func (s *FileStorage) DeleteComponentToken(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return os.Remove(s.componentTokenFile)
+	return removeFileIfExists(s.componentTokenFile)
 }
 
 // SavePreAuthCode 保存预授权码到文件
@@ -115,7 +123,7 @@ func (s *FileStorage) DeletePreAuthCode(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return os.Remove(s.preAuthCodeFile)
+	return removeFileIfExists(s.preAuthCodeFile)
 }
 
 // SaveVerifyTicket 保存验证票据到文件
@@ -154,7 +162,7 @@ func (s *FileStorage) DeleteComponentVerifyTicket(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return os.Remove(s.componentVerifyTicketFile)
+	return removeFileIfExists(s.componentVerifyTicketFile)
 }
 
 // SaveAuthorizerToken 保存授权方令牌到文件
@@ -189,7 +197,7 @@ func (s *FileStorage) DeleteAuthorizerToken(ctx context.Context, authorizerAppID
 	defer s.mu.Unlock()
 
 	filename := filepath.Join(s.authorizerTokensDir, authorizerAppID+".json")
-	return os.Remove(filename)
+	return removeFileIfExists(filename)
 }
 
 // ClearAuthorizerTokens 清除所有授权方令牌
@@ -208,7 +216,9 @@ func (s *FileStorage) ClearAuthorizerTokens(ctx context.Context) error {
 	for _, file := range files {
 		if filepath.Ext(file.Name()) == ".json" {
 			filename := filepath.Join(s.authorizerTokensDir, file.Name())
-			os.Remove(filename)
+			if err := removeFileIfExists(filename); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -289,6 +299,14 @@ func (s *FileStorage) loadFromFile(filename string, data interface{}) error {
 	return decoder.Decode(data)
 }
 
+// removeFileIfExists 删除文件，若文件不存在则返回 nil
+func removeFileIfExists(filename string) error {
+	if err := os.Remove(filename); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 // SavePrevEncodingAESKey 保存上一次的EncodingAESKey到文件
 func (s *FileStorage) SavePrevEncodingAESKey(ctx context.Context, appID string, prevKey string) error {
 	s.mu.Lock()
@@ -327,5 +345,129 @@ func (s *FileStorage) DeletePrevEncodingAESKey(ctx context.Context, appID string
 	defer s.mu.Unlock()
 
 	filename := filepath.Join(s.prevEncodingAESKeysDir, appID+".json")
-	return os.Remove(filename)
+	return removeFileIfExists(filename)
+}
+
+// SaveWechatPayCert 保存微信支付平台证书到文件
+func (s *FileStorage) SaveWechatPayCert(ctx context.Context, mchID string, cert *WechatPayCertificate) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if mchID == "" {
+		return fmt.Errorf("mchID cannot be empty")
+	}
+	if cert == nil {
+		return fmt.Errorf("cert cannot be nil")
+	}
+	if cert.SerialNo == "" {
+		return fmt.Errorf("serialNo cannot be empty")
+	}
+
+	dir := filepath.Join(s.wechatPayCertsDir, mchID)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	filename := filepath.Join(dir, cert.SerialNo+".json")
+	return s.saveToFile(filename, cert)
+}
+
+// GetWechatPayCert 从文件读取指定序列号的微信支付平台证书
+func (s *FileStorage) GetWechatPayCert(ctx context.Context, mchID, serialNo string) (*WechatPayCertificate, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if mchID == "" || serialNo == "" {
+		return nil, fmt.Errorf("mchID and serialNo cannot be empty")
+	}
+
+	filename := filepath.Join(s.wechatPayCertsDir, mchID, serialNo+".json")
+	var cert WechatPayCertificate
+	if err := s.loadFromFile(filename, &cert); err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &cert, nil
+}
+
+// GetLatestWechatPayCert 从文件读取最新的微信支付平台证书
+func (s *FileStorage) GetLatestWechatPayCert(ctx context.Context, mchID string) (*WechatPayCertificate, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if mchID == "" {
+		return nil, fmt.Errorf("mchID cannot be empty")
+	}
+
+	dir := filepath.Join(s.wechatPayCertsDir, mchID)
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var latest *WechatPayCertificate
+	for _, file := range files {
+		if filepath.Ext(file.Name()) != ".json" {
+			continue
+		}
+
+		filename := filepath.Join(dir, file.Name())
+		var cert WechatPayCertificate
+		if err := s.loadFromFile(filename, &cert); err != nil {
+			continue
+		}
+
+		if latest == nil || cert.ExpiresAt.After(latest.ExpiresAt) {
+			latest = &cert
+		}
+	}
+
+	return latest, nil
+}
+
+// DeleteWechatPayCert 从文件删除指定微信支付平台证书
+func (s *FileStorage) DeleteWechatPayCert(ctx context.Context, mchID, serialNo string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if mchID == "" || serialNo == "" {
+		return fmt.Errorf("mchID and serialNo cannot be empty")
+	}
+
+	filename := filepath.Join(s.wechatPayCertsDir, mchID, serialNo+".json")
+	return removeFileIfExists(filename)
+}
+
+// ListWechatPayCertSerialNos 列出文件中指定商户的所有微信支付平台证书序列号
+func (s *FileStorage) ListWechatPayCertSerialNos(ctx context.Context, mchID string) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if mchID == "" {
+		return nil, fmt.Errorf("mchID cannot be empty")
+	}
+
+	dir := filepath.Join(s.wechatPayCertsDir, mchID)
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, err
+	}
+
+	serialNos := make([]string, 0, len(files))
+	for _, file := range files {
+		if filepath.Ext(file.Name()) == ".json" {
+			serialNos = append(serialNos, file.Name()[:len(file.Name())-5])
+		}
+	}
+
+	return serialNos, nil
 }

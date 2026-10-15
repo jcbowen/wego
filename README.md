@@ -21,8 +21,10 @@ wego/
 ├── core/           # 核心配置和客户端
 ├── crypto/         # 加密解密功能
 ├── message/        # 消息处理功能
-├── officialaccount/ # 公众号开发功能
+├── miniprogram/    # 小程序开发功能
+├── official_account/ # 公众号开发功能
 ├── openplatform/   # 开放平台功能
+├── payment/        # 微信支付 V3 功能
 ├── storage/        # 存储抽象层
 ├── types/          # 类型定义
 └── doc/           # 技术文档
@@ -74,6 +76,42 @@ type (
     OfficialAccountMiniProgramPageMessage = official_account.MessageMiniProgramPage
     OfficialAccountNewsArticle            = official_account.NewsArticle
     UserInfo                              = types.OAuthUserInfoResponse
+
+    // 微信支付相关类型
+    PaymentConfig              = payment.Config
+    PaymentClient              = payment.Client
+    PaymentAmount              = payment.Amount
+    PaymentRefundAmount        = payment.RefundAmount
+    PaymentPayer               = payment.Payer
+    PaymentSceneInfo           = payment.SceneInfo
+    PaymentH5Info              = payment.H5Info
+    PaymentJSAPIRequest        = payment.JSAPIRequest
+    PaymentH5Request           = payment.H5Request
+    PaymentPrepayResponse      = payment.PrepayResponse
+    PaymentJSAPIPayParams      = payment.JSAPIPayParams
+    PaymentH5Response          = payment.H5Response
+    PaymentOrder               = payment.Order
+    PaymentRefundRequest       = payment.RefundRequest
+    PaymentRefundResponse      = payment.RefundResponse
+    PaymentCloseOrderRequest   = payment.CloseOrderRequest
+    PaymentNativeRequest       = payment.NativeRequest
+    PaymentNativeResponse      = payment.NativeResponse
+    PaymentAppRequest          = payment.AppRequest
+    PaymentAppPayParams        = payment.AppPayParams
+    PaymentBillRequest         = payment.BillRequest
+    PaymentBillResponse        = payment.BillResponse
+    PaymentProfitSharingRequest         = payment.ProfitSharingRequest
+    PaymentProfitSharingReceiver        = payment.ProfitSharingReceiver
+    PaymentProfitSharingResponse        = payment.ProfitSharingResponse
+    PaymentProfitSharingReturnRequest   = payment.ProfitSharingReturnRequest
+    PaymentProfitSharingReturnResponse  = payment.ProfitSharingReturnResponse
+    PaymentProfitSharingUnfreezeRequest = payment.ProfitSharingUnfreezeRequest
+    PaymentProfitSharingAmountsResponse = payment.ProfitSharingAmountsResponse
+    PaymentNotification        = payment.Notification
+    PaymentResource            = payment.Resource
+    PaymentNotificationHeaders = payment.NotificationHeaders
+    PaymentAPIError            = payment.APIError
+    PaymentAPIErrorDetail      = payment.APIErrorDetail
 )
 ```
 
@@ -363,6 +401,25 @@ func main() {
 - `OfficialAccountSubscribe()` - 获取订阅消息客户端（通过MPAPIClient的GetSubscribeClient()方法）
 - `GetStableTokenClient()` - 获取稳定版Token客户端（通过MPAPIClient的GetStableTokenClient()方法）
 
+### Payment 模块
+
+微信支付 API V3 功能，包含：
+
+- `Client` - 支付主客户端，内置请求签名与应答/回调验签
+- 下单：`JSAPIPay`、`H5Pay`、`NativePay`、`AppPay`
+- 查单：`QueryOrder`（按商户订单号）、`QueryOrderByTransactionID`（按微信支付订单号）
+- 关单：`CloseOrder`
+- 退款：`Refund`、`RefundQuery`
+- 调起支付：`BuildJSAPIPayParams`（小程序/公众号）、`BuildAppPayParams`（App）
+- 敏感信息：`EncryptSensitiveData`、`EncryptSerialNo`（RSAES-OAEP 加密）
+- 账单：`ApplyTradeBill`、`ApplyFundFlowBill`、`DownloadBill`
+- 分账：`ProfitSharing`、`ProfitSharingQuery`、`ProfitSharingReturn`、`ProfitSharingReturnQuery`、`ProfitSharingUnfreeze`、`ProfitSharingAmounts`
+- 回调：`VerifyNotification`、`VerifyNotificationByHeaders`、`DecryptNotificationResource`
+- 错误处理：`APIError` + `AsAPIError` / `IsAPIError`，可提取微信错误码做差异化处理
+- 构造：`NewClientE`、`NewClientWithStorageE`（返回 error，推荐）；`NewClient`、`NewClientWithStorage` 已 Deprecated
+
+**验签模式**：同时支持微信支付公钥（官方推荐）与平台证书，详见 [微信支付模块说明](doc/微信支付模块说明.md)。
+
 ### Message 模块
 
 消息处理功能，包含：
@@ -401,6 +458,7 @@ func main() {
 查看 `doc/` 目录获取完整的使用示例和技术文档：
 
 - [微信公众号开发库使用指南](doc/officialaccount/README.md)
+- [微信支付模块说明](doc/微信支付模块说明.md)
 - [授权流程技术说明](doc/openplatform/01-授权流程技术说明.md)
 - [消息加解密技术介绍](doc/openplatform/06-消息加解密技术介绍.md)
 

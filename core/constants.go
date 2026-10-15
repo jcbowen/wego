@@ -16,15 +16,15 @@ const (
 	ErrCodeAPIQuotaExceeded  = 45009
 
 	// 基础API域名
-	BaseAPIURL       = "https://api.weixin.qq.com"
-	OpenBaseURL      = "https://open.weixin.qq.com"
-	MPBaseURL        = "https://mp.weixin.qq.com"
-	PayAPIURL        = "https://api.mch.weixin.qq.com"
-	ResURL           = "https://res.wx.qq.com"
-	
+	BaseAPIURL  = "https://api.weixin.qq.com"
+	OpenBaseURL = "https://open.weixin.qq.com"
+	MPBaseURL   = "https://mp.weixin.qq.com"
+	PayAPIURL   = "https://api.mch.weixin.qq.com"
+	ResURL      = "https://res.wx.qq.com"
+
 	// 授权页面URL
-	MobileAuthPageURL   = "https://open.weixin.qq.com/wxaopen/safe/bindcomponent"
-	PCAuthPageURL       = "https://mp.weixin.qq.com/cgi-bin/componentloginpage"
+	MobileAuthPageURL    = "https://open.weixin.qq.com/wxaopen/safe/bindcomponent"
+	PCAuthPageURL        = "https://mp.weixin.qq.com/cgi-bin/componentloginpage"
 	SubscribeAuthPageURL = "https://mp.weixin.qq.com/mp/subscribemsg"
 
 	// 通用授权参数

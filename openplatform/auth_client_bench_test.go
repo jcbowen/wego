@@ -17,7 +17,7 @@ func BenchmarkCacheKeyGeneration(b *testing.B) {
 	cacher := &JSSDKCacher{}
 	url := "http://example.com/path/to/page"
 	jsAPIList := []string{"updateAppMessageShareData", "updateTimelineShareData", "chooseImage", "previewImage", "uploadImage"}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cacher.generateCacheKey(url, jsAPIList)
@@ -34,19 +34,19 @@ func BenchmarkCacheOperations(b *testing.B) {
 		Signature: "test_signature_hash",
 		JSAPIList: []string{"api1", "api2", "api3"},
 	}
-	
+
 	b.Run("Cache", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			cacher.CacheConfig("http://test.com", []string{"api1", "api2"}, config)
 		}
 	})
-	
+
 	b.Run("GetCached", func(b *testing.B) {
 		// 先缓存一些数据
 		for i := 0; i < 100; i++ {
 			cacher.CacheConfig("http://test.com", []string{"api1", "api2"}, config)
 		}
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			cacher.GetCachedConfig("http://test.com", []string{"api1", "api2"})
@@ -59,7 +59,7 @@ func BenchmarkContextPropagation(b *testing.B) {
 	// 模拟一个JSSDKManager（注意：这需要模拟依赖）
 	// 这里仅测试Context本身的传递开销
 	ctx := context.Background()
-	
+
 	b.Run("WithContext", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			// 模拟Context传递
