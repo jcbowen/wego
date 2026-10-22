@@ -75,6 +75,56 @@ const (
 	ProfitSharingAmountsURL = "https://api.mch.weixin.qq.com/v3/profitsharing/transactions/%s/amounts"
 )
 
+// 微信支付商家转账（用户确认收款模式）相关 API 地址
+// 参考：https://pay.weixin.qq.com/doc/v3/merchant/4012716434
+const (
+	// MchTransferCreateURL 发起转账（需用户确认收款）地址
+	MchTransferCreateURL = "https://api.mch.weixin.qq.com/v3/fund-app/mch-transfer/transfer-bills"
+
+	// MchTransferTransferURL 用户授权后转账地址（用户完成授权后实际出款）
+	MchTransferTransferURL = "https://api.mch.weixin.qq.com/v3/fund-app/mch-transfer/transfer-bills/transfer"
+
+	// MchTransferCancelURL 撤销转账地址（需格式化 out_bill_no，仅用户确认收款前可撤销）
+	MchTransferCancelURL = "https://api.mch.weixin.qq.com/v3/fund-app/mch-transfer/transfer-bills/out-bill-no/%s/cancel"
+
+	// MchTransferQueryByOutBillNoURL 按商户单号查询转账单地址（需格式化 out_bill_no）
+	MchTransferQueryByOutBillNoURL = "https://api.mch.weixin.qq.com/v3/fund-app/mch-transfer/transfer-bills/out-bill-no/%s"
+
+	// MchTransferQueryByBillNoURL 按微信转账单号查询转账单地址（需格式化 transfer_bill_no）
+	MchTransferQueryByBillNoURL = "https://api.mch.weixin.qq.com/v3/fund-app/mch-transfer/transfer-bills/transfer-bill-no/%s"
+
+	// MchTransferElecsignApplyByOutBillNoURL 按商户单号申请电子回单地址
+	MchTransferElecsignApplyByOutBillNoURL = "https://api.mch.weixin.qq.com/v3/fund-app/mch-transfer/elecsign/out-bill-no"
+
+	// MchTransferElecsignQueryByOutBillNoURL 按商户单号查询电子回单地址（需格式化 out_bill_no）
+	MchTransferElecsignQueryByOutBillNoURL = "https://api.mch.weixin.qq.com/v3/fund-app/mch-transfer/elecsign/out-bill-no/%s"
+
+	// MchTransferElecsignApplyByBillNoURL 按微信转账单号申请电子回单地址
+	MchTransferElecsignApplyByBillNoURL = "https://api.mch.weixin.qq.com/v3/fund-app/mch-transfer/elecsign/transfer-bill-no"
+
+	// MchTransferElecsignQueryByBillNoURL 按微信转账单号查询电子回单地址（需格式化 transfer_bill_no）
+	MchTransferElecsignQueryByBillNoURL = "https://api.mch.weixin.qq.com/v3/fund-app/mch-transfer/elecsign/transfer-bill-no/%s"
+)
+
+// 转账单据状态（TransferBillResponse.State / TransferBillCreateResponse.State）
+const (
+	TransferStateAccepted        = "ACCEPTED"          // 转账已受理（非终态，可原单重试）
+	TransferStateProcessing      = "PROCESSING"        // 转账处理中，结果尚未明确（建议检查账户余额）
+	TransferStateWaitUserConfirm = "WAIT_USER_CONFIRM" // 待收款用户确认（可拉起收款确认页）
+	TransferStateTransfering     = "TRANSFERING"       // 转账结果尚未明确（可拉起收款确认页重试确认）
+	TransferStateSuccess         = "SUCCESS"           // 转账成功
+	TransferStateFail            = "FAIL"              // 转账失败
+	TransferStateCanceling       = "CANCELING"         // 撤销请求受理成功，撤销中
+	TransferStateCancelled       = "CANCELLED"         // 撤销完成
+)
+
+// 电子回单申请单状态（TransferElecsignResponse.State）
+const (
+	TransferElecsignStateGenerating = "GENERATING" // 电子回单受理成功，处理中
+	TransferElecsignStateFinished   = "FINISHED"   // 电子回单处理完成（返回 hash 与下载地址）
+	TransferElecsignStateFailed     = "FAILED"     // 电子回单生成失败（fail_reason 返回原因）
+)
+
 // 微信支付验签模式相关常量
 const (
 	// PublicKeyIDPrefix 微信支付公钥 ID 前缀

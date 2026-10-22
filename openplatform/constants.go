@@ -38,6 +38,17 @@ const (
 	URLWxaGetTemplateList      = core.BaseAPIURL + "/wxa/gettemplatelist"
 	URLWxaDeleteTemplate       = core.BaseAPIURL + "/wxa/deletetemplate"
 
+	// 代小程序代码管理（使用 authorizer_access_token 调用）
+	// 参考：https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/code/commit.html
+	URLWxaCommit           = core.BaseAPIURL + "/wxa/commit"
+	URLWxaGetQrcode        = core.BaseAPIURL + "/wxa/get_qrcode"
+	URLWxaGetCategory      = core.BaseAPIURL + "/wxa/get_category"
+	URLWxaSubmitAudit      = core.BaseAPIURL + "/wxa/submit_audit"
+	URLWxaGetAuditStatus   = core.BaseAPIURL + "/wxa/get_auditstatus"
+	URLWxaRelease          = core.BaseAPIURL + "/wxa/release"
+	URLWxaRevertRelease    = core.BaseAPIURL + "/wxa/revertcoderelease"
+	URLWxaUploadAuditMedia = core.BaseAPIURL + "/wxa/uploadmedia"
+
 	// 小程序码
 	URLGetWxaCode = core.BaseAPIURL + "/wxa/getwxacode"
 

@@ -264,6 +264,24 @@ func (w *WeGo) SetHTTPClient(client core.HTTPClient) {
 	}
 }
 
+// OpenPlatform 返回开放平台客户端（含代小程序代码管理、域名设置、push ticket 等能力）
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OpenPlatformE。
+func (w *WeGo) OpenPlatform() *openplatform.Client {
+	openClient, err := w.OpenPlatformE()
+	if err != nil {
+		panic(err.Error())
+	}
+	return openClient
+}
+
+// OpenPlatformE 返回开放平台客户端（E 版：未初始化时返回 error）
+func (w *WeGo) OpenPlatformE() (*openplatform.Client, error) {
+	if w.OpenPlatformClient == nil {
+		return nil, fmt.Errorf("未初始化开放平台客户端")
+	}
+	return w.OpenPlatformClient, nil
+}
+
 // OpenPlatformAuth 返回开放平台授权相关功能
 // Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OpenPlatformAuthE。
 func (w *WeGo) OpenPlatformAuth() *openplatform.AuthClient {

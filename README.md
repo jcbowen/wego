@@ -440,10 +440,15 @@ func main() {
 
 - `APIClient` - 开放平台API客户端
 - `AuthClient` - 授权管理客户端
+- 代小程序代码管理：`CommitWxaCode`（上传代码+体验版）、`GetWxaTrialQrcode`（体验版二维码）、`GetWxaCategory`（类目）、`SubmitWxaAudit`（提审）、`UploadWxaAuditMedia`（提审素材）、`GetWxaAuditStatus`（审核状态）、`ReleaseWxaCode`（发布）、`RevertWxaCodeRelease`（版本回退）
+- 域名设置：`ModifyWxaServerDomain`（服务器域名）、`ModifyWxaJumpDomain`（业务域名）
+- `StartPushTicket`（启动 component_verify_ticket 推送服务）
 - API地址常量定义
 - API响应结构体
 - 授权信息数据结构
 - 事件处理器接口
+
+**客户端获取方法**：`OpenPlatform()` 获取开放平台客户端（上述能力均挂载其上），推荐使用 `OpenPlatformE`。
 
 ### OfficialAccount 模块
 
@@ -460,6 +465,9 @@ func main() {
 - `StableTokenClient` - 稳定版access_token客户端（内置缓存与force_refresh限频）
 - `SubscribeClient` - 订阅消息客户端
 - `OAuthClient` - 网页授权客户端
+- 带参数二维码：`CreateQRCode`（Client 级入口）、`GetQRCodeImage`（ticket 换图片二进制）
+- 数据分析：`GetUserSummary`/`GetUserCumulate`、`GetArticleSummary`/`GetArticleTotal`、`GetUserRead(Hour)`、`GetUserShare(Hour)`、`GetInterfaceSummary(Hour)`（含日期跨度校验）
+- 客服账号：`UploadKfAccountHeadImage`（头像 multipart 上传）
 
 **客户端获取方法**：
 - `OfficialAccountAPI()` - 获取公众号API客户端
@@ -487,6 +495,7 @@ func main() {
 - 敏感信息：`EncryptSensitiveData`、`EncryptSerialNo`（RSAES-OAEP 加密）
 - 账单：`ApplyTradeBill`、`ApplyFundFlowBill`、`DownloadBill`
 - 分账：`ProfitSharing`、`ProfitSharingQuery`、`ProfitSharingReturn`、`ProfitSharingReturnQuery`、`ProfitSharingUnfreeze`、`ProfitSharingAmounts`
+- 商家转账（用户确认收款模式，单笔）：`CreateTransferBill`（发起，返回 package_info 拉起收款确认页）、`TransferAfterUserAuth`（用户授权后转账，独立请求 `TransferAfterUserAuthRequest`，authorization_id/out_authorization_no 二选一）、`CancelTransferBill`（撤销）、`QueryTransferBillByOutBillNo`/`QueryTransferBillByBillNo`（查单）、`ApplyForElecsignByOutBillNo`/`ApplyForElecsignByBillNo`、`QueryElecsignByOutBillNo`/`QueryElecsignByBillNo`（电子回单）
 - 回调：`VerifyNotification`、`VerifyNotificationByHeaders`、`DecryptNotificationResource`
 - 错误处理：`APIError` + `AsAPIError` / `IsAPIError`，可提取微信错误码做差异化处理
 - 构造：`NewClientE`、`NewClientWithStorageE`（返回 error，推荐）；`NewClient`、`NewClientWithStorage` 已 Deprecated

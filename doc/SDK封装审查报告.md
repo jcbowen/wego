@@ -169,21 +169,21 @@ P2 批次：
 
 ## 五、官方已提供、当前未封装的能力（待补齐）
 
-> 2026-10-22 更新：下列「✅ 已补齐」项为第四批（方案 A）成果；其余保持未封装，按业务优先级另行安排。
+> 2026-10-22 更新：下列「✅ 已补齐」项为第四批（方案 A）与第五批（方案 B）成果；第五节全部剩余项已补齐。
 
 ### official_account
 - ✅ 用户管理：`UserClient`（`user/info`、`batchget`、`user/get`、`updateremark`、`tags/*` 全套）
 - ✅ 公众号 JSSDK ticket：`Client.GetJSAPITicket()`（含内存缓存）
-- 二维码：`URLQRCodeCreate` / `URLQRCodeShow` 常量已定义，但 `api_qrcode.go` 仅被 openplatform 间接使用，公众号侧无独立入口
+- ✅ 二维码（第五批）：`Client.CreateQRCode`（Client 级入口）+ `Client.GetQRCodeImage`（ticket 换图片二进制，含错误 JSON 识别与非 2xx 状态码判错）
 - ~~短链接 `URLShortURL`~~：官方已停用该服务，常量已删除
-- 数据分析 `datacube/*`：常量已定义，无实现
-- **新版客服消息**：`message/custom/typing` 已有；缺少 `kfaccount` 头像上传（当前只发 JSON，未做 multipart）
+- ✅ 数据分析 datacube（第五批）：`GetUserSummary`/`GetUserCumulate`、`GetArticleSummary`/`GetArticleTotal`、`GetUserRead(Hour)`、`GetUserShare(Hour)`、`GetInterfaceSummary(Hour)`，统一日期跨度校验；响应字段/渠道枚举已对照官方新版对齐（msgid 为 string、user_source 官方枚举、getarticletotal 明细含 target_user 等）
+- ✅ 客服消息（第五批）：`UploadKfAccountHeadImage` 客服头像 multipart 上传已实现
 - ✅ `GetMaterial` 视频素材返回 `down_url` JSON 的处理已修复
 
 ### openplatform
-- 代小程序：代码管理（`code/commit`、`get_qrcode`、`get_category`、`submit_audit`、`get_auditstatus`、`release`、`revertcoderelease`）全部缺失
-- 小程序服务域/业务域设置：`modify_wxa_server_domain` / `modify_wxa_jump_domain` 常量已有、无实现
-- `api_start_push_ticket`（`URLStartPushTicket`）无实现
+- ✅ 代小程序代码管理（第五批）：`CommitWxaCode`、`GetWxaTrialQrcode`（二进制/JSON 混合分流）、`GetWxaCategory`、`SubmitWxaAudit`、`UploadWxaAuditMedia`（multipart）、`GetWxaAuditStatus`、`ReleaseWxaCode`（空对象 body 防 44002）、`RevertWxaCodeRelease`（GET + app_version）
+- ✅ 第三方平台域名设置（第五批）：`ModifyWxaServerDomain`、`ModifyWxaJumpDomain`（注意业务域名字段为 `wxa_jump_h5_domain`）
+- ✅ `StartPushTicket`（第五批）：无 query 参数，凭证全走请求体
 - ✅ 代公众号网页授权 `OpenPlatformOAuthE` 空参数半成品已修复（`authorizerAppID` 参数化）
 
 ### miniprogram
@@ -193,7 +193,8 @@ P2 批次：
 - ✅ `wego.go` 已暴露 `MiniProgram()`/`MiniProgramE()`，新增能力均为 `Client` 语义化方法
 
 ### payment
-- 覆盖度最好，可选补：转账（`transfer/batches`）、商家券、消费卡、代金券、支付即服务、`combine` 合单支付
+- ✅ 商家转账（第五批）：新版单笔接口族（`/v3/fund-app/mch-transfer/*`）——`CreateTransferBill`（用户确认收款）、`TransferAfterUserAuth`（独立请求结构，authorization_id/out_authorization_no 二选一）、`CancelTransferBill`、`QueryTransferBillByOutBillNo`/`ByBillNo`、电子回单申请/查询（按商户单号/微信单号共 4 个），完整走 V3 签名 + 公钥/平台证书验签
+- 仍可选补：旧版批量转账 `transfer/batches`、商家券、消费卡、代金券、支付即服务、`combine` 合单支付
 
 ---
 
@@ -262,6 +263,54 @@ P2 批次：
 **外部交叉验证后的补丁（2026-10-22）**：经独立会话交叉审查发现并修复 4 处遗漏——① README 存储回退描述与 `storage/file.go` 实际实现不符（存在临时目录回退），已改为事实；② `ApplyClientOptions` 的 warnLogger 按值传入导致未知参数警告不进自定义 logger（与重构前行为有差异），已改为闭包；③ README 示例仍调用 Deprecated getter（10 处）且占位 AESKey 非 43 位（复制即触发 `Validate` 报错），已全部换 E 版并修正占位值；④ 审查报告第 19 行"标记 Deprecated"与常量已删除状态不一致，已同步。
 
 **示例编译复验（2026-10-22，第二轮）**：首轮探针结论有误——复刻编译发现示例 1–3 存在未使用变量（`declared and not used`）无法通过编译，已将各示例结尾改为输出客户端就绪状态（`%v` 打印 `xxxClient != nil`）使变量被消费；破坏性变更提示补录 P2 条目 9（删除导出常量 `URLRefreshComponentAccessToken`）。最终复验：README 全部 5 个示例提取后逐一 `go build` 通过（可复制即用），探针已删除。
+
+**第五批 —— 方案 B 能力补齐：已完成 ✅（2026-10-22）**
+
+第五节全部剩余项补齐（需求确认文件：项目根 `要求确认_第五批方案B能力补齐.md`）：
+
+| # | 内容 | 实现位置 |
+|---|---|---|
+| 1 | 代小程序代码管理全套（commit/体验版二维码/类目/提审/审核状态/发布/回退 + 提审素材 multipart） | `openplatform/wxa_code_client.go` |
+| 2 | 第三方平台域名设置（服务器域名/业务域名，body 字段 `wxa_server_domain`/`wxa_jump_h5_domain`） | `openplatform/domain_client.go` |
+| 3 | `StartPushTicket`（无 query 参数，凭证全走请求体） | `openplatform/push_ticket.go` |
+| 4 | 公众号二维码 Client 级入口 `CreateQRCode` + `GetQRCodeImage`（图片二进制，错误 JSON 识别） | `official_account/api_qrcode.go` |
+| 5 | datacube 数据分析 10 个接口（用户增长/累计、图文每日/总、阅读、分享、接口分析，统一日期跨度校验） | `official_account/datacube_client.go` |
+| 6 | `UploadKfAccountHeadImage` 客服头像 multipart 上传 | `official_account/kf_client.go` |
+| 7 | 商家转账新版单笔接口族 9 个方法（发起/授权后转账/撤销/双单号查单/回单申请与查询×2），V3 签名 + 公钥验签全链路 | `payment/transfer.go` |
+| 8 | `wego.go` 新增 `OpenPlatform(E)` getter；README/审查报告同步 | `wego.go` 等 |
+
+验证：三模块探针测试（mock storage + Do 拦截；payment 用本地生成 RSA 密钥对完整走「请求签名 → 响应验签」）校验 URL/Query/Body/Content-Type/二进制分流，跑通后删除。`go build`、`go vet`、`gofmt -l`、全量 `go test ./...` 通过。
+
+破坏性变更：本批为纯新增能力，无破坏性变更。
+
+**第六批 —— 官方文档验证修复：已完成 ✅（2026-10-22）**
+
+对第五批未提交代码逐项对照官方文档验证（需求确认文件：项目根 `要求确认_第六批_官方文档验证修复.md`），确认属实的差异已全部修复：
+
+| # | 修复内容 | 位置 |
+|---|---|---|
+| 1 | datacube 响应对齐官方：`MsgID` int64→string（"12003_3" 格式）；删 `UserSummaryItem.CumulateUser`（getusersummary 无此字段）；`user_source` 渠道枚举注释更新为官方新版（0其他合计/1公众号搜索/17名片分享/30扫描二维码/.../200视频号/201直播）；`ArticleTotalDetailItem` 删 `UserSource` 补 `TargetUser`（送达人数）；`UserReadItem` 补 `UserSource`；`ShareScene` 注释改官方枚举（1好友转发/2朋友圈/255其他）；getarticlesummary/getarticletotal/getusershare 标注官方已停止维护 | `official_account/datacube_client.go` |
+| 2 | `TransferAfterUserAuth` 改用独立请求 `TransferAfterUserAuthRequest`（无 openid/notify_url，authorization_id 与 out_authorization_no 二选一必填校验）；`TransferBillCancelResponse` 补 `UpdateTime`（官方必填） | `payment/transfer.go` |
+| 3 | 商家转账注释文档号全量更正（发起转账 4012716434、双单号查单 4012716437/4012716457、电子回单 4012716452/4012716456/4012716455）；`transfer_scene_report_infos` 注释更新为官方必填口径 | `payment/transfer.go` + `payment/constants.go` |
+| 4 | 客服头像注释更正（官方仅要求"5M 以内"，无 640x640 尺寸要求），文档链接更新为新版 api_uploadkfheadimg 页 | `official_account/kf_client.go` |
+| 5 | `GetQRCodeImage` 补 HTTP 非 2xx 状态码判错（官方对非法 ticket 返回 404，此前会被当图片二进制返回） | `official_account/api_qrcode.go` |
+
+决策记录：`user_recv_style`（红包样式）字段暂不封装，避免过度设计，后续有诉求再加。
+
+破坏性变更：均属第五批未提交代码的批内修正（字段类型/结构签名在合入前即已纠正），对既有发布版本无影响。
+
+**第七批 —— 六批复审遗留瑕疵修复：已完成 ✅（2026-10-22）**
+
+两处瑕疵均先以临时探针证实后修复（探针已删除）：
+
+| # | 问题探针结论 | 修复内容 | 位置 |
+|---|---|---|---|
+| 1 | `CreateTransferBill`/`TransferAfterUserAuth` 在 `transfer_scene_report_infos` 为空时请求穿透到 HTTP 层（官方标注必填但 SDK 无本地校验） | 新增 `validateTransferSceneReportInfos`：判空 + 逐项校验 `info_type`/`info_content` 非空，两个转账方法前置调用 | `payment/transfer.go` |
+| 2 | `GetQRCodeImage` 非 2xx 时错误只含状态码，丢失微信错误响应体（探针 404 + JSON 体仅报 "状态码: 404"） | 读取响应体提前至状态码判断前；非 2xx 时若 body 可解析出 `errcode/errmsg` 则附带入错，否则附前 512 字节原文；2xx JSON 判定仍以 Content-Type 为准避免误判图片字节 | `official_account/api_qrcode.go` |
+
+破坏性变更：#1 为客户端前置校验，仅拦截原本会被微信以 400 拒绝的请求，属第五批未提交代码的批内修正；#2 仅增强错误信息，无签名变化。
+
+补记（同日）：探针过程中发现 `TransferAfterUserAuth` 缺 `transfer_remark` 必填校验（官方必填，`CreateTransferBill` 已有），已补齐，校验顺序与其对齐（金额 → remark → 报备信息 → 二选一）。
 
 ---
 
