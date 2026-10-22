@@ -16,7 +16,7 @@
 | 2 | 客服消息多嵌套一层 msgtype | ✅ 已修复 | 新增 `CustomTextContent` 等 9 个内容体类型；`SendCustomMessageRequest` 字段改为内容体指针；`MessageXxx` 复用内容体类型 |
 | 3 | 群发/预览请求体结构错误 | ✅ 已修复 | 新增 `MassContent` 接口与 6 个类型化内容体；`MassContentFields` 嵌入三个请求体；新增 `NewMassSendRequest/NewPreviewRequest/NewSendAllRequest` |
 | 4 | `QueryBlockTmplMsg` 打到 get_industry | ✅ 已修复 | 新增常量 `URLQueryBlockTmplMsg = /cgi-bin/message/template/query_block_tmpl_msg` |
-| 5 | 刷新网页授权 token 用错接口 | ✅ 已修复 | 新增 `URLSnsOAuth2ComponentRefreshToken`；`URLRefreshComponentAccessToken` 标记 Deprecated；顺带修复两处 token 明文日志 |
+| 5 | 刷新网页授权 token 用错接口 | ✅ 已修复 | 新增 `URLSnsOAuth2ComponentRefreshToken`；`URLRefreshComponentAccessToken` 已删除（第三批 #16，与 `URLAuthorizerToken` 同址）；顺带修复两处 token 明文日志 |
 | 6 | clear_quota / quota 请求体字段错误 | ✅ 已修复 | body 统一为 `{"appid":...}`；`ClearComponentQuota` 改用 `/cgi-bin/component/clear_quota/v2` 且字段为 `appsecret`；新增 `ClearAuthorizerQuota` / `ClearAuthorizerQuotaBySecret` |
 | 7 | message 模块占位实现 + map 无锁 | ✅ 已修复 | 新增 `CryptoConfigProvider` 与 `WithCryptoConfigProvider/WithDefaultCryptoConfig` 选项；`cryptoCache` 加 `sync.RWMutex` + 双重检查；新增 `ClearCryptoCache` |
 | 8 | 仓库缺 go.sum | ✅ 已修复 | 已执行 `go mod tidy` 本地生成 `go.sum`；因 `.gitignore` 显式忽略 `/go.sum`（库项目约定：依赖校验由消费方自行生成），该文件不随仓库分发 |
@@ -34,6 +34,9 @@ P1 批次：
 6. `SendNewSubscribeMsgRequest` 新增 `MiniprogramState string` 字段，原 `Miniprogram` 字段的 json tag 由 `miniprogram_state`（错误用法）改为 `miniprogram`——若此前依赖原错误序列化行为需调整
 7. `WeGo` 全部 getter 与 `OAuthClient.GetAuthorizeURL` 系列新增 `XxxE` 返回 `(client, error)` 变体；旧方法标 `Deprecated`（保留 panic 兼容），建议迁移到 E 版
 8. `core.Request` 日志不再输出完整 headers/body（依赖日志做请求审计的需自行记录）
+
+P2 批次：
+9. 删除导出常量 `openplatform.URLRefreshComponentAccessToken`（与 `URLAuthorizerToken` 同址，见第三批 #16）——引用该常量的下游代码需改用 `URLAuthorizerToken`（刷新授权方 access_token）或 `URLSnsOAuth2ComponentRefreshToken`（刷新网页授权 token）
 
 ---
 
@@ -232,11 +235,20 @@ P1 批次：
 
 **验证方式**：临时探针测试校验了限频器（间隔拦截/日限拦截/跨天重置）、stable token 缓存命中、core 脱敏、`NewE` 错误传播链路，跑通后已按惯例删除。`go build`、`go vet`、`gofmt -l`、全量 `go test ./...` 通过（race 检测因 Windows 环境缺 CGO 编译器跳过，并发逻辑已由探针的 64 并发用例覆盖）。
 
-**第三批 —— 规范与清理（P2）**
-16. 删除已下线接口常量
-17. 抽离公共 opts 解析
-18. 修正 README 全部不一致项
-19. 补齐第五节的缺失能力（按业务优先级）
+**第三批 —— 规范与清理（P2）：部分完成（2026-10-22）**
+
+| # | P2 问题 | 状态 | 主要改动 |
+|---|---|---|---|
+| 16 | 删除已下线接口常量 | ✅ 已完成 | 删除 `URLRefreshComponentAccessToken`（与 `URLAuthorizerToken` 同址，已确认全库无引用）；`URLSnsOAuth2ComponentRefreshToken` 注释补充两者不可混用的说明 |
+| 17 | 抽离公共 opts 解析 | ✅ 已完成 | 新增 `core/opts.go` 的 `ApplyClientOptions`（回调式，支持模块扩展 handler）；`official_account`/`miniprogram`/`payment`/`openplatform` 四个模块构造函数的重复 switch 全部替换，openplatform 通过 extraHandler 处理 `EventHandler` |
+| 18 | 修正 README 全部不一致项 | ✅ 已完成 | `MPConfig`→`OfficialAccountConfig`（3 处）、`NewWeGo`→`NewE`、删除不存在的「内存存储自动回退」描述、稳定版 token 说明更新（内置缓存 + `SetStableTokenStorage` 持久化注入 + force_refresh 限频）、依赖版本对齐 go.mod（Go 1.26.0 / jcbaseGo v0.16.3 / gorm v1.31.2）、新增「E 版构造函数（推荐）」章节、模块说明中过时类型名（`WegoClient`/`MPClient`）修正、示例代码与当前 API 对齐 |
+| 19 | 补齐第五节缺失能力 | ⬜ 未执行 | 按业务优先级补充，待定 |
+
+**验证方式**：`go build`、`go vet`、`gofmt -l`（全库零输出，`payment/api.go`/`payment/types.go` 历史遗留格式化问题已随重构消除）、全量 `go test ./...` 通过。
+
+**外部交叉验证后的补丁（2026-10-22）**：经独立会话交叉审查发现并修复 4 处遗漏——① README 存储回退描述与 `storage/file.go` 实际实现不符（存在临时目录回退），已改为事实；② `ApplyClientOptions` 的 warnLogger 按值传入导致未知参数警告不进自定义 logger（与重构前行为有差异），已改为闭包；③ README 示例仍调用 Deprecated getter（10 处）且占位 AESKey 非 43 位（复制即触发 `Validate` 报错），已全部换 E 版并修正占位值；④ 审查报告第 19 行"标记 Deprecated"与常量已删除状态不一致，已同步。
+
+**示例编译复验（2026-10-22，第二轮）**：首轮探针结论有误——复刻编译发现示例 1–3 存在未使用变量（`declared and not used`）无法通过编译，已将各示例结尾改为输出客户端就绪状态（`%v` 打印 `xxxClient != nil`）使变量被消费；破坏性变更提示补录 P2 条目 9（删除导出常量 `URLRefreshComponentAccessToken`）。最终复验：README 全部 5 个示例提取后逐一 `go build` 通过（可复制即用），探针已删除。
 
 ---
 

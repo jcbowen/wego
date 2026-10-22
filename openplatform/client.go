@@ -84,24 +84,16 @@ func NewClientWithStorageE(config *Config, tokenStorage storage.TokenStorage, op
 	}
 
 	// 遍历所有可选参数，根据类型进行相应设置
-	if len(opt) > 0 {
-		for _, option := range opt {
-			switch v := option.(type) {
-			case debugger.LoggerInterface:
-				// 设置自定义日志器（支持debugger logger和wego logger）
-				client.SetLogger(v)
-			case core.HTTPClient:
-				// 设置自定义HTTP客户端
-				client.SetHTTPClient(v)
-			case EventHandler:
-				// 设置自定义事件处理器
-				client.SetEventHandler(v)
-			default:
-				// 记录未知类型的可选参数
-				client.logger.Warn(fmt.Sprintf("未知的可选参数类型: %T", v))
+	core.ApplyClientOptions(opt, func(msg string) { client.logger.Warn(msg) }, func(l debugger.LoggerInterface) {
+		client.SetLogger(l)
+	}, client.SetHTTPClient,
+		func(option any) (handled bool) {
+			if handler, ok := option.(EventHandler); ok {
+				client.SetEventHandler(handler)
+				return true
 			}
-		}
-	}
+			return false
+		})
 
 	client.req = core.NewRequest(client.httpClient, client.logger)
 

@@ -85,16 +85,7 @@ func NewClientWithStorageE(config *Config, tokenStorage storage.TokenStorage, op
 		logger:     logger.NewDefaultLoggerInterface(),
 	}
 
-	for _, option := range opts {
-		switch v := option.(type) {
-		case debugger.LoggerInterface:
-			client.SetLogger(v)
-		case core.HTTPClient:
-			client.SetHTTPClient(v)
-		default:
-			client.logger.Warn(fmt.Sprintf("未知的可选参数类型: %T", v))
-		}
-	}
+	core.ApplyClientOptions(opts, func(msg string) { client.logger.Warn(msg) }, client.SetLogger, client.SetHTTPClient)
 
 	client.req = core.NewRequest(client.httpClient, client.logger)
 	return client, nil

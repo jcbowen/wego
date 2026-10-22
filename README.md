@@ -127,24 +127,32 @@ go get github.com/jcbowen/wego
 
 WeGo库提供多种存储后端支持：
 
-- **文件存储（默认）**：使用`wego_storage`目录保存Token数据
+- **文件存储（默认）**：使用`./runtime/wego_storage`目录保存Token数据
 - **内存存储**：适合开发和测试环境，重启后数据丢失
 - **数据库存储**：支持GORM数据库存储
-- **自定义存储**：支持自定义存储实现
+- **自定义存储**：实现`storage.TokenStorage`接口即可
 
 **默认存储策略**：
 - 默认使用文件存储，数据持久化到本地文件
-- 如果文件存储创建失败，会自动回退到内存存储并记录警告日志
-- 可通过`NewWeGoWithStorage`方法指定自定义存储
+- 文件存储创建失败时自动回退到系统临时目录（`os.TempDir()/wego_storage`）；临时目录也不可用时，E 版构造返回error，旧版`wego.New`/`wego.NewWithStorage`为兼容保留，失败时会panic
+- 可通过`wego.NewWithStorage(storage, configs...)`指定自定义存储
 
 ### 稳定版Token说明
 
-WeGo库支持稳定版access_token功能：
+WeGo库支持稳定版access_token功能（`official_account.StableTokenClient`）：
 
-- **普通模式**：优先使用缓存的token，避免频繁刷新
-- **强制刷新模式**：强制刷新获取新的token
-- **自动刷新**：在token即将过期时自动刷新
-- **存储支持**：支持稳定版token的持久化存储（当前版本存储接口正在扩展中）
+- **普通模式**：优先使用缓存的token（内存缓存，5分钟过期余量），避免频繁刷新
+- **强制刷新模式**：强制刷新获取新token；官方限制`force_refresh`每天20次且间隔30秒，库内已内置限频器（超限返回明确错误）
+- **存储支持**：默认内存存储，可通过`Client.GetStableTokenClient().SetStableTokenStorage(s)`注入自定义持久化存储（实现`StableAccessTokenStorage`接口）
+
+### E 版构造函数（推荐）
+
+依赖库不应决定宿主进程生死。全库统一提供E版构造/获取方法，配置或依赖非法时返回`error`而非panic：
+
+- 模块级：`official_account.NewClientE`、`miniprogram.NewClientE`、`openplatform.NewClientE`、`payment.NewClientE`（及各自`NewXxxWithStorageE`）
+- 入口级：`wego.NewE(configs...)`、`wego.NewWithStorageE(storage, configs...)`
+- `WeGo`的全部getter均有`XxxE`变体（如`OpenPlatformAuthE`、`OfficialAccountAPIE`、`PaymentE`），未初始化对应客户端时返回error
+- 旧版`wego.New`/各getter仍可用（兼容层转发E版，失败时panic），已标`Deprecated`
 
 ### 基本使用
 
@@ -164,20 +172,30 @@ func main() {
 		ComponentAppID:     "your_component_app_id",
 		ComponentAppSecret: "your_component_app_secret",
 		ComponentToken:     "your_component_token",
-		EncodingAESKey:     "your_encoding_aes_key",
+		EncodingAESKey:     "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG", // 43位
 		RedirectURI:        "your_redirect_uri",
 	}
 
-    // 创建WeGo实例（只初始化开放平台）
-    wegoClient := wego.New(openPlatformConfig)
+    // 创建WeGo实例（只初始化开放平台），推荐使用NewE获取校验错误
+    wegoClient, err := wego.NewE(openPlatformConfig)
+    if err != nil {
+        panic(err)
+    }
 
-    // 使用开放平台功能
-    authClient := wegoClient.OpenPlatformAuth()
-    messageClient := wegoClient.OpenPlatformMessage()
+    // 使用开放平台功能（E版getter，未初始化时返回error）
+    authClient, err := wegoClient.OpenPlatformAuthE()
+    if err != nil {
+        panic(err)
+    }
+    messageClient, err := wegoClient.OpenPlatformMessageE()
+    if err != nil {
+        panic(err)
+    }
     // 需要直接调用开放平台API时可使用底层客户端：
     // wegoClient.OpenPlatformClient.GetComponentAccessToken(ctx, "...")
 
-	fmt.Println("开放平台客户端初始化成功！")
+	fmt.Printf("开放平台客户端初始化成功！authClient就绪: %v, messageClient就绪: %v\n",
+		authClient != nil, messageClient != nil)
 }
 ```
 
@@ -193,22 +211,35 @@ import (
 
 func main() {
 	// 配置公众号参数
-	officialAccountConfig := &wego.MPConfig{
+	officialAccountConfig := &wego.OfficialAccountConfig{
 		AppID:     "your_mp_app_id",
 		AppSecret: "your_mp_app_secret",
 		Token:     "your_mp_token",
-		AESKey:    "your_mp_aes_key",
+		AESKey:    "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG", // 43位
 	}
 
-    // 创建WeGo实例（只初始化公众号）
-    wegoClient := wego.New(officialAccountConfig)
+    // 创建WeGo实例（只初始化公众号），推荐使用NewE获取校验错误
+    wegoClient, err := wego.NewE(officialAccountConfig)
+    if err != nil {
+        panic(err)
+    }
 
-	// 使用公众号功能
-	apiClient := wegoClient.OfficialAccountAPI()
-	menuClient := wegoClient.OfficialAccountMenu()
-	messageClient := wegoClient.OfficialAccountMessage()
+	// 使用公众号功能（E版getter，未初始化时返回error）
+	apiClient, err := wegoClient.OfficialAccountAPIE()
+	if err != nil {
+		panic(err)
+	}
+	menuClient, err := wegoClient.OfficialAccountMenuE()
+	if err != nil {
+		panic(err)
+	}
+	messageClient, err := wegoClient.OfficialAccountMessageE()
+	if err != nil {
+		panic(err)
+	}
 
-	fmt.Println("公众号客户端初始化成功！")
+	fmt.Printf("公众号客户端初始化成功！apiClient: %v, menuClient: %v, messageClient: %v\n",
+		apiClient != nil, menuClient != nil, messageClient != nil)
 }
 ```
 
@@ -228,37 +259,52 @@ func main() {
 		ComponentAppID:     "your_component_app_id",
 		ComponentAppSecret: "your_component_app_secret",
 		ComponentToken:     "your_component_token",
-		EncodingAESKey:     "your_encoding_aes_key",
+		EncodingAESKey:     "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG", // 43位
 		RedirectURI:        "your_redirect_uri",
 	}
 
 	// 配置公众号参数
-	officialAccountConfig := &wego.MPConfig{
+	officialAccountConfig := &wego.OfficialAccountConfig{
 		AppID:     "your_mp_app_id",
 		AppSecret: "your_mp_app_secret",
 		Token:     "your_mp_token",
-		AESKey:    "your_mp_aes_key",
+		AESKey:    "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG", // 43位
 	}
 
-    // 创建WeGo实例（同时初始化开放平台和公众号）
-    wegoClient := wego.New(openPlatformConfig, officialAccountConfig)
+    // 创建WeGo实例（同时初始化开放平台和公众号），推荐使用NewE获取校验错误
+    wegoClient, err := wego.NewE(openPlatformConfig, officialAccountConfig)
+    if err != nil {
+        panic(err)
+    }
 
 	// 检查客户端是否初始化
 	fmt.Printf("开放平台已初始化: %v\n", wegoClient.OpenPlatformClient != nil)
 	fmt.Printf("公众号已初始化: %v\n", wegoClient.OfficialAccountClient != nil)
 
-    // 使用开放平台功能
-    openPlatformAuth := wegoClient.OpenPlatformAuth()
-    openPlatformMessage := wegoClient.OpenPlatformMessage()
+    // 使用开放平台功能（E版getter，未初始化时返回error）
+    openPlatformAuth, err := wegoClient.OpenPlatformAuthE()
+    if err != nil {
+        panic(err)
+    }
+    openPlatformMessage, err := wegoClient.OpenPlatformMessageE()
+    if err != nil {
+        panic(err)
+    }
 
 	// 使用公众号功能
-	officialAccountAPI := wegoClient.OfficialAccountAPI()
+	officialAccountAPI, err := wegoClient.OfficialAccountAPIE()
+	if err != nil {
+		panic(err)
+	}
 	
 	// 使用通用功能
 	cryptoClient := wegoClient.Crypto()
 	storageClient := wegoClient.Storage()
 
-	fmt.Println("所有客户端初始化成功！")
+	fmt.Printf("所有客户端初始化成功！openPlatformAuth: %v, openPlatformMessage: %v, officialAccountAPI: %v\n",
+		openPlatformAuth != nil, openPlatformMessage != nil, officialAccountAPI != nil)
+	fmt.Printf("通用功能就绪！cryptoClient: %v, storageClient: %v\n",
+		cryptoClient != nil, storageClient != nil)
 }
 ```
 
@@ -275,18 +321,24 @@ import (
 
 func main() {
 	// 配置公众号参数
-	config := &wego.MPConfig{
+	config := &wego.OfficialAccountConfig{
 		AppID:     "your_mp_app_id",
 		AppSecret: "your_mp_app_secret",
 		Token:     "your_mp_token",
-		AESKey:    "your_mp_aes_key",
+		AESKey:    "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG", // 43位
 	}
 
     // 创建WeGo实例
-    wegoClient := wego.New(config)
+    wegoClient, err := wego.NewE(config)
+    if err != nil {
+        panic(err)
+    }
 
-    // 获取公众号API客户端
-    apiClient := wegoClient.OfficialAccountAPI()
+    // 获取公众号API客户端（E版getter，未初始化时返回error）
+    apiClient, err := wegoClient.OfficialAccountAPIE()
+    if err != nil {
+        panic(err)
+    }
 
     // 使用稳定版token发送请求
 	ctx := context.Background()
@@ -324,18 +376,24 @@ import (
 
 func main() {
 	// 配置公众号参数
-	config := &wego.MPConfig{
+	config := &wego.OfficialAccountConfig{
 		AppID:     "your_mp_app_id",
 		AppSecret: "your_mp_app_secret",
 		Token:     "your_mp_token",
-		AESKey:    "your_mp_aes_key",
+		AESKey:    "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG", // 43位
 	}
 
 	// 创建WeGo实例
-	wegoClient := wego.NewWeGo(config)
+	wegoClient, err := wego.NewE(config)
+	if err != nil {
+		panic(err)
+	}
 
-	// 获取订阅消息客户端
-	subscribeClient := wegoClient.OfficialAccountSubscribe()
+	// 获取订阅消息客户端（E版getter，未初始化时返回error）
+	subscribeClient, err := wegoClient.OfficialAccountSubscribeE()
+	if err != nil {
+		panic(err)
+	}
 
 	// 获取订阅通知分类列表
 	ctx := context.Background()
@@ -362,8 +420,7 @@ func main() {
 
 核心配置和客户端实现，包含：
 
-- `OpenPlatformConfig` - 开放平台配置结构体
-- `WegoClient` - 主客户端
+- `Request` - 统一HTTP请求封装（含敏感参数日志脱敏）
 - 令牌管理和HTTP客户端
 
 ### OpenPlatform 模块
@@ -381,15 +438,16 @@ func main() {
 
 微信公众号开发功能，包含：
 
-- `MPClient` - 公众号主客户端
-- `MPAPIClient` - 公众号API客户端
+- `Client` - 公众号主客户端（token互斥锁 + 5分钟过期余量）
+- `APIClient` - 公众号API客户端
 - `MenuClient` - 菜单管理客户端
-- `MessageClient` - 消息处理客户端
+- `MessageClient` - 消息处理客户端（群发/预览）
 - `TemplateClient` - 模板消息客户端
 - `CustomClient` - 客服消息客户端
 - `MaterialClient` - 素材管理客户端
-- `StableTokenClient` - 稳定版access_token客户端
+- `StableTokenClient` - 稳定版access_token客户端（内置缓存与force_refresh限频）
 - `SubscribeClient` - 订阅消息客户端
+- `OAuthClient` - 网页授权客户端
 
 **客户端获取方法**：
 - `OfficialAccountAPI()` - 获取公众号API客户端
@@ -398,8 +456,9 @@ func main() {
 - `OfficialAccountTemplate()` - 获取模板消息客户端
 - `OfficialAccountCustom()` - 获取客服消息客户端
 - `OfficialAccountMaterial()` - 获取素材管理客户端
-- `OfficialAccountSubscribe()` - 获取订阅消息客户端（通过MPAPIClient的GetSubscribeClient()方法）
-- `GetStableTokenClient()` - 获取稳定版Token客户端（通过MPAPIClient的GetStableTokenClient()方法）
+- `OfficialAccountSubscribe()` - 获取订阅消息客户端
+- 以上均有`XxxE`变体（未初始化时返回error而非panic，推荐）
+- `Client.GetStableTokenClient()` - 获取稳定版Token客户端（公众号客户端方法）
 
 ### Payment 模块
 
@@ -447,11 +506,10 @@ func main() {
 - 支持自定义存储后端
 
 **默认存储策略**：
-- 默认存储为文件存储
-- 文件存储使用`./runtime/wego_storage`目录保存Token数据
-- 如果文件存储创建失败，会自动回退到内存存储并记录警告日志
-- 可通过`NewWithStorage`方法指定自定义存储
-- 稳定版token的持久化存储支持后续扩展
+- 默认存储为文件存储，使用`./runtime/wego_storage`目录保存Token数据
+- 文件存储创建失败时自动回退到系统临时目录；临时目录也不可用时，E版构造返回error，旧版构造panic
+- 可通过`wego.NewWithStorageE(storage, configs...)`指定自定义存储
+- 稳定版token默认使用内存存储，可通过`SetStableTokenStorage`注入持久化实现
 
 ## 示例
 
@@ -473,9 +531,9 @@ func main() {
 
 ## 依赖
 
-- Go 1.23.0+
-- gorm.io/gorm v1.31.0
-- github.com/jcbowen/jcbaseGo v0.13.6
+- Go 1.26.0+
+- gorm.io/gorm v1.31.2
+- github.com/jcbowen/jcbaseGo v0.16.3
 
 ## 许可证
 
