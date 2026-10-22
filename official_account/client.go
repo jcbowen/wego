@@ -27,6 +27,10 @@ type Client struct {
 	tokenMu    sync.RWMutex // 保护 access_token 的获取与刷新，避免并发重复刷新
 
 	stableTokenClient *StableTokenClient // 稳定版access_token客户端
+
+	jsapiTicketMu        sync.Mutex // 保护 JSAPI ticket 缓存
+	jsapiTicket          string     // 缓存的 JSAPI ticket
+	jsapiTicketExpiresAt time.Time  // JSAPI ticket 过期时间
 }
 
 // NewClientE 创建新的微信公众号客户端（使用默认文件存储），出错时返回 error 而不是 panic

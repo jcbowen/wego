@@ -110,9 +110,6 @@ const (
 	URLQRCodeCreate = core.BaseAPIURL + "/cgi-bin/qrcode/create"
 	URLQRCodeShow   = core.MPBaseURL + "/cgi-bin/showqrcode"
 
-	// 短链接
-	URLShortURL = core.BaseAPIURL + "/cgi-bin/shorturl"
-
 	// 设备功能
 	URLDeviceAuthorize    = core.BaseAPIURL + "/device/authorize"
 	URLDeviceCreateQRCode = core.BaseAPIURL + "/device/create_qrcode"

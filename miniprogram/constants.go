@@ -16,4 +16,22 @@ const (
 
 	// GrantTypeClientCredential 授权类型：client_credential
 	GrantTypeClientCredential = "client_credential"
+
+	// SubscribeMessageSendURL 发送订阅消息地址
+	SubscribeMessageSendURL = "https://api.weixin.qq.com/cgi-bin/message/subscribe/send"
+
+	// MsgSecCheckURL 内容安全检测（文本）地址
+	MsgSecCheckURL = "https://api.weixin.qq.com/wxa/msg_sec_check"
+
+	// MediaCheckAsyncURL 内容安全检测（音视频异步）地址，检测结果通过消息推送异步告知
+	MediaCheckAsyncURL = "https://api.weixin.qq.com/wxa/media_check_async"
+
+	// GetWxaCodeURL 获取小程序码（带 path 参数，数量有限制）地址
+	GetWxaCodeURL = "https://api.weixin.qq.com/wxa/getwxacode"
+
+	// GetWxaCodeUnlimitURL 获取小程序码（带 scene 参数，数量不限）地址
+	GetWxaCodeUnlimitURL = "https://api.weixin.qq.com/wxa/getwxacodeunlimit"
+
+	// CreateWxaQrcodeURL 获取小程序二维码（旧接口，带 path 参数）地址
+	CreateWxaQrcodeURL = "https://api.weixin.qq.com/cgi-bin/wxaapp/createwxaqrcode"
 )

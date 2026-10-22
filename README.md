@@ -423,6 +423,17 @@ func main() {
 - `Request` - 统一HTTP请求封装（含敏感参数日志脱敏）
 - 令牌管理和HTTP客户端
 
+### MiniProgram 模块
+
+微信小程序开发功能，通过 `MiniProgram()` / `MiniProgramE()` 获取客户端：
+
+- 登录：`Code2Session`
+- 手机号：`GetPhoneNumber`
+- 订阅消息：`SendSubscribeMessage`
+- 内容安全：`MsgSecCheck`（文本，v2 同步）、`MediaCheckAsync`（音视频，v2 异步）
+- 小程序码：`GetWxaCode`、`GetWxaCodeUnlimit`（scene 参数，不限量）、`CreateWxaQrcode`（旧接口）
+- 用户数据解密：`DecryptUserInfo`
+
 ### OpenPlatform 模块
 
 微信开放平台功能，包含：
@@ -438,13 +449,14 @@ func main() {
 
 微信公众号开发功能，包含：
 
-- `Client` - 公众号主客户端（token互斥锁 + 5分钟过期余量）
+- `Client` - 公众号主客户端（token互斥锁 + 5分钟过期余量 + JSAPI ticket缓存）
 - `APIClient` - 公众号API客户端
 - `MenuClient` - 菜单管理客户端
 - `MessageClient` - 消息处理客户端（群发/预览）
 - `TemplateClient` - 模板消息客户端
 - `CustomClient` - 客服消息客户端
-- `MaterialClient` - 素材管理客户端
+- `MaterialClient` - 素材管理客户端（含视频素材元数据返回）
+- `UserClient` - 用户管理客户端（用户信息/标签管理）
 - `StableTokenClient` - 稳定版access_token客户端（内置缓存与force_refresh限频）
 - `SubscribeClient` - 订阅消息客户端
 - `OAuthClient` - 网页授权客户端
@@ -457,6 +469,8 @@ func main() {
 - `OfficialAccountCustom()` - 获取客服消息客户端
 - `OfficialAccountMaterial()` - 获取素材管理客户端
 - `OfficialAccountSubscribe()` - 获取订阅消息客户端
+- `OfficialAccountUser()` - 获取用户管理客户端
+- `OfficialAccount()` - 获取公众号基础客户端（`GetJSAPITicket()` 获取 JSSDK ticket）
 - 以上均有`XxxE`变体（未初始化时返回error而非panic，推荐）
 - `Client.GetStableTokenClient()` - 获取稳定版Token客户端（公众号客户端方法）
 

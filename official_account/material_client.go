@@ -220,32 +220,84 @@ func (c *MaterialClient) UploadMaterial(ctx context.Context, materialType Materi
 	return &result, nil
 }
 
+// GetMaterialResponse 获取永久素材响应
+//
+// 根据素材类型区分两种返回形态：
+//   - 图片/语音/缩略图等二进制素材：Data 为原始字节流，ContentType 为响应 Content-Type
+//   - 视频素材：微信返回 JSON（title/description/down_url），解析到对应字段
+type GetMaterialResponse struct {
+	core.APIResponse
+	ContentType string `json:"-"`           // 响应 Content-Type
+	Data        []byte `json:"-"`           // 二进制素材的原始数据（非视频素材时有效）
+	Title       string `json:"title"`       // 视频素材标题（仅视频素材返回）
+	Description string `json:"description"` // 视频素材描述（仅视频素材返回）
+	DownURL     string `json:"down_url"`    // 视频素材下载地址（仅视频素材返回，官方文档字段）
+	VideoURL    string `json:"video_url"`   // 视频素材地址（部分场景返回 video_url 而非 down_url）
+}
+
 // GetMaterial 获取永久素材
-func (c *MaterialClient) GetMaterial(ctx context.Context, mediaID string) ([]byte, error) {
+//
+// 参数:
+//   - ctx: 上下文
+//   - mediaID: 素材 media_id
+//
+// 返回:
+//   - *GetMaterialResponse: 二进制素材填充 Data/ContentType；视频素材填充 Title/Description/DownURL(或 VideoURL)
+//   - error: 请求失败或微信返回错误时返回错误
+//
+// 文档:
+//   - https://developers.weixin.qq.com/doc/offiaccount/Asset_Management/Get_materials.html
+func (c *MaterialClient) GetMaterial(ctx context.Context, mediaID string) (*GetMaterialResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	request := map[string]string{
-		"media_id": mediaID,
-	}
-
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetMaterial, url.QueryEscape(accessToken))
 
-	// 使用MakeRequest获取原始响应数据
-	var respData []byte
-	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "POST",
-		URL:    apiURL,
-		Body:   request,
-		Result: &respData,
-	})
+	// 素材接口的响应可能是二进制流，必须走 MakeRaw 并按 Content-Type 区分处理
+	requestBody, err := json.Marshal(map[string]string{"media_id": mediaID})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("序列化请求体失败: %v", err)
 	}
 
-	return respData, nil
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("创建HTTP请求失败: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.Client.req.MakeRaw(req)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应失败: %v", err)
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	// JSON 响应：要么是错误信息，要么是视频素材的元数据
+	if strings.Contains(contentType, "application/json") {
+		var result GetMaterialResponse
+		if err := json.Unmarshal(respBody, &result); err != nil {
+			return nil, fmt.Errorf("解析响应失败: %v", err)
+		}
+		if !result.IsSuccess() {
+			return nil, &result.APIResponse
+		}
+		result.ContentType = contentType
+		return &result, nil
+	}
+
+	// 二进制素材：直接返回原始数据
+	return &GetMaterialResponse{
+		APIResponse: core.APIResponse{ErrCode: 0, ErrMsg: "success"},
+		ContentType: contentType,
+		Data:        respBody,
+	}, nil
 }
 
 // DeleteMaterial 删除永久素材

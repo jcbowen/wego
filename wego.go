@@ -409,9 +409,14 @@ func (w *WeGo) OfficialAccountOAuthE() (*official_account.OAuthClient, error) {
 }
 
 // OpenPlatformOAuth 返回开放平台网页授权相关功能（代公众号授权）
+//
+// 参数:
+//   - redirectURI: 授权后重定向地址
+//   - authorizerAppID: 授权方公众号/小程序的 AppID，不能为空
+//
 // Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OpenPlatformOAuthE。
-func (w *WeGo) OpenPlatformOAuth(redirectURI string) *openplatform.OAuthClient {
-	oauthClient, err := w.OpenPlatformOAuthE(redirectURI)
+func (w *WeGo) OpenPlatformOAuth(redirectURI, authorizerAppID string) *openplatform.OAuthClient {
+	oauthClient, err := w.OpenPlatformOAuthE(redirectURI, authorizerAppID)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -419,12 +424,23 @@ func (w *WeGo) OpenPlatformOAuth(redirectURI string) *openplatform.OAuthClient {
 }
 
 // OpenPlatformOAuthE 返回开放平台网页授权相关功能（E 版：未初始化时返回 error）
-func (w *WeGo) OpenPlatformOAuthE(redirectURI string) (*openplatform.OAuthClient, error) {
+//
+// 参数:
+//   - redirectURI: 授权后重定向地址
+//   - authorizerAppID: 授权方公众号/小程序的 AppID，不能为空
+//
+// 返回:
+//   - *openplatform.OAuthClient: 网页授权客户端
+//   - error: 客户端未初始化或 authorizerAppID 为空时返回错误
+func (w *WeGo) OpenPlatformOAuthE(redirectURI, authorizerAppID string) (*openplatform.OAuthClient, error) {
 	if w.OpenPlatformClient == nil {
 		return nil, fmt.Errorf("未初始化开放平台客户端")
 	}
+	if authorizerAppID == "" {
+		return nil, fmt.Errorf("authorizerAppID 不能为空，代公众号网页授权必须指定授权方 AppID")
+	}
 	authClient := openplatform.NewAuthClient(w.OpenPlatformClient)
-	authorizerClient := authClient.NewAuthorizerClient("") // 这里需要传入具体的authorizerAppID
+	authorizerClient := authClient.NewAuthorizerClient(authorizerAppID)
 	return authorizerClient.GetOAuthClient(redirectURI), nil
 }
 
@@ -465,6 +481,51 @@ func (w *WeGo) OfficialAccountSubscribeE() (*official_account.SubscribeClient, e
 	}
 	apiClient := official_account.NewMPAPIClient(w.OfficialAccountClient)
 	return apiClient.GetSubscribeClient(), nil
+}
+
+// OfficialAccountUser 返回公众号用户管理相关功能
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OfficialAccountUserE。
+func (w *WeGo) OfficialAccountUser() *official_account.UserClient {
+	userClient, err := w.OfficialAccountUserE()
+	if err != nil {
+		panic(err.Error())
+	}
+	return userClient
+}
+
+// OfficialAccountUserE 返回公众号用户管理相关功能（E 版：未初始化时返回 error）
+//
+// 返回:
+//   - *official_account.UserClient: 用户管理客户端（用户信息、标签管理）
+//   - error: 未初始化公众号客户端时返回错误
+func (w *WeGo) OfficialAccountUserE() (*official_account.UserClient, error) {
+	if w.OfficialAccountClient == nil {
+		return nil, fmt.Errorf("未初始化公众号客户端")
+	}
+	return official_account.NewUserClient(w.OfficialAccountClient), nil
+}
+
+// OfficialAccount 返回公众号基础客户端
+// 注意：JSSDK ticket（GetJSAPITicket/InvalidateJSAPITicket）挂在该客户端上。
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OfficialAccountE。
+func (w *WeGo) OfficialAccount() *official_account.Client {
+	oaClient, err := w.OfficialAccountE()
+	if err != nil {
+		panic(err.Error())
+	}
+	return oaClient
+}
+
+// OfficialAccountE 返回公众号基础客户端（E 版：未初始化时返回 error）
+//
+// 返回:
+//   - *official_account.Client: 公众号基础客户端
+//   - error: 未初始化公众号客户端时返回错误
+func (w *WeGo) OfficialAccountE() (*official_account.Client, error) {
+	if w.OfficialAccountClient == nil {
+		return nil, fmt.Errorf("未初始化公众号客户端")
+	}
+	return w.OfficialAccountClient, nil
 }
 
 // MiniProgram 返回微信小程序客户端

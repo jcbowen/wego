@@ -169,24 +169,28 @@ P2 批次：
 
 ## 五、官方已提供、当前未封装的能力（待补齐）
 
+> 2026-10-22 更新：下列「✅ 已补齐」项为第四批（方案 A）成果；其余保持未封装，按业务优先级另行安排。
+
 ### official_account
-- 用户管理：`/cgi-bin/user/info`、`user/info/batchget`、`tags/*`（URL 已定义但**没有任何 client 方法**，属「有常量无实现」）
+- ✅ 用户管理：`UserClient`（`user/info`、`batchget`、`user/get`、`updateremark`、`tags/*` 全套）
+- ✅ 公众号 JSSDK ticket：`Client.GetJSAPITicket()`（含内存缓存）
 - 二维码：`URLQRCodeCreate` / `URLQRCodeShow` 常量已定义，但 `api_qrcode.go` 仅被 openplatform 间接使用，公众号侧无独立入口
-- 短链接 `URLShortURL`、JSSDK ticket `URLGetTicket`（公众号侧无封装）
+- ~~短链接 `URLShortURL`~~：官方已停用该服务，常量已删除
 - 数据分析 `datacube/*`：常量已定义，无实现
 - **新版客服消息**：`message/custom/typing` 已有；缺少 `kfaccount` 头像上传（当前只发 JSON，未做 multipart）
-- 草稿箱/素材：`material_client.go` 已实现较完整，但 `GetMaterial` 对视频类返回 `{"video_url":..}` 的处理缺失（会把 JSON 当二进制返回）
+- ✅ `GetMaterial` 视频素材返回 `down_url` JSON 的处理已修复
 
 ### openplatform
 - 代小程序：代码管理（`code/commit`、`get_qrcode`、`get_category`、`submit_audit`、`get_auditstatus`、`release`、`revertcoderelease`）全部缺失
 - 小程序服务域/业务域设置：`modify_wxa_server_domain` / `modify_wxa_jump_domain` 常量已有、无实现
 - `api_start_push_ticket`（`URLStartPushTicket`）无实现
-- 代公众号网页授权：`wego.go:329-336` 的 `OpenPlatformOAuth` 传了空 `authorizerAppID`，是半成品
+- ✅ 代公众号网页授权 `OpenPlatformOAuthE` 空参数半成品已修复（`authorizerAppID` 参数化）
 
 ### miniprogram
 - 登录：`code2Session` 已有
-- 缺失：`getAccessToken`（内部有）、**小程序码**（`getwxacode`/`getwxacodeunlimit`/`createwxaqrcode`）、**订阅消息**、**内容安全检测**（`msg_sec_check`、`media_check_async`）、**统一服务消息**、**云函数触发**等
-- 未在 `wego.go` 暴露任何语义化方法（仅有 `MiniProgram()` 返回裸 client）
+- ✅ 已补齐：订阅消息（`SendSubscribeMessage`）、内容安全检测（`MsgSecCheck`/`MediaCheckAsync` v2）、小程序码（`GetWxaCode`/`GetWxaCodeUnlimit`/`CreateWxaQrcode`）
+- 缺失：云函数触发等
+- ✅ `wego.go` 已暴露 `MiniProgram()`/`MiniProgramE()`，新增能力均为 `Client` 语义化方法
 
 ### payment
 - 覆盖度最好，可选补：转账（`transfer/batches`）、商家券、消费卡、代金券、支付即服务、`combine` 合单支付
@@ -242,7 +246,16 @@ P2 批次：
 | 16 | 删除已下线接口常量 | ✅ 已完成 | 删除 `URLRefreshComponentAccessToken`（与 `URLAuthorizerToken` 同址，已确认全库无引用）；`URLSnsOAuth2ComponentRefreshToken` 注释补充两者不可混用的说明 |
 | 17 | 抽离公共 opts 解析 | ✅ 已完成 | 新增 `core/opts.go` 的 `ApplyClientOptions`（回调式，支持模块扩展 handler）；`official_account`/`miniprogram`/`payment`/`openplatform` 四个模块构造函数的重复 switch 全部替换，openplatform 通过 extraHandler 处理 `EventHandler` |
 | 18 | 修正 README 全部不一致项 | ✅ 已完成 | `MPConfig`→`OfficialAccountConfig`（3 处）、`NewWeGo`→`NewE`、删除不存在的「内存存储自动回退」描述、稳定版 token 说明更新（内置缓存 + `SetStableTokenStorage` 持久化注入 + force_refresh 限频）、依赖版本对齐 go.mod（Go 1.26.0 / jcbaseGo v0.16.3 / gorm v1.31.2）、新增「E 版构造函数（推荐）」章节、模块说明中过时类型名（`WegoClient`/`MPClient`）修正、示例代码与当前 API 对齐 |
-| 19 | 补齐第五节缺失能力 | ⬜ 未执行 | 按业务优先级补充，待定 |
+| 19 | 补齐第五节缺失能力 | ✅ 已完成 | 方案 A（最小闭环）：① `GetMaterial` 视频素材 JSON 返回修复（新增 `GetMaterialResponse`，二进制走 Data、视频解析 title/description/down_url）；② `OpenPlatformOAuthE` 补全 `authorizerAppID` 参数（空值显式报错）；③ 新增 `UserClient`（用户信息/批量/关注列表/备注/标签 CRUD/打标/取标签粉丝/用户标签）；④ 公众号 `GetJSAPITicket`/`InvalidateJSAPITicket`（内存缓存 + 5 分钟余量）；⑤ 小程序订阅消息 `SendSubscribeMessage`、内容安全 `MsgSecCheck`/`MediaCheckAsync`（v2）；⑥ 小程序码 `GetWxaCode`/`GetWxaCodeUnlimit`/`CreateWxaQrcode`（二进制/JSON 混合响应处理）；⑦ `wego.go` 新增 `OfficialAccountUser(E)`/`OfficialAccount(E)` getter；⑧ 删除已下线的 `URLShortURL` 常量 |
+
+**第四批 —— 能力补齐（P2-19）：已完成 ✅（2026-10-22，方案 A 最小闭环）**
+
+验证方式：临时探针测试（假 RoundTripper 拦截请求）校验了用户管理请求体/Query 拼接、batchtagging 序列化、getticket `type=jsapi` 参数与缓存、GetMaterial 二进制/视频 JSON/错误三路径、订阅消息 data 嵌套、msg_sec_check v2 请求体、getwxacodeunlimit 请求体与二进制/错误双路径、`OpenPlatformOAuthE` 空参校验，跑通后已删除。`go build`、`go vet`、`gofmt -l`、全量 `go test ./...` 通过。
+
+破坏性变更（P2-19 批次）：
+- `MaterialClient.GetMaterial` 签名从 `([]byte, error)` 改为 `(*GetMaterialResponse, error)`
+- `WeGo.OpenPlatformOAuth/OpenPlatformOAuthE` 新增 `authorizerAppID` 参数
+- 删除导出常量 `official_account.URLShortURL`（官方已停用短链接服务）
 
 **验证方式**：`go build`、`go vet`、`gofmt -l`（全库零输出，`payment/api.go`/`payment/types.go` 历史遗留格式化问题已随重构消除）、全量 `go test ./...` 通过。
 
