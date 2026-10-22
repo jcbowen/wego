@@ -5,8 +5,8 @@ go 1.26.0
 // replace github.com/jcbowen/jcbaseGo => ../jcbaseGo
 
 require (
-	github.com/jcbowen/jcbaseGo v0.15.7
-	gorm.io/gorm v1.31.0
+	github.com/jcbowen/jcbaseGo v0.16.3
+	gorm.io/gorm v1.31.2
 )
 
 require (
