@@ -191,7 +191,12 @@ func (c *Client) AppPay(ctx context.Context, req *AppRequest) (*PrepayResponse, 
 //   - if order.TradeState == payment.TradeStateUserPaying { /* 轮询查单 */ }
 //
 // 文档:
-//   - https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_5_1.shtml
+//   - https://pay.weixin.qq.com/docs/merchant/apis/code-payment-v3/direct/code-pay.html
+//   - https://pay.weixin.qq.com/doc/v3/merchant/4012647301 （官方说明：付款码支付当前文档以 V2 为准）
+//
+// 注意:
+//   - 官方 OpenAPI 规范包含本接口，生产环境已广泛使用；但官方文档中心当前
+//     「付款码支付」产品页仍标注为 V2 接口，接入前建议在商户后台实测验证
 func (c *Client) CodePay(ctx context.Context, req *CodePayRequest) (*Order, error) {
 	if req == nil {
 		return nil, fmt.Errorf("请求参数不能为空")
@@ -368,14 +373,17 @@ func (c *Client) CloseOrder(ctx context.Context, outTradeNo string) error {
 //   - if err := client.ReverseOrder(ctx, "ORDER_20240101_001"); err != nil { return err }
 //
 // 文档:
-//   - https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_5_6.shtml
+//   - https://pay.weixin.qq.com/doc/v3/merchant/4012647301 （官方说明：付款码支付当前文档以 V2 为准）
+//
+// 注意:
+//   - 与 CodePay 同属付款码支付配套接口，官方文档中心当前标注为 V2，接入前建议实测验证
 func (c *Client) ReverseOrder(ctx context.Context, outTradeNo string) error {
 	if outTradeNo == "" {
 		return fmt.Errorf("商户订单号不能为空")
 	}
 
 	apiURL := fmt.Sprintf(PayReverseOrderURL, url.PathEscape(outTradeNo))
-	req := &CloseOrderRequest{MchID: c.config.MchID}
+	req := &ReverseOrderRequest{MchID: c.config.MchID}
 
 	return c.doRequest(ctx, "POST", apiURL, req, nil, true)
 }

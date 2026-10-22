@@ -454,6 +454,58 @@ func TestCodePay(t *testing.T) {
 	if paying.TradeState != TradeStateUserPaying {
 		t.Fatalf("USERPAYING 结果异常: %+v", paying)
 	}
+
+	// 可选字段：detail / settle_info / support_fapiao / scene_info 序列化
+	payingBody2 := `{"out_trade_no":"ORDER_003","trade_state":"USERPAYING"}`
+	mock.body = []byte(payingBody2)
+	mock.headers = signedHeaders(t, km.priv, "PUB_KEY_ID_TEST", payingBody2)
+	_, err = c.CodePay(context.Background(), &CodePayRequest{
+		Description:   "测试商品",
+		OutTradeNo:    "ORDER_003",
+		Amount:        Amount{Total: 100},
+		Payer:         CodePayer{AuthCode: "1345235315201154982642655746"},
+		SupportFapiao: true,
+		Detail: &OrderDetail{
+			CostPrice: 608800,
+			InvoiceID: "微信123",
+			GoodsDetail: []GoodsDetail{{
+				MerchantGoodsID:  "1246464644",
+				WechatpayGoodsID: "1001",
+				GoodsName:        "iPhoneX 256G",
+				Quantity:         1,
+				UnitPrice:        528800,
+			}},
+		},
+		SettleInfo: &SettleInfo{ProfitSharing: true},
+		SceneInfo: &CodePaySceneInfo{
+			DeviceID:  "013467007045764",
+			StoreInfo: &CodePayStoreInfo{ID: "0001", Name: "腾讯大厦分店", AreaCode: "440305", Address: "广东省深圳市南山区科技中一道10000号"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CodePay(可选字段) 失败: %v", err)
+	}
+	if err := json.Unmarshal(mock.lastBody, &sent); err != nil {
+		t.Fatalf("请求体解析失败: %v", err)
+	}
+	if sent["support_fapiao"] != true {
+		t.Fatalf("support_fapiao 未携带: %+v", sent)
+	}
+	if detail, ok := sent["detail"].(map[string]interface{}); !ok || detail["cost_price"] != float64(608800) {
+		t.Fatalf("detail 未携带: %+v", sent["detail"])
+	} else if goods, ok := detail["goods_detail"].([]interface{}); !ok || len(goods) != 1 {
+		t.Fatalf("goods_detail 未携带: %+v", detail)
+	} else if item, ok := goods[0].(map[string]interface{}); !ok || item["merchant_goods_id"] != "1246464644" || item["quantity"] != float64(1) {
+		t.Fatalf("goods_detail 元素异常: %+v", goods[0])
+	}
+	if settle, ok := sent["settle_info"].(map[string]interface{}); !ok || settle["profit_sharing"] != true {
+		t.Fatalf("settle_info 未携带: %+v", sent["settle_info"])
+	}
+	if scene, ok := sent["scene_info"].(map[string]interface{}); !ok || scene["device_id"] != "013467007045764" {
+		t.Fatalf("scene_info 未携带: %+v", sent["scene_info"])
+	} else if store, ok := scene["store_info"].(map[string]interface{}); !ok || store["id"] != "0001" {
+		t.Fatalf("store_info 未携带: %+v", scene["store_info"])
+	}
 }
 
 func TestReverseOrder(t *testing.T) {

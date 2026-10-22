@@ -86,7 +86,7 @@ type H5Request struct {
 
 // CodePayer 付款码支付支付者信息
 type CodePayer struct {
-	AuthCode string `json:"auth_code"` // 顾客的付款码（扫码枪读取，1~64 位数字，10~15 开头为微信付款码）
+	AuthCode string `json:"auth_code"` // 授权码：扫码设备读取的顾客付款码（18 位纯数字，10~15 开头为微信付款码码段）
 }
 
 // CodePayStoreInfo 付款码支付门店信息
@@ -99,8 +99,44 @@ type CodePayStoreInfo struct {
 
 // CodePaySceneInfo 付款码支付场景信息
 type CodePaySceneInfo struct {
-	PayerClientIP string            `json:"payer_client_ip,omitempty"` // 调用支付接口的终端 IP
+	DeviceID      string            `json:"device_id,omitempty"`       // 商户端设备号（门店号或收银设备 ID）
+	DeviceIP      string            `json:"device_ip,omitempty"`       // 商户端设备 IP，取公网出口 IP
+	PayerClientIP string            `json:"payer_client_ip,omitempty"` // 用户终端 IP（部分通道要求，建议填写）
 	StoreInfo     *CodePayStoreInfo `json:"store_info,omitempty"`      // 门店信息
+}
+
+// GoodsDetail 单品优惠明细（OrderDetail.GoodsDetail 元素）
+//
+// 说明:
+//   - 微信侧商品编码字段在官方不同接口文档中存在 wechatpay_goods_id / wxpay_goods_id
+//     两种写法，本结构按 V3 下单接口主流口径使用 wechatpay_goods_id
+type GoodsDetail struct {
+	MerchantGoodsID  string `json:"merchant_goods_id"`            // 商户侧商品编码
+	WechatpayGoodsID string `json:"wechatpay_goods_id,omitempty"` // 微信支付商品编码
+	GoodsName        string `json:"goods_name,omitempty"`         // 商品名称
+	Quantity         int    `json:"quantity"`                     // 商品数量
+	UnitPrice        int    `json:"unit_price"`                   // 商品单价，单位为分（如有优惠传优惠后单价）
+}
+
+// OrderDetail 订单优惠信息（下单时的 detail 字段）
+//
+// 说明:
+//   - 有单品优惠活动的商户需要上传，否则可能无法享受优惠
+//   - 整体序列化后（压缩空格换行）不能超过 6144 字节
+type OrderDetail struct {
+	CostPrice   int           `json:"cost_price,omitempty"`   // 订单原价，单位为分（防止一张小票分多次支付套取优惠）
+	InvoiceID   string        `json:"invoice_id,omitempty"`   // 商品小票 ID
+	GoodsDetail []GoodsDetail `json:"goods_detail,omitempty"` // 单品列表，至少 1 条
+}
+
+// SettleInfo 结算信息（下单时的 settle_info 字段）
+//
+// 说明:
+//   - ProfitSharing=true 表示订单支付成功后资金冻结，可调用请求分账 API 分账；
+//     false 或不传则资金直接进入可用余额
+//   - 需要分账的订单必须在下单时声明，支付成功后无法补设
+type SettleInfo struct {
+	ProfitSharing bool `json:"profit_sharing,omitempty"` // 是否指定分账
 }
 
 // CodePayRequest 付款码支付下单请求（B扫C）
@@ -110,17 +146,26 @@ type CodePaySceneInfo struct {
 //   - 提交后同步返回订单结果（结构与查单一致）：trade_state=SUCCESS 表示扣款成功，
 //     USERPAYING 表示用户输入密码中，需用 QueryOrder 轮询最终状态
 //   - USERPAYING 超时不再等待时，需调用撤销接口终止交易，避免用户后续输入密码意外扣款
+//   - 不支持 time_expire：付款码支付为即时扣款，无支付窗口概念
 type CodePayRequest struct {
-	AppID       string            `json:"appid"`                // 应用 ID
-	MchID       string            `json:"mchid"`                // 商户号
-	Description string            `json:"description"`          // 商品描述
-	OutTradeNo  string            `json:"out_trade_no"`         // 商户订单号
-	NotifyURL   string            `json:"notify_url"`           // 支付结果通知地址
-	Amount      Amount            `json:"amount"`               // 订单金额
-	Payer       CodePayer         `json:"payer"`                // 支付者信息（付款码）
-	Attach      string            `json:"attach,omitempty"`     // 附加数据
-	GoodsTag    string            `json:"goods_tag,omitempty"`  // 订单优惠标记
-	SceneInfo   *CodePaySceneInfo `json:"scene_info,omitempty"` // 场景信息
+	AppID         string            `json:"appid"`                    // 应用 ID
+	MchID         string            `json:"mchid"`                    // 商户号
+	Description   string            `json:"description"`              // 商品描述
+	OutTradeNo    string            `json:"out_trade_no"`             // 商户订单号
+	NotifyURL     string            `json:"notify_url"`               // 支付结果通知地址
+	Amount        Amount            `json:"amount"`                   // 订单金额
+	Payer         CodePayer         `json:"payer"`                    // 支付者信息（付款码）
+	Attach        string            `json:"attach,omitempty"`         // 附加数据
+	GoodsTag      string            `json:"goods_tag,omitempty"`      // 订单优惠标记
+	SupportFapiao bool              `json:"support_fapiao,omitempty"` // 电子发票入口开放标识（true 时支付成功页出现开票入口，需开通电子发票功能）
+	Detail        *OrderDetail      `json:"detail,omitempty"`         // 订单优惠信息（单品优惠）
+	SettleInfo    *SettleInfo       `json:"settle_info,omitempty"`    // 结算信息（分账标识）
+	SceneInfo     *CodePaySceneInfo `json:"scene_info,omitempty"`     // 场景信息
+}
+
+// ReverseOrderRequest 撤销订单请求（付款码支付配套）
+type ReverseOrderRequest struct {
+	MchID string `json:"mchid"` // 商户号
 }
 
 // CloseOrderRequest 关闭订单请求
