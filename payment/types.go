@@ -84,6 +84,45 @@ type H5Request struct {
 	SceneInfo   *SceneInfo `json:"scene_info"`   // H5 场景信息必填
 }
 
+// CodePayer 付款码支付支付者信息
+type CodePayer struct {
+	AuthCode string `json:"auth_code"` // 顾客的付款码（扫码枪读取，1~64 位数字，10~15 开头为微信付款码）
+}
+
+// CodePayStoreInfo 付款码支付门店信息
+type CodePayStoreInfo struct {
+	ID       string `json:"id,omitempty"`        // 门店编号
+	Name     string `json:"name,omitempty"`      // 门店名称
+	AreaCode string `json:"area_code,omitempty"` // 门店所在地行政区划码
+	Address  string `json:"address,omitempty"`   // 门店详细地址
+}
+
+// CodePaySceneInfo 付款码支付场景信息
+type CodePaySceneInfo struct {
+	PayerClientIP string            `json:"payer_client_ip,omitempty"` // 调用支付接口的终端 IP
+	StoreInfo     *CodePayStoreInfo `json:"store_info,omitempty"`      // 门店信息
+}
+
+// CodePayRequest 付款码支付下单请求（B扫C）
+//
+// 说明:
+//   - amount.total 必须大于 0，付款码支付不支持 0 元下单
+//   - 提交后同步返回订单结果（结构与查单一致）：trade_state=SUCCESS 表示扣款成功，
+//     USERPAYING 表示用户输入密码中，需用 QueryOrder 轮询最终状态
+//   - USERPAYING 超时不再等待时，需调用撤销接口终止交易，避免用户后续输入密码意外扣款
+type CodePayRequest struct {
+	AppID       string            `json:"appid"`                // 应用 ID
+	MchID       string            `json:"mchid"`                // 商户号
+	Description string            `json:"description"`          // 商品描述
+	OutTradeNo  string            `json:"out_trade_no"`         // 商户订单号
+	NotifyURL   string            `json:"notify_url"`           // 支付结果通知地址
+	Amount      Amount            `json:"amount"`               // 订单金额
+	Payer       CodePayer         `json:"payer"`                // 支付者信息（付款码）
+	Attach      string            `json:"attach,omitempty"`     // 附加数据
+	GoodsTag    string            `json:"goods_tag,omitempty"`  // 订单优惠标记
+	SceneInfo   *CodePaySceneInfo `json:"scene_info,omitempty"` // 场景信息
+}
+
 // CloseOrderRequest 关闭订单请求
 type CloseOrderRequest struct {
 	MchID string `json:"mchid"` // 商户号

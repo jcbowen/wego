@@ -14,6 +14,11 @@ const (
 	// PayAppURL App 支付下单地址
 	PayAppURL = "https://api.mch.weixin.qq.com/v3/pay/transactions/app"
 
+	// PayCodePayURL 付款码支付下单地址（收银员扫顾客付款码，B扫C）
+	// 提交后立即返回订单结果：trade_state=SUCCESS 为扣款成功；USERPAYING 表示用户支付中，
+	// 需轮询查单确认最终状态；USERPAYING 长期未成功时用撤销接口终止交易
+	PayCodePayURL = "https://api.mch.weixin.qq.com/v3/pay/transactions/codepay"
+
 	// PayQueryOrderURL 按商户订单号查询订单地址（需格式化 out_trade_no）
 	PayQueryOrderURL = "https://api.mch.weixin.qq.com/v3/pay/transactions/out-trade-no/%s"
 
@@ -22,6 +27,10 @@ const (
 
 	// PayCloseOrderURL 关闭订单地址（需格式化 out_trade_no）
 	PayCloseOrderURL = "https://api.mch.weixin.qq.com/v3/pay/transactions/out-trade-no/%s/close"
+
+	// PayReverseOrderURL 撤销订单地址（需格式化 out_trade_no，付款码支付配套：
+	// USERPAYING 在途交易无法用关单接口终止，只能撤销）
+	PayReverseOrderURL = "https://api.mch.weixin.qq.com/v3/pay/transactions/out-trade-no/%s/reverse"
 
 	// PayRefundURL 退款申请地址
 	PayRefundURL = "https://api.mch.weixin.qq.com/v3/refund/domestic/refunds"

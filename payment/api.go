@@ -175,6 +175,46 @@ func (c *Client) AppPay(ctx context.Context, req *AppRequest) (*PrepayResponse, 
 	return &result, nil
 }
 
+// CodePay 付款码支付下单（B扫C：收银员用扫码设备读取顾客展示的付款码收款）
+//
+// 参数:
+//   - ctx: 上下文
+//   - req: 付款码支付下单请求（Payer.AuthCode 为顾客付款码，必填）
+//
+// 返回:
+//   - *Order: 订单结果，与查单接口同构；TradeState=SUCCESS 表示扣款成功（TransactionID 有值），
+//     TradeState=USERPAYING 表示用户支付中，需用 QueryOrder 轮询最终状态
+//   - error: 请求失败时返回错误；扣款失败（如余额不足）返回 *APIError，业务码可据此判断是否换码重扫
+//
+// 使用示例:
+//   - order, err := client.CodePay(ctx, &payment.CodePayRequest{OutTradeNo: "ORDER_001", Amount: payment.Amount{Total: 100}, Description: "商品", Payer: payment.CodePayer{AuthCode: "1345235315201154982642655744"}})
+//   - if order.TradeState == payment.TradeStateUserPaying { /* 轮询查单 */ }
+//
+// 文档:
+//   - https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_5_1.shtml
+func (c *Client) CodePay(ctx context.Context, req *CodePayRequest) (*Order, error) {
+	if req == nil {
+		return nil, fmt.Errorf("请求参数不能为空")
+	}
+	if err := validateOrderRequest(req.OutTradeNo, req.Description, req.Amount.Total); err != nil {
+		return nil, err
+	}
+	if req.Payer.AuthCode == "" {
+		return nil, fmt.Errorf("付款码不能为空")
+	}
+
+	req.AppID = defaultString(req.AppID, c.config.AppID)
+	req.MchID = defaultString(req.MchID, c.config.MchID)
+	req.NotifyURL = defaultString(req.NotifyURL, c.config.NotifyURL)
+
+	var result Order
+	if err := c.doRequest(ctx, "POST", PayCodePayURL, req, &result, true); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 // BuildAppPayParams 生成 App 端调起支付所需的参数
 //
 // 参数:
@@ -305,6 +345,36 @@ func (c *Client) CloseOrder(ctx context.Context, outTradeNo string) error {
 	}
 
 	apiURL := fmt.Sprintf(PayCloseOrderURL, url.PathEscape(outTradeNo))
+	req := &CloseOrderRequest{MchID: c.config.MchID}
+
+	return c.doRequest(ctx, "POST", apiURL, req, nil, true)
+}
+
+// ReverseOrder 撤销订单（付款码支付配套）
+//
+// 参数:
+//   - ctx: 上下文
+//   - outTradeNo: 商户订单号
+//
+// 返回:
+//   - error: 撤销失败时返回错误
+//
+// 说明:
+//   - 付款码交易处于 USERPAYING（用户支付中）时无法用 CloseOrder 关闭，只能撤销以终止在途扣款
+//   - 对已支付订单撤销会失败（如 ORDER_PAID 类错误），撤销不退款——退钱必须走 Refund
+//   - 接口成功时微信返回 204 No Content，无响应体
+//
+// 使用示例:
+//   - if err := client.ReverseOrder(ctx, "ORDER_20240101_001"); err != nil { return err }
+//
+// 文档:
+//   - https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_5_6.shtml
+func (c *Client) ReverseOrder(ctx context.Context, outTradeNo string) error {
+	if outTradeNo == "" {
+		return fmt.Errorf("商户订单号不能为空")
+	}
+
+	apiURL := fmt.Sprintf(PayReverseOrderURL, url.PathEscape(outTradeNo))
 	req := &CloseOrderRequest{MchID: c.config.MchID}
 
 	return c.doRequest(ctx, "POST", apiURL, req, nil, true)

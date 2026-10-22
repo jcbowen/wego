@@ -404,6 +404,84 @@ func TestAppPay(t *testing.T) {
 	}
 }
 
+func TestCodePay(t *testing.T) {
+	// 扣款成功：同步返回订单结果
+	body := `{"appid":"wx1234567890","mchid":"1900000001","out_trade_no":"ORDER_001","transaction_id":"1009665485201508060766242864","trade_type":"MICROPAY","trade_state":"SUCCESS","trade_state_desc":"支付成功","amount":{"total":100,"payer_total":100,"currency":"CNY","payer_currency":"CNY"}}`
+	mock := &mockHTTPClient{statusCode: 200, body: []byte(body)}
+	c, km := newTestClient(t, mock)
+	mock.headers = signedHeaders(t, km.priv, "PUB_KEY_ID_TEST", body)
+
+	order, err := c.CodePay(context.Background(), &CodePayRequest{
+		Description: "测试商品",
+		OutTradeNo:  "ORDER_001",
+		Amount:      Amount{Total: 100},
+		Payer:       CodePayer{AuthCode: "1345235315201154982642655744"},
+	})
+	if err != nil {
+		t.Fatalf("CodePay 失败: %v", err)
+	}
+	if order.TradeState != TradeStateSuccess || order.TransactionID == "" {
+		t.Fatalf("扣款成功结果异常: %+v", order)
+	}
+	if mock.lastReq.URL.String() != PayCodePayURL {
+		t.Fatalf("请求地址错误: %s", mock.lastReq.URL.String())
+	}
+
+	var sent map[string]interface{}
+	if err := json.Unmarshal(mock.lastBody, &sent); err != nil {
+		t.Fatalf("请求体解析失败: %v", err)
+	}
+	if sent["appid"] != "wx1234567890" || sent["mchid"] != "1900000001" {
+		t.Fatalf("appid/mchid 未自动填充: %+v", sent)
+	}
+	if payer, ok := sent["payer"].(map[string]interface{}); !ok || payer["auth_code"] != "1345235315201154982642655744" {
+		t.Fatalf("auth_code 未携带: %+v", sent["payer"])
+	}
+
+	// USERPAYING：用户支付中，返回订单结果由业务轮询查单
+	payingBody := `{"out_trade_no":"ORDER_002","trade_state":"USERPAYING","trade_state_desc":"用户支付中"}`
+	mock.body = []byte(payingBody)
+	mock.headers = signedHeaders(t, km.priv, "PUB_KEY_ID_TEST", payingBody)
+	paying, err := c.CodePay(context.Background(), &CodePayRequest{
+		Description: "测试商品",
+		OutTradeNo:  "ORDER_002",
+		Amount:      Amount{Total: 100},
+		Payer:       CodePayer{AuthCode: "1345235315201154982642655745"},
+	})
+	if err != nil {
+		t.Fatalf("CodePay(USERPAYING) 失败: %v", err)
+	}
+	if paying.TradeState != TradeStateUserPaying {
+		t.Fatalf("USERPAYING 结果异常: %+v", paying)
+	}
+}
+
+func TestReverseOrder(t *testing.T) {
+	mock := &mockHTTPClient{statusCode: 204}
+	c, km := newTestClient(t, mock)
+	mock.headers = signedHeaders(t, km.priv, "PUB_KEY_ID_TEST", "")
+
+	if err := c.ReverseOrder(context.Background(), "ORDER_001"); err != nil {
+		t.Fatalf("ReverseOrder 失败: %v", err)
+	}
+	wantURL := strings.Replace(PayReverseOrderURL, "%s", "ORDER_001", 1)
+	if mock.lastReq.URL.String() != wantURL {
+		t.Fatalf("请求地址错误: %s", mock.lastReq.URL.String())
+	}
+	var sent map[string]interface{}
+	if err := json.Unmarshal(mock.lastBody, &sent); err != nil {
+		t.Fatalf("请求体解析失败: %v", err)
+	}
+	if sent["mchid"] != "1900000001" {
+		t.Fatalf("mchid 未自动填充: %+v", sent)
+	}
+
+	// 商户订单号为空必须拒绝
+	if err := c.ReverseOrder(context.Background(), ""); err == nil {
+		t.Fatal("空订单号未报错")
+	}
+}
+
 func TestCloseOrder(t *testing.T) {
 	mock := &mockHTTPClient{statusCode: 204}
 	c, km := newTestClient(t, mock)
@@ -662,6 +740,11 @@ func TestParameterValidation(t *testing.T) {
 	}{
 		{"NativePay 空请求", func() error { _, err := c.NativePay(ctx, nil); return err }},
 		{"AppPay 空请求", func() error { _, err := c.AppPay(ctx, nil); return err }},
+		{"CodePay 空请求", func() error { _, err := c.CodePay(ctx, nil); return err }},
+		{"CodePay 空付款码", func() error {
+			_, err := c.CodePay(ctx, &CodePayRequest{Description: "测试商品", OutTradeNo: "ORDER_001", Amount: Amount{Total: 100}})
+			return err
+		}},
 		{"CloseOrder 空订单号", func() error { return c.CloseOrder(ctx, "") }},
 		{"QueryOrder 空订单号", func() error { _, err := c.QueryOrder(ctx, ""); return err }},
 		{"QueryOrderByTransactionID 空单号", func() error { _, err := c.QueryOrderByTransactionID(ctx, ""); return err }},
