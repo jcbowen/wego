@@ -3,9 +3,15 @@ package payment
 import "time"
 
 // Amount 订单金额
+//
+// 说明:
+//   - 下单时仅需 Total（可附 Currency），PayerTotal/PayerCurrency 用于接收查单与
+//     付款码支付同步返回中的实付金额（使用优惠券时 payer_total = total - 优惠金额）
 type Amount struct {
-	Total    int    `json:"total"`              // 订单总金额，单位为分
-	Currency string `json:"currency,omitempty"` // 货币类型，默认 CNY
+	Total         int    `json:"total"`                    // 订单总金额，单位为分
+	Currency      string `json:"currency,omitempty"`       // 货币类型，默认 CNY
+	PayerTotal    int    `json:"payer_total,omitempty"`    // 用户支付金额，单位为分（应答字段）
+	PayerCurrency string `json:"payer_currency,omitempty"` // 用户支付货币类型（应答字段）
 }
 
 // RefundAmount 退款金额
@@ -86,36 +92,44 @@ type H5Request struct {
 
 // CodePayer 付款码支付支付者信息
 type CodePayer struct {
-	AuthCode string `json:"auth_code"` // 授权码：扫码设备读取的顾客付款码（18 位纯数字，10~15 开头为微信付款码码段）
+	AuthCode string `json:"auth_code"` // 授权码：扫码设备读取的顾客付款码（即用户微信钱包展示的付款码，10~15 开头为微信付款码码段）
 }
 
 // CodePayStoreInfo 付款码支付门店信息
+//
+// 说明:
+//   - ID 与 OutID 二选一必填：有微信支付线下场所 ID 传 ID，否则传商户自有门店编码 OutID
+//   - 官方要求线下条码支付必须传入用户实际付款的场景信息（合规要求）
 type CodePayStoreInfo struct {
-	ID       string `json:"id,omitempty"`        // 门店编号
+	ID       string `json:"id,omitempty"`        // 门店编号：微信支付线下场所 ID，纯数字，与 OutID 二选一必填
+	OutID    string `json:"out_id,omitempty"`    // 商户自定义编码：商户系统门店编码，与 ID 二选一必填
 	Name     string `json:"name,omitempty"`      // 门店名称
 	AreaCode string `json:"area_code,omitempty"` // 门店所在地行政区划码
 	Address  string `json:"address,omitempty"`   // 门店详细地址
 }
 
 // CodePaySceneInfo 付款码支付场景信息
+//
+// 说明:
+//   - 官方 V3 文档中 codepay 的 scene_info 为必填，其下 store_info 亦必填
 type CodePaySceneInfo struct {
-	DeviceID      string            `json:"device_id,omitempty"`       // 商户端设备号（门店号或收银设备 ID）
-	DeviceIP      string            `json:"device_ip,omitempty"`       // 商户端设备 IP，取公网出口 IP
-	PayerClientIP string            `json:"payer_client_ip,omitempty"` // 用户终端 IP（部分通道要求，建议填写）
-	StoreInfo     *CodePayStoreInfo `json:"store_info,omitempty"`      // 门店信息
+	DeviceID  string            `json:"device_id,omitempty"` // 商户端设备号（门店号或收银设备 ID）
+	DeviceIP  string            `json:"device_ip,omitempty"` // 商户端设备 IP
+	StoreInfo *CodePayStoreInfo `json:"store_info"`          // 商户门店信息（必填）
 }
 
 // GoodsDetail 单品优惠明细（OrderDetail.GoodsDetail 元素）
 //
 // 说明:
-//   - 微信侧商品编码字段在官方不同接口文档中存在 wechatpay_goods_id / wxpay_goods_id
-//     两种写法，本结构按 V3 下单接口主流口径使用 wechatpay_goods_id
+//   - 微信侧商品编码字段在官方不同接口文档中存在 wxpay_goods_id / wechatpay_goods_id
+//     两种写法，本结构当前仅被付款码支付（codepay）使用，按其官方文档口径使用 wxpay_goods_id；
+//     若后续复用到 JSAPI 下单等接口，需核对该接口文档的拼写
 type GoodsDetail struct {
-	MerchantGoodsID  string `json:"merchant_goods_id"`            // 商户侧商品编码
-	WechatpayGoodsID string `json:"wechatpay_goods_id,omitempty"` // 微信支付商品编码
-	GoodsName        string `json:"goods_name,omitempty"`         // 商品名称
-	Quantity         int    `json:"quantity"`                     // 商品数量
-	UnitPrice        int    `json:"unit_price"`                   // 商品单价，单位为分（如有优惠传优惠后单价）
+	MerchantGoodsID string `json:"merchant_goods_id"`           // 商户侧商品编码
+	WxpayGoodsID    string `json:"wxpay_goods_id,omitempty"`    // 微信支付商品编码（官方统一商品编号，没有可不传）
+	GoodsName       string `json:"goods_name,omitempty"`        // 商品名称
+	Quantity        int    `json:"quantity"`                    // 商品数量
+	UnitPrice       int    `json:"unit_price"`                  // 商品单价，单位为分（如有优惠传优惠后单价）
 }
 
 // OrderDetail 订单优惠信息（下单时的 detail 字段）
@@ -147,12 +161,13 @@ type SettleInfo struct {
 //     USERPAYING 表示用户输入密码中，需用 QueryOrder 轮询最终状态
 //   - USERPAYING 超时不再等待时，需调用撤销接口终止交易，避免用户后续输入密码意外扣款
 //   - 不支持 time_expire：付款码支付为即时扣款，无支付窗口概念
+//   - 官方 V3 文档参数表无 notify_url，结果通过同步应答与查单获取，不走异步通知
+//   - scene_info 必填，其下 store_info 必填（ID 与 OutID 二选一）
 type CodePayRequest struct {
 	AppID         string            `json:"appid"`                    // 应用 ID
 	MchID         string            `json:"mchid"`                    // 商户号
 	Description   string            `json:"description"`              // 商品描述
 	OutTradeNo    string            `json:"out_trade_no"`             // 商户订单号
-	NotifyURL     string            `json:"notify_url"`               // 支付结果通知地址
 	Amount        Amount            `json:"amount"`                   // 订单金额
 	Payer         CodePayer         `json:"payer"`                    // 支付者信息（付款码）
 	Attach        string            `json:"attach,omitempty"`         // 附加数据
@@ -160,11 +175,15 @@ type CodePayRequest struct {
 	SupportFapiao bool              `json:"support_fapiao,omitempty"` // 电子发票入口开放标识（true 时支付成功页出现开票入口，需开通电子发票功能）
 	Detail        *OrderDetail      `json:"detail,omitempty"`         // 订单优惠信息（单品优惠）
 	SettleInfo    *SettleInfo       `json:"settle_info,omitempty"`    // 结算信息（分账标识）
-	SceneInfo     *CodePaySceneInfo `json:"scene_info,omitempty"`     // 场景信息
+	SceneInfo     *CodePaySceneInfo `json:"scene_info"`               // 场景信息（必填，含门店信息）
 }
 
 // ReverseOrderRequest 撤销订单请求（付款码支付配套）
+//
+// 说明:
+//   - 官方 V3 文档中 appid 与 mchid 均为必填
 type ReverseOrderRequest struct {
+	AppID string `json:"appid"` // 应用 ID
 	MchID string `json:"mchid"` // 商户号
 }
 
@@ -224,20 +243,45 @@ type AppPayParams struct {
 	Sign      string `json:"sign"`
 }
 
+// PromotionGoodsDetail 优惠活动单品明细（PromotionDetail.GoodsDetail 元素）
+type PromotionGoodsDetail struct {
+	GoodsID       string `json:"goods_id"`                  // 商品编码
+	Quantity      int    `json:"quantity"`                  // 商品数量
+	UnitPrice     int    `json:"unit_price"`                // 商品单价，单位为分
+	DiscountAmount int   `json:"discount_amount"`           // 商品优惠金额，单位为分
+	GoodsRemark   string `json:"goods_remark,omitempty"`    // 商品备注
+}
+
+// PromotionDetail 订单优惠信息（应答字段，下单走优惠活动时返回）
+type PromotionDetail struct {
+	CouponID            string                 `json:"coupon_id"`                    // 券 ID
+	Name                string                 `json:"name,omitempty"`               // 优惠名称
+	Scope               string                 `json:"scope,omitempty"`              // 优惠范围：GLOBAL 全场代金券 / SINGLE 单品优惠
+	Type                string                 `json:"type,omitempty"`               // 优惠类型：CASH 充值型 / NOCASH 免充值型
+	Amount              int                    `json:"amount"`                       // 优惠券面额，单位为分
+	StockID             string                 `json:"stock_id,omitempty"`           // 活动 ID（批次 ID）
+	WechatpayContribute int                    `json:"wechatpay_contribute,omitempty"` // 微信出资，单位为分
+	MerchantContribute  int                    `json:"merchant_contribute,omitempty"`  // 商户出资，单位为分
+	OtherContribute     int                    `json:"other_contribute,omitempty"`     // 其他出资，单位为分
+	Currency            string                 `json:"currency,omitempty"`           // 优惠货币类型
+	GoodsDetail         []PromotionGoodsDetail `json:"goods_detail,omitempty"`       // 单品列表
+}
+
 // Order 查询订单响应
 type Order struct {
-	AppID          string    `json:"appid"`                  // 应用 ID
-	MchID          string    `json:"mchid"`                  // 商户号
-	OutTradeNo     string    `json:"out_trade_no"`           // 商户订单号
-	TransactionID  string    `json:"transaction_id"`         // 微信支付订单号
-	TradeType      string    `json:"trade_type,omitempty"`   // 交易类型
-	TradeState     string    `json:"trade_state"`            // 交易状态
-	TradeStateDesc string    `json:"trade_state_desc"`       // 交易状态描述
-	BankType       string    `json:"bank_type,omitempty"`    // 付款银行
-	Attach         string    `json:"attach,omitempty"`       // 附加数据
-	SuccessTime    time.Time `json:"success_time,omitempty"` // 支付完成时间
-	Amount         *Amount   `json:"amount,omitempty"`       // 订单金额
-	Payer          *Payer    `json:"payer,omitempty"`        // 支付者信息
+	AppID           string            `json:"appid"`                  // 应用 ID
+	MchID           string            `json:"mchid"`                  // 商户号
+	OutTradeNo      string            `json:"out_trade_no"`           // 商户订单号
+	TransactionID   string            `json:"transaction_id"`         // 微信支付订单号
+	TradeType       string            `json:"trade_type,omitempty"`   // 交易类型
+	TradeState      string            `json:"trade_state"`            // 交易状态
+	TradeStateDesc  string            `json:"trade_state_desc"`       // 交易状态描述
+	BankType        string            `json:"bank_type,omitempty"`    // 付款银行
+	Attach          string            `json:"attach,omitempty"`       // 附加数据
+	SuccessTime     time.Time         `json:"success_time,omitempty"` // 支付完成时间
+	Amount          *Amount           `json:"amount,omitempty"`       // 订单金额
+	Payer           *Payer            `json:"payer,omitempty"`        // 支付者信息
+	PromotionDetail []PromotionDetail `json:"promotion_detail,omitempty"` // 优惠信息（走优惠活动时返回）
 }
 
 // RefundRequest 退款申请请求

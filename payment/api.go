@@ -187,16 +187,21 @@ func (c *Client) AppPay(ctx context.Context, req *AppRequest) (*PrepayResponse, 
 //   - error: 请求失败时返回错误；扣款失败（如余额不足）返回 *APIError，业务码可据此判断是否换码重扫
 //
 // 使用示例:
-//   - order, err := client.CodePay(ctx, &payment.CodePayRequest{OutTradeNo: "ORDER_001", Amount: payment.Amount{Total: 100}, Description: "商品", Payer: payment.CodePayer{AuthCode: "1345235315201154982642655744"}})
+//   - order, err := client.CodePay(ctx, &payment.CodePayRequest{
+//         OutTradeNo: "ORDER_001", Amount: payment.Amount{Total: 100}, Description: "商品",
+//         Payer: payment.CodePayer{AuthCode: "1345235315201154982642655744"},
+//         SceneInfo: &payment.CodePaySceneInfo{StoreInfo: &payment.CodePayStoreInfo{ID: "0001"}},
+//     })
 //   - if order.TradeState == payment.TradeStateUserPaying { /* 轮询查单 */ }
 //
 // 文档:
 //   - https://pay.weixin.qq.com/docs/merchant/apis/code-payment-v3/direct/code-pay.html
-//   - https://pay.weixin.qq.com/doc/v3/merchant/4012647301 （官方说明：付款码支付当前文档以 V2 为准）
+//   - https://pay.weixin.qq.com/doc/v3/merchant/4012382150
 //
 // 注意:
-//   - 官方 OpenAPI 规范包含本接口，生产环境已广泛使用；但官方文档中心当前
-//     「付款码支付」产品页仍标注为 V2 接口，接入前建议在商户后台实测验证
+//   - 官方文档中心「付款码支付」产品页提示该产品文档以 V2 为准，V3 接口文档本身已提供，
+//     接入前建议在商户后台实测验证
+//   - 结果通过同步应答与查单获取，官方参数表无 notify_url，不走异步通知
 func (c *Client) CodePay(ctx context.Context, req *CodePayRequest) (*Order, error) {
 	if req == nil {
 		return nil, fmt.Errorf("请求参数不能为空")
@@ -207,10 +212,15 @@ func (c *Client) CodePay(ctx context.Context, req *CodePayRequest) (*Order, erro
 	if req.Payer.AuthCode == "" {
 		return nil, fmt.Errorf("付款码不能为空")
 	}
+	if req.SceneInfo == nil || req.SceneInfo.StoreInfo == nil {
+		return nil, fmt.Errorf("场景信息不能为空：scene_info 及其 store_info 为官方必填项")
+	}
+	if req.SceneInfo.StoreInfo.ID == "" && req.SceneInfo.StoreInfo.OutID == "" {
+		return nil, fmt.Errorf("门店信息不完整：store_info 的 id 与 out_id 需二选一填写")
+	}
 
 	req.AppID = defaultString(req.AppID, c.config.AppID)
 	req.MchID = defaultString(req.MchID, c.config.MchID)
-	req.NotifyURL = defaultString(req.NotifyURL, c.config.NotifyURL)
 
 	var result Order
 	if err := c.doRequest(ctx, "POST", PayCodePayURL, req, &result, true); err != nil {
@@ -365,25 +375,29 @@ func (c *Client) CloseOrder(ctx context.Context, outTradeNo string) error {
 //   - error: 撤销失败时返回错误
 //
 // 说明:
-//   - 付款码交易处于 USERPAYING（用户支付中）时无法用 CloseOrder 关闭，只能撤销以终止在途扣款
-//   - 对已支付订单撤销会失败（如 ORDER_PAID 类错误），撤销不退款——退钱必须走 Refund
-//   - 接口成功时微信返回 204 No Content，无响应体
+//   - 支付交易返回失败或支付系统超时时调用；USERPAYING（用户支付中）在途交易无法用
+//     CloseOrder 关闭，只能撤销
+//   - 官方语义：订单用户支付失败时微信侧将订单关闭；用户支付成功时微信侧将订单资金退还给用户
+//   - 接口成功时微信返回 200 OK，应答含 appid/mchid/out_trade_no
 //
 // 使用示例:
 //   - if err := client.ReverseOrder(ctx, "ORDER_20240101_001"); err != nil { return err }
 //
 // 文档:
-//   - https://pay.weixin.qq.com/doc/v3/merchant/4012647301 （官方说明：付款码支付当前文档以 V2 为准）
+//   - https://pay.weixin.qq.com/doc/v3/merchant/4012382161
 //
 // 注意:
-//   - 与 CodePay 同属付款码支付配套接口，官方文档中心当前标注为 V2，接入前建议实测验证
+//   - 官方文档中心提示本功能处于灰度测试阶段、暂未全量开放，接入前建议在商户后台实测验证
 func (c *Client) ReverseOrder(ctx context.Context, outTradeNo string) error {
 	if outTradeNo == "" {
 		return fmt.Errorf("商户订单号不能为空")
 	}
 
 	apiURL := fmt.Sprintf(PayReverseOrderURL, url.PathEscape(outTradeNo))
-	req := &ReverseOrderRequest{MchID: c.config.MchID}
+	req := &ReverseOrderRequest{
+		AppID: c.config.AppID,
+		MchID: c.config.MchID,
+	}
 
 	return c.doRequest(ctx, "POST", apiURL, req, nil, true)
 }

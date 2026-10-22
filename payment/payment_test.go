@@ -416,12 +416,16 @@ func TestCodePay(t *testing.T) {
 		OutTradeNo:  "ORDER_001",
 		Amount:      Amount{Total: 100},
 		Payer:       CodePayer{AuthCode: "1345235315201154982642655744"},
+		SceneInfo:   &CodePaySceneInfo{StoreInfo: &CodePayStoreInfo{ID: "0001"}},
 	})
 	if err != nil {
 		t.Fatalf("CodePay 失败: %v", err)
 	}
 	if order.TradeState != TradeStateSuccess || order.TransactionID == "" {
 		t.Fatalf("扣款成功结果异常: %+v", order)
+	}
+	if order.Amount == nil || order.Amount.PayerTotal != 100 {
+		t.Fatalf("实付金额解析异常: %+v", order.Amount)
 	}
 	if mock.lastReq.URL.String() != PayCodePayURL {
 		t.Fatalf("请求地址错误: %s", mock.lastReq.URL.String())
@@ -437,6 +441,9 @@ func TestCodePay(t *testing.T) {
 	if payer, ok := sent["payer"].(map[string]interface{}); !ok || payer["auth_code"] != "1345235315201154982642655744" {
 		t.Fatalf("auth_code 未携带: %+v", sent["payer"])
 	}
+	if _, exists := sent["notify_url"]; exists {
+		t.Fatalf("官方 codepay 参数表无 notify_url，不应携带: %+v", sent)
+	}
 
 	// USERPAYING：用户支付中，返回订单结果由业务轮询查单
 	payingBody := `{"out_trade_no":"ORDER_002","trade_state":"USERPAYING","trade_state_desc":"用户支付中"}`
@@ -447,6 +454,7 @@ func TestCodePay(t *testing.T) {
 		OutTradeNo:  "ORDER_002",
 		Amount:      Amount{Total: 100},
 		Payer:       CodePayer{AuthCode: "1345235315201154982642655745"},
+		SceneInfo:   &CodePaySceneInfo{StoreInfo: &CodePayStoreInfo{OutID: "SHOP_A1"}},
 	})
 	if err != nil {
 		t.Fatalf("CodePay(USERPAYING) 失败: %v", err)
@@ -469,11 +477,11 @@ func TestCodePay(t *testing.T) {
 			CostPrice: 608800,
 			InvoiceID: "微信123",
 			GoodsDetail: []GoodsDetail{{
-				MerchantGoodsID:  "1246464644",
-				WechatpayGoodsID: "1001",
-				GoodsName:        "iPhoneX 256G",
-				Quantity:         1,
-				UnitPrice:        528800,
+				MerchantGoodsID: "1246464644",
+				WxpayGoodsID:    "1001",
+				GoodsName:       "iPhoneX 256G",
+				Quantity:        1,
+				UnitPrice:       528800,
 			}},
 		},
 		SettleInfo: &SettleInfo{ProfitSharing: true},
@@ -497,6 +505,8 @@ func TestCodePay(t *testing.T) {
 		t.Fatalf("goods_detail 未携带: %+v", detail)
 	} else if item, ok := goods[0].(map[string]interface{}); !ok || item["merchant_goods_id"] != "1246464644" || item["quantity"] != float64(1) {
 		t.Fatalf("goods_detail 元素异常: %+v", goods[0])
+	} else if item["wxpay_goods_id"] != "1001" {
+		t.Fatalf("wxpay_goods_id 未携带: %+v", item)
 	}
 	if settle, ok := sent["settle_info"].(map[string]interface{}); !ok || settle["profit_sharing"] != true {
 		t.Fatalf("settle_info 未携带: %+v", sent["settle_info"])
@@ -509,9 +519,11 @@ func TestCodePay(t *testing.T) {
 }
 
 func TestReverseOrder(t *testing.T) {
-	mock := &mockHTTPClient{statusCode: 204}
+	// 官方应答为 200 OK + JSON（appid/mchid/out_trade_no）
+	reverseBody := `{"appid":"wx1234567890","mchid":"1900000001","out_trade_no":"ORDER_001"}`
+	mock := &mockHTTPClient{statusCode: 200, body: []byte(reverseBody)}
 	c, km := newTestClient(t, mock)
-	mock.headers = signedHeaders(t, km.priv, "PUB_KEY_ID_TEST", "")
+	mock.headers = signedHeaders(t, km.priv, "PUB_KEY_ID_TEST", reverseBody)
 
 	if err := c.ReverseOrder(context.Background(), "ORDER_001"); err != nil {
 		t.Fatalf("ReverseOrder 失败: %v", err)
@@ -524,8 +536,8 @@ func TestReverseOrder(t *testing.T) {
 	if err := json.Unmarshal(mock.lastBody, &sent); err != nil {
 		t.Fatalf("请求体解析失败: %v", err)
 	}
-	if sent["mchid"] != "1900000001" {
-		t.Fatalf("mchid 未自动填充: %+v", sent)
+	if sent["appid"] != "wx1234567890" || sent["mchid"] != "1900000001" {
+		t.Fatalf("appid/mchid 未自动填充: %+v", sent)
 	}
 
 	// 商户订单号为空必须拒绝
@@ -795,6 +807,26 @@ func TestParameterValidation(t *testing.T) {
 		{"CodePay 空请求", func() error { _, err := c.CodePay(ctx, nil); return err }},
 		{"CodePay 空付款码", func() error {
 			_, err := c.CodePay(ctx, &CodePayRequest{Description: "测试商品", OutTradeNo: "ORDER_001", Amount: Amount{Total: 100}})
+			return err
+		}},
+		{"CodePay 缺场景信息", func() error {
+			_, err := c.CodePay(ctx, &CodePayRequest{Description: "测试商品", OutTradeNo: "ORDER_001", Amount: Amount{Total: 100}, Payer: CodePayer{AuthCode: "1345235315201154982642655744"}})
+			return err
+		}},
+		{"CodePay 缺门店信息", func() error {
+			_, err := c.CodePay(ctx, &CodePayRequest{
+				Description: "测试商品", OutTradeNo: "ORDER_001", Amount: Amount{Total: 100},
+				Payer:     CodePayer{AuthCode: "1345235315201154982642655744"},
+				SceneInfo: &CodePaySceneInfo{},
+			})
+			return err
+		}},
+		{"CodePay 门店编号缺失", func() error {
+			_, err := c.CodePay(ctx, &CodePayRequest{
+				Description: "测试商品", OutTradeNo: "ORDER_001", Amount: Amount{Total: 100},
+				Payer:     CodePayer{AuthCode: "1345235315201154982642655744"},
+				SceneInfo: &CodePaySceneInfo{StoreInfo: &CodePayStoreInfo{Name: "门店"}},
+			})
 			return err
 		}},
 		{"CloseOrder 空订单号", func() error { return c.CloseOrder(ctx, "") }},
