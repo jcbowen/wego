@@ -2,6 +2,7 @@ package official_account
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jcbowen/wego/core"
@@ -112,8 +113,9 @@ type StableAccessTokenStorage interface {
 	GetStableAccessToken(appID string) (*StableAccessTokenInfo, error)
 }
 
-// DefaultStableAccessTokenStorage 默认稳定版access_token存储实现（基于内存）
+// DefaultStableAccessTokenStorage 默认稳定版access_token存储实现（基于内存，并发安全）
 type DefaultStableAccessTokenStorage struct {
+	mu     sync.RWMutex
 	tokens map[string]*StableAccessTokenInfo
 }
 
@@ -126,6 +128,8 @@ func NewDefaultStableAccessTokenStorage() *DefaultStableAccessTokenStorage {
 
 // SetStableAccessToken 设置稳定版access_token
 func (s *DefaultStableAccessTokenStorage) SetStableAccessToken(appID string, token *StableAccessTokenInfo) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.tokens[appID] = token
 	return nil
 }
@@ -147,6 +151,8 @@ type ClearQuotaResponse struct {
 
 // GetStableAccessToken 获取稳定版access_token
 func (s *DefaultStableAccessTokenStorage) GetStableAccessToken(appID string) (*StableAccessTokenInfo, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	token, exists := s.tokens[appID]
 	if !exists {
 		return nil, nil

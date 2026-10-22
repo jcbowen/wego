@@ -106,13 +106,19 @@ type SubscribeMsgData struct {
 }
 
 // SendNewSubscribeMsgRequest 发送订阅消息请求
+// 参考文档：https://developers.weixin.qq.com/doc/offiaccount/Subscription_Messages/Message_Send_API.html
 type SendNewSubscribeMsgRequest struct {
-	Touser      string                      `json:"touser"`
-	TemplateID  string                      `json:"template_id"`
-	Page        string                      `json:"page,omitempty"`
-	Data        map[string]SubscribeMsgData `json:"data"`
-	Miniprogram *TemplateMessageMiniProgram `json:"miniprogram_state,omitempty"`
-	Lang        string                      `json:"lang,omitempty"`
+	Touser     string                      `json:"touser"`
+	TemplateID string                      `json:"template_id"`
+	Page       string                      `json:"page,omitempty"`
+	Data       map[string]SubscribeMsgData `json:"data"`
+	// MiniprogramState 小程序状态，官方为 string：
+	// developer-开发版 / trial-体验版 / formal-正式版（默认）
+	MiniprogramState string `json:"miniprogram_state,omitempty"`
+	// Lang 进入小程序查看的语言：zh_CN / zh_TW / zh_HK / en
+	Lang string `json:"lang,omitempty"`
+	// Miniprogram 跳转小程序配置（可选）
+	Miniprogram *TemplateMessageMiniProgram `json:"miniprogram,omitempty"`
 }
 
 // SendNewSubscribeMsgResponse 发送订阅消息响应
@@ -121,9 +127,9 @@ type SendNewSubscribeMsgResponse struct {
 }
 
 // GetCategory 获取订阅通知分类列表
-// 接口文档：https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/subscribe-message/subscribeMessage.getCategory.html
-// 功能：获取小程序账号的类目
-// 请求方式：GET
+// 接口文档：https://developers.weixin.qq.com/doc/offiaccount/Subscription_Messages/Category_list_API.html
+// 功能：获取公众号订阅通知的类目
+// 请求方式：GET /wxaapi/newtmpl/getcategory
 func (c *SubscribeClient) GetCategory(ctx context.Context) (*GetCategoryResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
@@ -131,7 +137,7 @@ func (c *SubscribeClient) GetCategory(ctx context.Context) (*GetCategoryResponse
 	}
 
 	var result GetCategoryResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", "https://api.weixin.qq.com/cgi-bin/template/get_category", url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCategory, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -149,9 +155,9 @@ func (c *SubscribeClient) GetCategory(ctx context.Context) (*GetCategoryResponse
 }
 
 // GetPubNewTemplateTitles 获取公共模板标题列表
-// 接口文档：https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/subscribe-message/subscribeMessage.getPubTemplateTitleList.html
+// 接口文档：https://developers.weixin.qq.com/doc/offiaccount/Subscription_Messages/Template_API.html
 // 功能：获取公共模板标题列表
-// 请求方式：GET
+// 请求方式：GET /wxaapi/newtmpl/getpubtemplatetitles
 func (c *SubscribeClient) GetPubNewTemplateTitles(ctx context.Context, categoryID int, start, limit int) (*GetPubNewTemplateTitlesResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
@@ -160,7 +166,7 @@ func (c *SubscribeClient) GetPubNewTemplateTitles(ctx context.Context, categoryI
 
 	var result GetPubNewTemplateTitlesResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s&ids=%d&start=%d&limit=%d",
-		"https://api.weixin.qq.com/cgi-bin/template/get_pub_template_titles", url.QueryEscape(accessToken), categoryID, start, limit)
+		URLGetPubTemplateTitles, url.QueryEscape(accessToken), categoryID, start, limit)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,

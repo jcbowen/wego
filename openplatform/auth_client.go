@@ -296,8 +296,8 @@ func (c *AuthorizerClient) CallAPI(ctx context.Context, apiURL string, params in
 		}
 	}
 
-	// 4. 发送HTTP请求
-	resp, err := http.DefaultClient.Do(req)
+	// 4. 发送HTTP请求（使用注入的HTTP客户端，保证自定义超时/代理/埋点生效）
+	resp, err := c.authClient.client.req.MakeRaw(req)
 	if err != nil {
 		return nil, fmt.Errorf("API调用失败: %v", err)
 	}
@@ -307,6 +307,11 @@ func (c *AuthorizerClient) CallAPI(ctx context.Context, apiURL string, params in
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %v", err)
+	}
+
+	// 5.1 校验HTTP状态码，避免 500/302 被当作正常响应解析
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("API调用失败 - 状态码: %d, 响应: %s", resp.StatusCode, string(respBody))
 	}
 
 	// 6. 解析响应并统一返回错误类型
@@ -408,6 +413,8 @@ func (c *AuthorizerClient) DeleteConditionalMenu(ctx context.Context, menuID str
 }
 
 // CallAPIWithRetry 带重试的API调用
+// 遇到 40001（access_token 无效）/ 42001（access_token 过期）时会清除本地缓存的
+// 授权方 token 并重新获取后重试；其他错误直接返回
 func (c *AuthorizerClient) CallAPIWithRetry(ctx context.Context, apiURL string, params interface{}, maxRetries int) ([]byte, error) {
 	for i := 0; i < maxRetries; i++ {
 		resp, err := c.CallAPI(ctx, apiURL, params)
@@ -415,10 +422,15 @@ func (c *AuthorizerClient) CallAPIWithRetry(ctx context.Context, apiURL string, 
 			return resp, nil
 		}
 
-		// 检查是否是Token过期错误
+		// 检查是否是Token过期/无效错误
 		if strings.Contains(err.Error(), "40001") || strings.Contains(err.Error(), "42001") {
-			// Token过期，清除缓存并重试
-			// 这里需要实现缓存清除逻辑
+			// Token过期：删除本地缓存的授权方token，强制下次调用重新获取
+			if delErr := c.authClient.client.storage.DeleteAuthorizerToken(ctx, c.authorizerAppID); delErr != nil {
+				c.authClient.client.logger.Warn("清除授权方token缓存失败", map[string]interface{}{
+					"authorizer_appid": c.authorizerAppID,
+					"error":            delErr.Error(),
+				})
+			}
 			continue
 		}
 
@@ -911,7 +923,18 @@ func (c *AuthorizerClient) GetOAuthClient(redirectURI string) *OAuthClient {
 //     -- scope：授权类型，snsapi_base 静默授权，snsapi_userinfo 授权并获取用户信息
 //     -- state：用于保持请求和回调的状态，授权请求后原样带回给第三方。
 //     -- forcePopup 强制此次授权需要用户弹窗确认；默认为false；需要注意的是，若用户命中了特殊场景下的静默授权逻辑，则此参数不生效
+//
+// Deprecated: 参数非法时会直接 panic 终止进程，请改用 GetAuthorizeURLE。
 func (oc *OAuthClient) GetAuthorizeURL(opts ...string) string {
+	authorizeURL, err := oc.GetAuthorizeURLE(opts...)
+	if err != nil {
+		panic(err.Error())
+	}
+	return authorizeURL
+}
+
+// GetAuthorizeURLE 生成授权页面URL（E 版：参数非法时返回 error 而非 panic）
+func (oc *OAuthClient) GetAuthorizeURLE(opts ...string) (string, error) {
 	// 解析参数
 	var scope, state, forcePopup string
 	if len(opts) > 0 {
@@ -928,13 +951,13 @@ func (oc *OAuthClient) GetAuthorizeURL(opts ...string) string {
 
 	// 验证参数
 	if oc.authorizerClient.authorizerAppID == "" {
-		panic("authorizerAppID不能为空")
+		return "", fmt.Errorf("authorizerAppID不能为空")
 	}
 	if oc.redirectURI == "" {
-		panic("redirectURI不能为空")
+		return "", fmt.Errorf("redirectURI不能为空")
 	}
 	if scope == "" {
-		panic("scope不能为空")
+		return "", fmt.Errorf("scope不能为空")
 	}
 
 	// 严格按照微信官方文档要求的参数顺序和大小写
@@ -952,17 +975,29 @@ func (oc *OAuthClient) GetAuthorizeURL(opts ...string) string {
 	params.Set("component_appid", oc.authorizerClient.authClient.client.GetConfig().ComponentAppID)
 
 	// 使用微信官方文档指定的授权URL
-	return fmt.Sprintf("%s?%s#wechat_redirect", official_account.URLConnectOAuth2Authorize, params.Encode())
+	return fmt.Sprintf("%s?%s#wechat_redirect", official_account.URLConnectOAuth2Authorize, params.Encode()), nil
 }
 
 // GetBaseAuthorizeURL 生成静默授权URL
+// Deprecated: 请改用 GetBaseAuthorizeURLE。
 func (oc *OAuthClient) GetBaseAuthorizeURL(state string) string {
 	return oc.GetAuthorizeURL("snsapi_base", state)
 }
 
+// GetBaseAuthorizeURLE 生成静默授权URL（E 版）
+func (oc *OAuthClient) GetBaseAuthorizeURLE(state string) (string, error) {
+	return oc.GetAuthorizeURLE("snsapi_base", state)
+}
+
 // GetUserInfoAuthorizeURL 生成用户信息授权URL
+// Deprecated: 请改用 GetUserInfoAuthorizeURLE。
 func (oc *OAuthClient) GetUserInfoAuthorizeURL(state string) string {
 	return oc.GetAuthorizeURL("snsapi_userinfo", state)
+}
+
+// GetUserInfoAuthorizeURLE 生成用户信息授权URL（E 版）
+func (oc *OAuthClient) GetUserInfoAuthorizeURLE(state string) (string, error) {
+	return oc.GetAuthorizeURLE("snsapi_userinfo", state)
 }
 
 // OAuthToken 网页授权Token
@@ -1102,8 +1137,56 @@ func (jm *JSSDKManager) GetConfig(ctx context.Context, url string, jsAPIList []s
 	return config, nil
 }
 
-// getJSAPITicket 获取JSAPI Ticket
+// jsapiTicketExpireMargin JSAPI Ticket 过期安全余量
+const jsapiTicketExpireMargin = 5 * time.Minute
+
+// jsapiTicketInfo JSAPI Ticket 缓存项
+type jsapiTicketInfo struct {
+	ticket    string
+	expiresAt time.Time
+}
+
+// getCachedJSAPITicket 读取缓存的JSAPI Ticket（含安全余量判断）
+func (c *Client) getCachedJSAPITicket(appID string) (string, bool) {
+	c.jsapiTicketMu.Lock()
+	defer c.jsapiTicketMu.Unlock()
+
+	info, ok := c.jsapiTicketMap[appID]
+	if !ok {
+		return "", false
+	}
+	if time.Now().Before(info.expiresAt.Add(-jsapiTicketExpireMargin)) {
+		return info.ticket, true
+	}
+	// 已过期（含余量），移除
+	delete(c.jsapiTicketMap, appID)
+	return "", false
+}
+
+// cacheJSAPITicket 缓存JSAPI Ticket
+func (c *Client) cacheJSAPITicket(appID, ticket string, expiresIn int) {
+	c.jsapiTicketMu.Lock()
+	defer c.jsapiTicketMu.Unlock()
+
+	if c.jsapiTicketMap == nil {
+		c.jsapiTicketMap = make(map[string]*jsapiTicketInfo)
+	}
+	c.jsapiTicketMap[appID] = &jsapiTicketInfo{
+		ticket:    ticket,
+		expiresAt: time.Now().Add(time.Duration(expiresIn) * time.Second),
+	}
+}
+
+// getJSAPITicket 获取JSAPI Ticket（优先使用缓存）
+// ticket 接口有独立调用配额，不能每次生成 JSSDK 配置都请求
 func (jm *JSSDKManager) getJSAPITicket(ctx context.Context, accessToken string) (string, error) {
+	appID := jm.authorizerClient.authorizerAppID
+
+	// 优先读缓存
+	if ticket, ok := jm.authorizerClient.authClient.client.getCachedJSAPITicket(appID); ok {
+		return ticket, nil
+	}
+
 	apiURL := official_account.URLGetTicket
 
 	params := map[string]interface{}{
@@ -1135,6 +1218,9 @@ func (jm *JSSDKManager) getJSAPITicket(ctx context.Context, accessToken string) 
 	if result.Ticket == "" {
 		return "", fmt.Errorf("获取JSAPI Ticket失败，返回票据为空")
 	}
+
+	// 写入缓存
+	jm.authorizerClient.authClient.client.cacheJSAPITicket(appID, result.Ticket, result.ExpiresIn)
 
 	return result.Ticket, nil
 }

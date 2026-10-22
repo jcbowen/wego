@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/jcbowen/jcbaseGo/component/debugger"
@@ -13,6 +14,9 @@ import (
 	"github.com/jcbowen/wego/storage"
 )
 
+// accessTokenExpireMargin access_token 过期安全余量，避免网络延迟导致临界过期
+const accessTokenExpireMargin = 5 * time.Minute
+
 // Client 微信公众号客户端
 type Client struct {
 	config     *Config
@@ -20,39 +24,64 @@ type Client struct {
 	storage    storage.TokenStorage
 	logger     logger.LoggerInterface
 	req        *core.Request
+	tokenMu    sync.RWMutex // 保护 access_token 的获取与刷新，避免并发重复刷新
 
 	stableTokenClient *StableTokenClient // 稳定版access_token客户端
 }
 
-// NewClient 创建新的微信公众号客户端（使用默认文件存储）
+// NewClientE 创建新的微信公众号客户端（使用默认文件存储），出错时返回 error 而不是 panic
 // @param config *Config 公众号配置信息
 // @param opts ...any 可选参数，支持以下类型：
 //   - debugger.LoggerInterface: 自定义日志器
 //   - core.HTTPClient: 自定义HTTP客户端
 //
 // @return *Client 公众号客户端实例
-func NewClient(config *Config, opts ...any) *Client {
+// @return error 文件存储创建失败时返回错误
+func NewClientE(config *Config, opts ...any) (*Client, error) {
 	// 使用当前工作目录下的 wego_storage 文件夹作为默认存储路径
 	fileStorage, err := storage.NewFileStorage("./runtime/wego_storage")
 	if err != nil {
-		log.Panic("文件存储创建失败: " + err.Error())
+		return nil, fmt.Errorf("文件存储创建失败: %w", err)
 	}
-	return NewMPClientWithStorage(config, fileStorage, opts...)
+	return NewMPClientWithStorageE(config, fileStorage, opts...)
 }
 
-// NewMPClientWithStorage 创建新的微信公众号客户端（使用自定义存储）
+// NewClient 创建新的微信公众号客户端（使用默认文件存储）
+//
+// Deprecated: 配置或存储非法时会直接 log.Panic 终止进程，依赖库不应越权决定宿主进程生死。
+// 请改用 NewClientE。
+func NewClient(config *Config, opts ...any) *Client {
+	client, err := NewClientE(config, opts...)
+	if err != nil {
+		log.Panic("创建微信公众号客户端失败: " + err.Error())
+	}
+	return client
+}
+
+// NewMPClientWithStorageE 创建新的微信公众号客户端（使用自定义存储），出错时返回 error 而不是 panic
 // @param config *Config 公众号配置信息
-// @param storage storage.TokenStorage 自定义存储实例
+// @param tokenStorage storage.TokenStorage 自定义存储实例
 // @param opts ...any 可选参数，支持以下类型：
 //   - debugger.LoggerInterface: 自定义日志器
 //   - core.HTTPClient: 自定义HTTP客户端
 //
 // @return *Client 公众号客户端实例
-func NewMPClientWithStorage(config *Config, storage storage.TokenStorage, opts ...any) *Client {
+// @return error 配置校验失败时返回错误
+func NewMPClientWithStorageE(config *Config, tokenStorage storage.TokenStorage, opts ...any) (*Client, error) {
+	if config == nil {
+		return nil, fmt.Errorf("配置不能为空")
+	}
+	if tokenStorage == nil {
+		return nil, fmt.Errorf("存储不能为空")
+	}
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("配置校验失败: %w", err)
+	}
+
 	client := &Client{
 		config:     config,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
-		storage:    storage,
+		storage:    tokenStorage,
 		logger:     logger.NewDefaultLoggerInterface(),
 	}
 
@@ -76,6 +105,17 @@ func NewMPClientWithStorage(config *Config, storage storage.TokenStorage, opts .
 	client.req = core.NewRequest(client.httpClient, client.logger)
 	client.stableTokenClient = NewStableTokenClient(client)
 
+	return client, nil
+}
+
+// NewMPClientWithStorage 创建新的微信公众号客户端（使用自定义存储）
+//
+// Deprecated: 配置非法时会直接 log.Panic 终止进程，请改用 NewMPClientWithStorageE。
+func NewMPClientWithStorage(config *Config, tokenStorage storage.TokenStorage, opts ...any) *Client {
+	client, err := NewMPClientWithStorageE(config, tokenStorage, opts...)
+	if err != nil {
+		log.Panic("创建微信公众号客户端失败: " + err.Error())
+	}
 	return client
 }
 
@@ -110,17 +150,20 @@ func (c *Client) SetHTTPClient(client core.HTTPClient) {
 
 // GetAccessToken 获取公众号access_token
 func (c *Client) GetAccessToken(ctx context.Context) (string, error) {
-	// 从存储中获取token
+	// 读锁查缓存，命中直接返回
+	c.tokenMu.RLock()
 	token, err := c.storage.GetAuthorizerToken(ctx, c.config.AppID)
 	if err != nil {
+		c.tokenMu.RUnlock()
 		return "", err
 	}
-
-	if token != nil && time.Now().Before(token.ExpiresAt) {
+	if token != nil && c.isTokenValid(token.ExpiresAt) {
+		c.tokenMu.RUnlock()
 		return token.AuthorizerAccessToken, nil
 	}
+	c.tokenMu.RUnlock()
 
-	// 重新获取access_token
+	// 未命中则加锁刷新
 	return c.refreshAccessToken(ctx)
 }
 
@@ -141,19 +184,18 @@ func (c *Client) MakeRequestWithStableToken(ctx context.Context, method, url str
 
 // refreshAccessToken 刷新access_token
 func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
-	// 双重检查：再次从存储中获取
+	// 互斥锁 + 双重检查，避免并发场景下重复刷新（微信侧并发刷新会互相覆盖并返回 40001）
+	c.tokenMu.Lock()
+	defer c.tokenMu.Unlock()
+
 	token, err := c.storage.GetAuthorizerToken(ctx, c.config.AppID)
 	if err != nil {
 		return "", err
 	}
 
-	if token != nil && time.Now().Before(token.ExpiresAt) {
+	if token != nil && c.isTokenValid(token.ExpiresAt) {
 		return token.AuthorizerAccessToken, nil
 	}
-
-	// 调用微信API获取access_token
-	apiURL := fmt.Sprintf("%s/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s", core.BaseAPIURL,
-		c.config.AppID, c.config.AppSecret)
 
 	var result struct {
 		core.APIResponse
@@ -161,9 +203,15 @@ func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
 		ExpiresIn   int    `json:"expires_in"`
 	}
 
+	// 参数走 Query String，与官方 /cgi-bin/token 的 GET 方式一致
 	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
-		URL:    apiURL,
+		URL:    URLAccessToken,
+		Query: map[string]string{
+			"grant_type": core.GrantTypeClientCredential,
+			"appid":      c.config.AppID,
+			"secret":     c.config.AppSecret,
+		},
 		Result: &result,
 	})
 	if err != nil {
@@ -187,6 +235,11 @@ func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
 	}
 
 	return result.AccessToken, nil
+}
+
+// isTokenValid 判断 access_token 是否仍在有效期内（考虑安全余量）
+func (c *Client) isTokenValid(expiresAt time.Time) bool {
+	return time.Now().Before(expiresAt.Add(-accessTokenExpireMargin))
 }
 
 // GetConfig 获取配置信息

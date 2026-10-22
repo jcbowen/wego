@@ -28,7 +28,7 @@ type Client struct {
 	tokenMu    sync.RWMutex
 }
 
-// NewClient 创建新的小程序客户端（使用默认文件存储）
+// NewClientE 创建新的小程序客户端（使用默认文件存储），出错时返回 error 而不是 panic
 //
 // 参数:
 //   - config: 小程序配置信息
@@ -36,28 +36,52 @@ type Client struct {
 //
 // 返回:
 //   - *Client: 小程序客户端实例
-func NewClient(config *Config, opts ...any) *Client {
+//   - error: 文件存储创建失败或配置校验失败时返回错误
+func NewClientE(config *Config, opts ...any) (*Client, error) {
 	fileStorage, err := storage.NewFileStorage("./runtime/wego_storage")
 	if err != nil {
-		log.Panic("文件存储创建失败: " + err.Error())
+		return nil, fmt.Errorf("文件存储创建失败: %w", err)
 	}
-	return NewClientWithStorage(config, fileStorage, opts...)
+	return NewClientWithStorageE(config, fileStorage, opts...)
 }
 
-// NewClientWithStorage 创建新的小程序客户端（使用自定义存储）
+// NewClient 创建新的小程序客户端（使用默认文件存储）
+//
+// Deprecated: 配置或存储非法时会直接 log.Panic 终止进程，依赖库不应越权决定宿主进程生死。
+// 请改用 NewClientE。
+func NewClient(config *Config, opts ...any) *Client {
+	client, err := NewClientE(config, opts...)
+	if err != nil {
+		log.Panic("创建小程序客户端失败: " + err.Error())
+	}
+	return client
+}
+
+// NewClientWithStorageE 创建新的小程序客户端（使用自定义存储），出错时返回 error 而不是 panic
 //
 // 参数:
 //   - config: 小程序配置信息
-//   - storage: 自定义存储实例
+//   - tokenStorage: 自定义存储实例
 //   - opts: 可选参数，支持 debugger.LoggerInterface 与 core.HTTPClient
 //
 // 返回:
 //   - *Client: 小程序客户端实例
-func NewClientWithStorage(config *Config, storage storage.TokenStorage, opts ...any) *Client {
+//   - error: 配置校验失败时返回错误
+func NewClientWithStorageE(config *Config, tokenStorage storage.TokenStorage, opts ...any) (*Client, error) {
+	if config == nil {
+		return nil, fmt.Errorf("配置不能为空")
+	}
+	if tokenStorage == nil {
+		return nil, fmt.Errorf("存储不能为空")
+	}
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("配置校验失败: %w", err)
+	}
+
 	client := &Client{
 		config:     config,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
-		storage:    storage,
+		storage:    tokenStorage,
 		logger:     logger.NewDefaultLoggerInterface(),
 	}
 
@@ -73,6 +97,17 @@ func NewClientWithStorage(config *Config, storage storage.TokenStorage, opts ...
 	}
 
 	client.req = core.NewRequest(client.httpClient, client.logger)
+	return client, nil
+}
+
+// NewClientWithStorage 创建新的小程序客户端（使用自定义存储）
+//
+// Deprecated: 配置非法时会直接 log.Panic 终止进程，请改用 NewClientWithStorageE。
+func NewClientWithStorage(config *Config, tokenStorage storage.TokenStorage, opts ...any) *Client {
+	client, err := NewClientWithStorageE(config, tokenStorage, opts...)
+	if err != nil {
+		log.Panic("创建小程序客户端失败: " + err.Error())
+	}
 	return client
 }
 

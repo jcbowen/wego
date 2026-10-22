@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/jcbowen/jcbaseGo/component/debugger"
@@ -27,9 +28,12 @@ type Client struct {
 	eventHandler EventHandler          // 事件处理器
 	crypt        *crypto.WXBizMsgCrypt // 消息加解密实例
 	req          *core.Request
+
+	jsapiTicketMu  sync.Mutex
+	jsapiTicketMap map[string]*jsapiTicketInfo // JSAPI Ticket 缓存（按授权方appid区分）
 }
 
-// NewClient 创建新的API客户端（使用默认文件存储）
+// NewClientE 创建新的API客户端（使用默认文件存储），出错时返回 error 而不是 panic
 // @param config *Config 开放平台配置信息
 // @param opt ...any 可选参数，支持以下类型：
 //   - debugger.LoggerInterface: 自定义日志器
@@ -37,21 +41,44 @@ type Client struct {
 //   - EventHandler: 自定义事件处理器
 //
 // @return *Client API客户端实例
-func NewClient(config *Config, opt ...any) (apiClient *Client) {
+// @return error 文件存储创建失败或配置校验失败时返回错误
+func NewClientE(config *Config, opt ...any) (*Client, error) {
 	// 使用当前工作目录下的 ./runtime/wego_storage 文件夹作为默认存储路径
 	fileStorage, err := storage.NewFileStorage("./runtime/wego_storage")
 	if err != nil {
-		log.Panicf("文件存储创建失败: %v", err)
+		return nil, fmt.Errorf("文件存储创建失败: %w", err)
 	}
-	return NewClientWithStorage(config, fileStorage, opt...)
+	return NewClientWithStorageE(config, fileStorage, opt...)
 }
 
-// NewClientWithStorage 创建新的API客户端（使用自定义存储）
-func NewClientWithStorage(config *Config, storage storage.TokenStorage, opt ...any) *Client {
+// NewClient 创建新的API客户端（使用默认文件存储）
+//
+// Deprecated: 配置或存储非法时会直接 log.Panic 终止进程，依赖库不应越权决定宿主进程生死。
+// 请改用 NewClientE。
+func NewClient(config *Config, opt ...any) *Client {
+	client, err := NewClientE(config, opt...)
+	if err != nil {
+		log.Panic("创建开放平台客户端失败: " + err.Error())
+	}
+	return client
+}
+
+// NewClientWithStorageE 创建新的API客户端（使用自定义存储），出错时返回 error 而不是 panic
+func NewClientWithStorageE(config *Config, tokenStorage storage.TokenStorage, opt ...any) (*Client, error) {
+	if config == nil {
+		return nil, fmt.Errorf("配置不能为空")
+	}
+	if tokenStorage == nil {
+		return nil, fmt.Errorf("存储不能为空")
+	}
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("配置校验失败: %w", err)
+	}
+
 	client := &Client{
 		config:     config,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
-		storage:    storage,
+		storage:    tokenStorage,
 		logger:     logger.NewDefaultLoggerInterface(),
 		crypt:      crypto.NewWXBizMsgCrypt(config.ComponentToken, config.EncodingAESKey, config.ComponentAppID),
 	}
@@ -78,6 +105,17 @@ func NewClientWithStorage(config *Config, storage storage.TokenStorage, opt ...a
 
 	client.req = core.NewRequest(client.httpClient, client.logger)
 
+	return client, nil
+}
+
+// NewClientWithStorage 创建新的API客户端（使用自定义存储）
+//
+// Deprecated: 配置非法时会直接 log.Panic 终止进程，请改用 NewClientWithStorageE。
+func NewClientWithStorage(config *Config, tokenStorage storage.TokenStorage, opt ...any) *Client {
+	client, err := NewClientWithStorageE(config, tokenStorage, opt...)
+	if err != nil {
+		log.Panic("创建开放平台客户端失败: " + err.Error())
+	}
 	return client
 }
 

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 
 	"github.com/jcbowen/jcbaseGo/component/helper"
 	"github.com/jcbowen/wego/logger"
@@ -22,6 +23,33 @@ type VerifyResponseFunc func(ctx context.Context, statusCode int, headers http.H
 //   - 返回 nil 表示响应体不是该服务的错误格式，由调用方回退到通用错误
 //   - 微信支付 V3 等接口在 4xx/5xx 时会返回结构化错误 JSON，需解析后供业务判断
 type ErrorParserFunc func(statusCode int, headers http.Header, body []byte) error
+
+// sensitiveQueryPattern 匹配 URL query 中的敏感参数（token/secret/ticket 等）
+var sensitiveQueryPattern = regexp.MustCompile(`(?i)(access_token|component_access_token|secret|ticket)=([^&]*)`)
+
+// redactSensitiveQuery 脱敏 URL 中的敏感参数，避免凭证进入日志
+func redactSensitiveQuery(rawURL string) string {
+	if rawURL == "" {
+		return rawURL
+	}
+	return sensitiveQueryPattern.ReplaceAllString(rawURL, "$1=[REDACTED]")
+}
+
+// sensitiveBodyPattern 匹配响应体 JSON 中敏感字段（token/secret/ticket 等）的字符串值
+var sensitiveBodyPattern = regexp.MustCompile(`(?i)("(?:access_token|component_access_token|secret|ticket|api_ticket|jsapi_ticket|encrypt_key|session_key)"\s*:\s*")[^"]*(")`)
+
+// redactSensitiveBody 脱敏响应体 JSON 中的敏感字段值，保留键名便于排障；
+// 非 JSON 文本（如账单文件流、加密 XML）不含上述键名模式，原样返回
+//
+// 参数：body 原始响应体
+// 返回：脱敏后的字符串
+// 使用示例：r.logger.Info(..., "response_body": redactSensitiveBody(respBody))
+func redactSensitiveBody(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	return sensitiveBodyPattern.ReplaceAllString(string(body), "${1}[REDACTED]${2}")
+}
 
 type ReqMakeOpt struct {
 	Method         string             // HTTP方法，如GET、POST等
@@ -123,18 +151,20 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 		req.Header.Set(key, value)
 	}
 
-	// 记录请求日志
-	r.logger.Info(fmt.Sprintf("发送HTTP请求 - Method: %s URL: %s", req.Method, req.URL.String()), map[string]interface{}{
-		"request_method":  req.Method,
-		"request_url":     req.URL.String(),
-		"request_headers": req.Header,
-		"request_body":    string(reqBody),
+	// 记录请求日志（URL 中的 token/secret 等凭证需脱敏后落日志；
+	// headers/body 可能含 Authorization、密钥等凭证，仅记录规模信息，需完整审计时请自行记录）
+	safeURL := redactSensitiveQuery(req.URL.String())
+	r.logger.Info(fmt.Sprintf("发送HTTP请求 - Method: %s URL: %s", req.Method, safeURL), map[string]interface{}{
+		"request_method":       req.Method,
+		"request_url":          safeURL,
+		"request_header_count": len(req.Header),
+		"request_body_size":    len(reqBody),
 	})
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
 		r.logger.Error(fmt.Sprintf("发送请求失败: %v", err), map[string]interface{}{
-			"url": requestURL,
+			"url": redactSensitiveQuery(requestURL),
 		})
 		return fmt.Errorf("发送请求失败: %w", err)
 	}
@@ -152,16 +182,17 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 		return fmt.Errorf("读取响应体失败: %w", err)
 	}
 
-	// 记录响应日志
+	// 记录响应日志（响应体可能含 access_token 等凭证，脱敏后落日志）
 	r.logger.Info(fmt.Sprintf("HTTP响应 - 状态码: %d, 内容长度: %d", resp.StatusCode, len(respBody)), map[string]interface{}{
 		"status_code":     resp.StatusCode,
 		"response_length": len(respBody),
-		"response_body":   string(respBody),
+		"response_body":   redactSensitiveBody(respBody),
 	})
 
 	// 检查HTTP状态码
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		r.logger.Error(fmt.Sprintf("HTTP请求失败 - 状态码: %d, 响应: %s", resp.StatusCode, string(respBody)), map[string]interface{}{
+		safeBody := redactSensitiveBody(respBody)
+		r.logger.Error(fmt.Sprintf("HTTP请求失败 - 状态码: %d, 响应: %s", resp.StatusCode, safeBody), map[string]interface{}{
 			"status_code": resp.StatusCode,
 		})
 		// 优先使用业务方提供的错误解析，便于区分错误码（如微信支付 ORDER_PAID）
@@ -197,7 +228,7 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 	// 解析JSON响应
 	if result != nil {
 		if err = json.Unmarshal(respBody, result); err != nil {
-			r.logger.Error(fmt.Sprintf("解析响应失败: %v, 响应内容: %s", err, string(respBody)))
+			r.logger.Error(fmt.Sprintf("解析响应失败: %v, 响应内容: %s", err, redactSensitiveBody(respBody)))
 			return fmt.Errorf("解析响应失败: %w", err)
 		}
 	}

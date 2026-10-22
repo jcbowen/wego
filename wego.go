@@ -1,6 +1,7 @@
 package wego
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/jcbowen/jcbaseGo/component/debugger"
@@ -32,6 +33,10 @@ type WeGo struct {
 
 // New 创建新的WeGo实例，支持多种客户端配置和可选参数
 // 同类型的客户端只能初始化一个，比如第一个参数是微信公众号，后面的不管还有几个公众号配置都忽略掉
+//
+// Deprecated: 任一客户端初始化失败时会直接 log.Panic 终止进程，依赖库不应越权决定宿主进程生死。
+// 请改用 NewE。
+//
 // @param configParams ...any 配置参数，支持以下类型：
 //   - openplatform.Config 或 *openplatform.Config: 开放平台配置
 //   - official_account.Config 或 *official_account.Config: 公众号配置
@@ -45,6 +50,52 @@ type WeGo struct {
 //
 // @return *WeGo WeGo实例
 func New(params ...any) *WeGo {
+	wego, err := NewE(params...)
+	if err != nil {
+		log.Panic("创建WeGo实例失败: " + err.Error())
+	}
+	return wego
+}
+
+// NewE 创建新的WeGo实例（出错返回 error），支持多种客户端配置和可选参数
+// 同类型的客户端只能初始化一个，比如第一个参数是微信公众号，后面的不管还有几个公众号配置都忽略掉
+//
+// @param params ...any 配置参数与可选参数，说明同 New
+//
+// @return *WeGo WeGo实例
+// @return error 任一客户端初始化失败时返回错误
+func NewE(params ...any) (*WeGo, error) {
+	return newWeGo(nil, params...)
+}
+
+// NewWithStorage 创建新的WeGo实例（使用自定义存储），支持可选参数
+//
+// Deprecated: 任一客户端初始化失败时会直接 log.Panic 终止进程，请改用 NewWithStorageE。
+func NewWithStorage(tokenStorage storage.TokenStorage, params ...any) *WeGo {
+	wego, err := NewWithStorageE(tokenStorage, params...)
+	if err != nil {
+		log.Panic("创建WeGo实例失败: " + err.Error())
+	}
+	return wego
+}
+
+// NewWithStorageE 创建新的WeGo实例（使用自定义存储，出错返回 error）
+//
+// @param tokenStorage storage.TokenStorage 自定义存储实例，不能为空
+// @param params ...any 配置参数与可选参数，说明同 New
+//
+// @return *WeGo WeGo实例
+// @return error 任一客户端初始化失败时返回错误
+func NewWithStorageE(tokenStorage storage.TokenStorage, params ...any) (*WeGo, error) {
+	if tokenStorage == nil {
+		return nil, fmt.Errorf("存储不能为空")
+	}
+	return newWeGo(tokenStorage, params...)
+}
+
+// newWeGo WeGo实例的公共构建逻辑
+// tokenStorage 为 nil 时使用各客户端的默认文件存储
+func newWeGo(tokenStorage storage.TokenStorage, params ...any) (*WeGo, error) {
 	wego := &WeGo{}
 
 	// 分离配置参数和可选参数
@@ -65,52 +116,38 @@ func New(params ...any) *WeGo {
 		case openplatform.Config, *openplatform.Config:
 			// 如果还没有初始化过开放平台客户端，则初始化
 			if wego.OpenPlatformClient == nil {
-				// 统一转换为指针类型
-				var openPlatformConfig *openplatform.Config
-				if ptr, ok := cfg.(*openplatform.Config); ok {
-					openPlatformConfig = ptr
-				} else {
-					configCopy := cfg.(openplatform.Config)
-					openPlatformConfig = &configCopy
+				client, err := buildClient[openplatform.Client](tokenStorage, toConfigPtr[openplatform.Config](cfg), optParams...)
+				if err != nil {
+					return nil, fmt.Errorf("初始化开放平台客户端失败: %w", err)
 				}
-				wego.OpenPlatformClient = openplatform.NewClient(openPlatformConfig, optParams...)
+				wego.OpenPlatformClient = client
 			}
 		case official_account.Config, *official_account.Config:
 			// 如果还没有初始化过公众号客户端，则初始化
 			if wego.OfficialAccountClient == nil {
-				// 统一转换为指针类型
-				var officialAccountConfig *official_account.Config
-				if ptr, ok := cfg.(*official_account.Config); ok {
-					officialAccountConfig = ptr
-				} else {
-					configCopy := cfg.(official_account.Config)
-					officialAccountConfig = &configCopy
+				client, err := buildClient[official_account.Client](tokenStorage, toConfigPtr[official_account.Config](cfg), optParams...)
+				if err != nil {
+					return nil, fmt.Errorf("初始化公众号客户端失败: %w", err)
 				}
-				wego.OfficialAccountClient = official_account.NewClient(officialAccountConfig, optParams...)
+				wego.OfficialAccountClient = client
 			}
 		case miniprogram.Config, *miniprogram.Config:
 			// 如果还没有初始化过小程序客户端，则初始化
 			if wego.MiniProgramClient == nil {
-				var miniProgramConfig *miniprogram.Config
-				if ptr, ok := cfg.(*miniprogram.Config); ok {
-					miniProgramConfig = ptr
-				} else {
-					configCopy := cfg.(miniprogram.Config)
-					miniProgramConfig = &configCopy
+				client, err := buildClient[miniprogram.Client](tokenStorage, toConfigPtr[miniprogram.Config](cfg), optParams...)
+				if err != nil {
+					return nil, fmt.Errorf("初始化小程序客户端失败: %w", err)
 				}
-				wego.MiniProgramClient = miniprogram.NewClient(miniProgramConfig, optParams...)
+				wego.MiniProgramClient = client
 			}
 		case payment.Config, *payment.Config:
 			// 如果还没有初始化过支付客户端，则初始化
 			if wego.PaymentClient == nil {
-				var paymentConfig *payment.Config
-				if ptr, ok := cfg.(*payment.Config); ok {
-					paymentConfig = ptr
-				} else {
-					configCopy := cfg.(payment.Config)
-					paymentConfig = &configCopy
+				client, err := buildClient[payment.Client](tokenStorage, toConfigPtr[payment.Config](cfg), optParams...)
+				if err != nil {
+					return nil, fmt.Errorf("初始化支付客户端失败: %w", err)
 				}
-				wego.PaymentClient = payment.NewClient(paymentConfig, optParams...)
+				wego.PaymentClient = client
 			}
 		default:
 			log.Printf("警告：不支持的配置类型 %T", cfg)
@@ -119,7 +156,65 @@ func New(params ...any) *WeGo {
 		}
 	}
 
-	return wego
+	return wego, nil
+}
+
+// buildClient 根据配置类型创建对应的客户端实例
+// C 为客户端类型，T 为配置类型；tokenStorage 非 nil 时使用自定义存储，否则使用默认文件存储
+func buildClient[C any, T any](tokenStorage storage.TokenStorage, config *T, opts ...any) (*C, error) {
+	switch c := any(config).(type) {
+	case *openplatform.Config:
+		if tokenStorage != nil {
+			client, err := openplatform.NewClientWithStorageE(c, tokenStorage, opts...)
+			return castClient[C](client, err)
+		}
+		client, err := openplatform.NewClientE(c, opts...)
+		return castClient[C](client, err)
+	case *official_account.Config:
+		if tokenStorage != nil {
+			client, err := official_account.NewMPClientWithStorageE(c, tokenStorage, opts...)
+			return castClient[C](client, err)
+		}
+		client, err := official_account.NewClientE(c, opts...)
+		return castClient[C](client, err)
+	case *miniprogram.Config:
+		if tokenStorage != nil {
+			client, err := miniprogram.NewClientWithStorageE(c, tokenStorage, opts...)
+			return castClient[C](client, err)
+		}
+		client, err := miniprogram.NewClientE(c, opts...)
+		return castClient[C](client, err)
+	case *payment.Config:
+		if tokenStorage != nil {
+			client, err := payment.NewClientWithStorageE(c, tokenStorage, opts...)
+			return castClient[C](client, err)
+		}
+		client, err := payment.NewClientE(c, opts...)
+		return castClient[C](client, err)
+	default:
+		return nil, fmt.Errorf("不支持的配置类型: %T", config)
+	}
+}
+
+// castClient 将 any 类型的客户端断言为目标类型
+func castClient[C any](client any, err error) (*C, error) {
+	if err != nil {
+		return nil, err
+	}
+	typed, ok := client.(*C)
+	if !ok {
+		return nil, fmt.Errorf("客户端类型断言失败: %T", client)
+	}
+	return typed, nil
+}
+
+// toConfigPtr 将配置参数统一转换为指针类型
+func toConfigPtr[T any](cfg any) *T {
+	if ptr, ok := cfg.(*T); ok {
+		return ptr
+	}
+	configCopy := cfg.(T)
+	return &configCopy
 }
 
 // isConfigParam 检查参数是否为配置参数（支持指针和非指针类型）
@@ -135,98 +230,6 @@ func isConfigParam(param any) bool {
 	default:
 		return false
 	}
-}
-
-// NewWithStorage 创建新的WeGo实例（使用自定义存储），支持可选参数
-// 同类型的客户端只能初始化一个，比如第一个参数是微信公众号，后面的不管还有几个公众号配置都忽略掉
-// @param storage storage.TokenStorage 自定义存储实例
-// @param configParams ...any 配置参数，支持以下类型：
-//   - openplatform.Config 或 *openplatform.Config: 开放平台配置
-//   - official_account.Config 或 *official_account.Config: 公众号配置
-//   - miniprogram.Config 或 *miniprogram.Config: 微信小程序配置
-//   - payment.Config 或 *payment.Config: 微信支付配置
-//
-// @param optParams ...any 可选参数，支持以下类型：
-//   - debugger.LoggerInterface: 自定义日志器
-//   - core.HTTPClient: 自定义HTTP客户端
-//   - openplatform.EventHandler: 开放平台事件处理器
-//
-// @return *WeGo WeGo实例
-func NewWithStorage(storage storage.TokenStorage, params ...any) *WeGo {
-	wego := &WeGo{}
-
-	// 分离配置参数和可选参数
-	var configParams []any
-	var optParams []any
-
-	for _, param := range params {
-		// 检查是否为配置参数（支持指针和非指针类型）
-		if isConfigParam(param) {
-			configParams = append(configParams, param)
-		} else {
-			optParams = append(optParams, param)
-		}
-	}
-
-	for _, config := range configParams {
-		switch cfg := config.(type) {
-		case openplatform.Config, *openplatform.Config:
-			// 如果还没有初始化过开放平台客户端，则初始化
-			if wego.OpenPlatformClient == nil {
-				// 统一转换为指针类型
-				var openPlatformConfig *openplatform.Config
-				if ptr, ok := cfg.(*openplatform.Config); ok {
-					openPlatformConfig = ptr
-				} else {
-					configCopy := cfg.(openplatform.Config)
-					openPlatformConfig = &configCopy
-				}
-				wego.OpenPlatformClient = openplatform.NewClientWithStorage(openPlatformConfig, storage, optParams...)
-			}
-		case official_account.Config, *official_account.Config:
-			// 如果还没有初始化过公众号客户端，则初始化
-			if wego.OfficialAccountClient == nil {
-				// 统一转换为指针类型
-				var officialAccountConfig *official_account.Config
-				if ptr, ok := cfg.(*official_account.Config); ok {
-					officialAccountConfig = ptr
-				} else {
-					configCopy := cfg.(official_account.Config)
-					officialAccountConfig = &configCopy
-				}
-				wego.OfficialAccountClient = official_account.NewMPClientWithStorage(officialAccountConfig, storage, optParams...)
-			}
-		case miniprogram.Config, *miniprogram.Config:
-			// 如果还没有初始化过小程序客户端，则初始化
-			if wego.MiniProgramClient == nil {
-				var miniProgramConfig *miniprogram.Config
-				if ptr, ok := cfg.(*miniprogram.Config); ok {
-					miniProgramConfig = ptr
-				} else {
-					configCopy := cfg.(miniprogram.Config)
-					miniProgramConfig = &configCopy
-				}
-				wego.MiniProgramClient = miniprogram.NewClientWithStorage(miniProgramConfig, storage, optParams...)
-			}
-		case payment.Config, *payment.Config:
-			// 如果还没有初始化过支付客户端，则初始化
-			if wego.PaymentClient == nil {
-				var paymentConfig *payment.Config
-				if ptr, ok := cfg.(*payment.Config); ok {
-					paymentConfig = ptr
-				} else {
-					configCopy := cfg.(payment.Config)
-					paymentConfig = &configCopy
-				}
-				wego.PaymentClient = payment.NewClientWithStorage(paymentConfig, storage, optParams...)
-			}
-		default:
-			// 忽略不支持的配置类型
-			continue
-		}
-	}
-
-	return wego
 }
 
 // SetLogger 设置日志记录器
@@ -262,118 +265,250 @@ func (w *WeGo) SetHTTPClient(client core.HTTPClient) {
 }
 
 // OpenPlatformAuth 返回开放平台授权相关功能
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OpenPlatformAuthE。
 func (w *WeGo) OpenPlatformAuth() *openplatform.AuthClient {
-	if w.OpenPlatformClient == nil {
-		panic("未初始化开放平台客户端")
+	authClient, err := w.OpenPlatformAuthE()
+	if err != nil {
+		panic(err.Error())
 	}
-	return openplatform.NewAuthClient(w.OpenPlatformClient)
+	return authClient
+}
+
+// OpenPlatformAuthE 返回开放平台授权相关功能（E 版：未初始化时返回 error）
+func (w *WeGo) OpenPlatformAuthE() (*openplatform.AuthClient, error) {
+	if w.OpenPlatformClient == nil {
+		return nil, fmt.Errorf("未初始化开放平台客户端")
+	}
+	return openplatform.NewAuthClient(w.OpenPlatformClient), nil
 }
 
 // OpenPlatformMessage 返回开放平台消息处理相关功能
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OpenPlatformMessageE。
 func (w *WeGo) OpenPlatformMessage() *message.MessageClient {
-	if w.OpenPlatformClient == nil {
-		panic("未初始化开放平台客户端")
+	messageClient, err := w.OpenPlatformMessageE()
+	if err != nil {
+		panic(err.Error())
 	}
-	return message.NewMessageClient(w.OpenPlatformClient)
+	return messageClient
+}
+
+// OpenPlatformMessageE 返回开放平台消息处理相关功能（E 版：未初始化时返回 error）
+func (w *WeGo) OpenPlatformMessageE() (*message.MessageClient, error) {
+	if w.OpenPlatformClient == nil {
+		return nil, fmt.Errorf("未初始化开放平台客户端")
+	}
+	return message.NewMessageClient(w.OpenPlatformClient), nil
 }
 
 // OfficialAccountAPI 返回公众号API相关功能
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OfficialAccountAPIE。
 func (w *WeGo) OfficialAccountAPI() *official_account.APIClient {
-	if w.OfficialAccountClient == nil {
-		panic("未初始化公众号客户端")
+	apiClient, err := w.OfficialAccountAPIE()
+	if err != nil {
+		panic(err.Error())
 	}
-	return official_account.NewMPAPIClient(w.OfficialAccountClient)
+	return apiClient
+}
+
+// OfficialAccountAPIE 返回公众号API相关功能（E 版：未初始化时返回 error）
+func (w *WeGo) OfficialAccountAPIE() (*official_account.APIClient, error) {
+	if w.OfficialAccountClient == nil {
+		return nil, fmt.Errorf("未初始化公众号客户端")
+	}
+	return official_account.NewMPAPIClient(w.OfficialAccountClient), nil
 }
 
 // OfficialAccountMenu 返回公众号菜单相关功能
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OfficialAccountMenuE。
 func (w *WeGo) OfficialAccountMenu() *official_account.MenuClient {
-	if w.OfficialAccountClient == nil {
-		panic("未初始化公众号客户端")
+	menuClient, err := w.OfficialAccountMenuE()
+	if err != nil {
+		panic(err.Error())
 	}
-	return official_account.NewMenuClient(w.OfficialAccountClient)
+	return menuClient
+}
+
+// OfficialAccountMenuE 返回公众号菜单相关功能（E 版：未初始化时返回 error）
+func (w *WeGo) OfficialAccountMenuE() (*official_account.MenuClient, error) {
+	if w.OfficialAccountClient == nil {
+		return nil, fmt.Errorf("未初始化公众号客户端")
+	}
+	return official_account.NewMenuClient(w.OfficialAccountClient), nil
 }
 
 // OfficialAccountMessage 返回公众号消息相关功能
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OfficialAccountMessageE。
 func (w *WeGo) OfficialAccountMessage() *official_account.MessageClient {
-	if w.OfficialAccountClient == nil {
-		panic("未初始化公众号客户端")
+	messageClient, err := w.OfficialAccountMessageE()
+	if err != nil {
+		panic(err.Error())
 	}
-	return official_account.NewMessageClient(w.OfficialAccountClient)
+	return messageClient
+}
+
+// OfficialAccountMessageE 返回公众号消息相关功能（E 版：未初始化时返回 error）
+func (w *WeGo) OfficialAccountMessageE() (*official_account.MessageClient, error) {
+	if w.OfficialAccountClient == nil {
+		return nil, fmt.Errorf("未初始化公众号客户端")
+	}
+	return official_account.NewMessageClient(w.OfficialAccountClient), nil
 }
 
 // OfficialAccountTemplate 返回公众号模板消息相关功能
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OfficialAccountTemplateE。
 func (w *WeGo) OfficialAccountTemplate() *official_account.TemplateClient {
-	if w.OfficialAccountClient == nil {
-		panic("未初始化公众号客户端")
+	templateClient, err := w.OfficialAccountTemplateE()
+	if err != nil {
+		panic(err.Error())
 	}
-	return official_account.NewTemplateClient(w.OfficialAccountClient)
+	return templateClient
+}
+
+// OfficialAccountTemplateE 返回公众号模板消息相关功能（E 版：未初始化时返回 error）
+func (w *WeGo) OfficialAccountTemplateE() (*official_account.TemplateClient, error) {
+	if w.OfficialAccountClient == nil {
+		return nil, fmt.Errorf("未初始化公众号客户端")
+	}
+	return official_account.NewTemplateClient(w.OfficialAccountClient), nil
 }
 
 // OfficialAccountCustom 返回公众号客服消息相关功能
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OfficialAccountCustomE。
 func (w *WeGo) OfficialAccountCustom() *official_account.CustomClient {
-	if w.OfficialAccountClient == nil {
-		panic("未初始化公众号客户端")
+	customClient, err := w.OfficialAccountCustomE()
+	if err != nil {
+		panic(err.Error())
 	}
-	return official_account.NewCustomClient(w.OfficialAccountClient)
+	return customClient
+}
+
+// OfficialAccountCustomE 返回公众号客服消息相关功能（E 版：未初始化时返回 error）
+func (w *WeGo) OfficialAccountCustomE() (*official_account.CustomClient, error) {
+	if w.OfficialAccountClient == nil {
+		return nil, fmt.Errorf("未初始化公众号客户端")
+	}
+	return official_account.NewCustomClient(w.OfficialAccountClient), nil
 }
 
 // OfficialAccountOAuth 返回公众号网页授权相关功能
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OfficialAccountOAuthE。
 func (w *WeGo) OfficialAccountOAuth() *official_account.OAuthClient {
-	if w.OfficialAccountClient == nil {
-		panic("未初始化公众号客户端")
+	oauthClient, err := w.OfficialAccountOAuthE()
+	if err != nil {
+		panic(err.Error())
 	}
-	return official_account.NewOAuthClient(w.OfficialAccountClient)
+	return oauthClient
+}
+
+// OfficialAccountOAuthE 返回公众号网页授权相关功能（E 版：未初始化时返回 error）
+func (w *WeGo) OfficialAccountOAuthE() (*official_account.OAuthClient, error) {
+	if w.OfficialAccountClient == nil {
+		return nil, fmt.Errorf("未初始化公众号客户端")
+	}
+	return official_account.NewOAuthClient(w.OfficialAccountClient), nil
 }
 
 // OpenPlatformOAuth 返回开放平台网页授权相关功能（代公众号授权）
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OpenPlatformOAuthE。
 func (w *WeGo) OpenPlatformOAuth(redirectURI string) *openplatform.OAuthClient {
+	oauthClient, err := w.OpenPlatformOAuthE(redirectURI)
+	if err != nil {
+		panic(err.Error())
+	}
+	return oauthClient
+}
+
+// OpenPlatformOAuthE 返回开放平台网页授权相关功能（E 版：未初始化时返回 error）
+func (w *WeGo) OpenPlatformOAuthE(redirectURI string) (*openplatform.OAuthClient, error) {
 	if w.OpenPlatformClient == nil {
-		panic("未初始化开放平台客户端")
+		return nil, fmt.Errorf("未初始化开放平台客户端")
 	}
 	authClient := openplatform.NewAuthClient(w.OpenPlatformClient)
 	authorizerClient := authClient.NewAuthorizerClient("") // 这里需要传入具体的authorizerAppID
-	return authorizerClient.GetOAuthClient(redirectURI)
+	return authorizerClient.GetOAuthClient(redirectURI), nil
 }
 
 // OfficialAccountMaterial 返回公众号素材管理相关功能
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OfficialAccountMaterialE。
 func (w *WeGo) OfficialAccountMaterial() *official_account.MaterialClient {
-	if w.OfficialAccountClient == nil {
-		panic("未初始化公众号客户端")
+	materialClient, err := w.OfficialAccountMaterialE()
+	if err != nil {
+		panic(err.Error())
 	}
-	return official_account.NewMaterialClient(w.OfficialAccountClient)
+	return materialClient
+}
+
+// OfficialAccountMaterialE 返回公众号素材管理相关功能（E 版：未初始化时返回 error）
+func (w *WeGo) OfficialAccountMaterialE() (*official_account.MaterialClient, error) {
+	if w.OfficialAccountClient == nil {
+		return nil, fmt.Errorf("未初始化公众号客户端")
+	}
+	return official_account.NewMaterialClient(w.OfficialAccountClient), nil
 }
 
 // OfficialAccountSubscribe 返回公众号订阅消息相关功能
 // 功能：获取订阅消息客户端实例，用于管理订阅消息相关功能
 // 返回值：*official_account.SubscribeClient 订阅消息客户端指针
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OfficialAccountSubscribeE。
 func (w *WeGo) OfficialAccountSubscribe() *official_account.SubscribeClient {
+	subscribeClient, err := w.OfficialAccountSubscribeE()
+	if err != nil {
+		panic(err.Error())
+	}
+	return subscribeClient
+}
+
+// OfficialAccountSubscribeE 返回公众号订阅消息相关功能（E 版：未初始化时返回 error）
+func (w *WeGo) OfficialAccountSubscribeE() (*official_account.SubscribeClient, error) {
 	if w.OfficialAccountClient == nil {
-		panic("未初始化公众号客户端")
+		return nil, fmt.Errorf("未初始化公众号客户端")
 	}
 	apiClient := official_account.NewMPAPIClient(w.OfficialAccountClient)
-	return apiClient.GetSubscribeClient()
+	return apiClient.GetSubscribeClient(), nil
 }
 
 // MiniProgram 返回微信小程序客户端
 //
 // 返回:
 //   - *miniprogram.Client: 小程序客户端
+//
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 MiniProgramE。
 func (w *WeGo) MiniProgram() *miniprogram.Client {
-	if w.MiniProgramClient == nil {
-		panic("未初始化小程序客户端")
+	miniProgramClient, err := w.MiniProgramE()
+	if err != nil {
+		panic(err.Error())
 	}
-	return w.MiniProgramClient
+	return miniProgramClient
+}
+
+// MiniProgramE 返回微信小程序客户端（E 版：未初始化时返回 error）
+func (w *WeGo) MiniProgramE() (*miniprogram.Client, error) {
+	if w.MiniProgramClient == nil {
+		return nil, fmt.Errorf("未初始化小程序客户端")
+	}
+	return w.MiniProgramClient, nil
 }
 
 // Payment 返回微信支付客户端
 //
 // 返回:
 //   - *payment.Client: 支付客户端
+//
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 PaymentE。
 func (w *WeGo) Payment() *payment.Client {
-	if w.PaymentClient == nil {
-		panic("未初始化支付客户端")
+	paymentClient, err := w.PaymentE()
+	if err != nil {
+		panic(err.Error())
 	}
-	return w.PaymentClient
+	return paymentClient
+}
+
+// PaymentE 返回微信支付客户端（E 版：未初始化时返回 error）
+func (w *WeGo) PaymentE() (*payment.Client, error) {
+	if w.PaymentClient == nil {
+		return nil, fmt.Errorf("未初始化支付客户端")
+	}
+	return w.PaymentClient, nil
 }
 
 // Crypto 返回加密解密相关功能

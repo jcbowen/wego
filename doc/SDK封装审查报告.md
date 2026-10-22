@@ -21,13 +21,19 @@
 | 7 | message 模块占位实现 + map 无锁 | ✅ 已修复 | 新增 `CryptoConfigProvider` 与 `WithCryptoConfigProvider/WithDefaultCryptoConfig` 选项；`cryptoCache` 加 `sync.RWMutex` + 双重检查；新增 `ClearCryptoCache` |
 | 8 | 仓库缺 go.sum | ✅ 已修复 | 已执行 `go mod tidy` 本地生成 `go.sum`；因 `.gitignore` 显式忽略 `/go.sum`（库项目约定：依赖校验由消费方自行生成），该文件不随仓库分发 |
 
-**破坏性变更提示**（P0 修复引入，需在发布说明中注明）：
+**破坏性变更提示**（修复引入，需在发布说明中注明）：
 
+P0 批次：
 1. `MessageClient.MassSend/Preview/SendAll` 的 `(msgType string, content interface{})` 参数合并为 `content MassContent`
 2. `SendCustomMessageRequest` 各字段类型由 `MessageXxx` 改为 `CustomXxxContent`
 3. `openplatform.ClearQuotaRequest/GetApiQuotaRequest` 字段由 `ComponentAppID` 改为 `AppID`
 4. `ClearComponentQuotaRequest.ComponentAppSecret` 改为 `AppSecret`，并新增可选 `AppID`
 5. `NewSecureMessageProcessor()` 改为可变参数（原无参调用仍兼容）
+
+P1 批次：
+6. `SendNewSubscribeMsgRequest` 新增 `MiniprogramState string` 字段，原 `Miniprogram` 字段的 json tag 由 `miniprogram_state`（错误用法）改为 `miniprogram`——若此前依赖原错误序列化行为需调整
+7. `WeGo` 全部 getter 与 `OAuthClient.GetAuthorizeURL` 系列新增 `XxxE` 返回 `(client, error)` 变体；旧方法标 `Deprecated`（保留 panic 兼容），建议迁移到 E 版
+8. `core.Request` 日志不再输出完整 headers/body（依赖日志做请求审计的需自行记录）
 
 ---
 
@@ -212,14 +218,19 @@
 
 **验证方式**：临时探针测试（`zz_probe_test.go`，已按惯例删除）校验了客服消息/群发/预览的序列化结构、OAuth Query 参数名、配额接口请求体、加解密实例并发获取。
 
-**第二批 —— 稳定性（P1）：待执行**
-9. stable_token 增加内存/存储缓存 + force_refresh 限频（20 次/天、间隔 30s）
-10. `official_account.Client` 补 token 互斥锁与过期余量（对齐 miniprogram）
-11. 全库移除 `log.Panic`，统一 E 版构造函数
-12. 清理 token 明文日志
-13. 统一订阅消息接口体系与 `miniprogram_state` 类型
-14. `CallAPI` 改用注入的 httpClient；`CallAPIWithRetry` 补真实刷新逻辑
-15. JSAPI ticket 缓存
+**第二批 —— 稳定性（P1）：已完成 ✅（2026-10-22）**
+
+| # | P1 问题 | 状态 | 主要改动 |
+|---|---|---|---|
+| 9 | stable_token 空壳缓存 + force_refresh 无限频 | ✅ 已修复 | `stable_token_client.go` 重写：`DefaultStableAccessTokenStorage` 加 `sync.RWMutex` 并发安全；`getValidStableAccessToken` 实现真实缓存命中（5 分钟过期余量，内存优先、持久化兜底回填）；新增限频字段与 `checkForceRefreshLimitLocked`/`recordForceRefreshLocked`（20 次/天 + 30 秒间隔 + 跨天自动重置），在 `GetStableAccessTokenForceRefresh` 路径拦截；支持通过 `SetStableTokenStorage` 注入自定义存储 |
+| 10 | 公众号 access_token 无锁无余量 | ✅ 已修复 | `official_account/client.go` 对齐 miniprogram：新增 `tokenMu sync.RWMutex`（读锁查缓存、写锁刷新 + 双重检查）；URL 改用常量 `URLAccessToken`（参数走 Query）；过期余量 5 分钟（`isTokenValid` 提前判定） |
+| 11 | 全库 `log.Panic` | ✅ 已修复 | 四个模块 + `wego` 全部新增 E 版入口：模块级 `NewClientE/NewClientWithStorageE`（内部走 `Config.Validate()` 校验）；`wego.NewE/NewWithStorageE`（`buildClient[T]` 泛型统一分发）；`WeGo` 全部 13 个 getter（`OpenPlatformAuth/OfficialAccountXxx/MiniProgram/Payment` 等）与 `OAuthClient.GetAuthorizeURL` 系列均新增 `XxxE` 变体；所有旧构造/旧 getter 统一标 `Deprecated` 并转发 E 版，panic 只保留在 Deprecated 兼容层内（行为与旧版一致），核心逻辑零 panic |
+| 12 | token 明文日志 | ✅ 已修复 | `core/req.go` 新增 `redactSensitiveQuery`（URL 中 `access_token/component_access_token/secret/ticket` 等参数值整体替换为 `[REDACTED]`）与 `redactSensitiveBody`（响应体 JSON 中 `access_token/secret/ticket/session_key` 等字段值脱敏，保留键名便于排障）；请求日志改为脱敏 URL，仅记录 header 数量与 body 大小（不再记录完整 headers/body）；响应体脱敏后落日志；`openplatform` 组件 token 明文日志已在 P0-5 修复 |
+| 13 | 订阅消息硬编码 URL 与类型 | ✅ 已修复 | `subscribe_client.go` 两处硬编码 URL 换为常量 `URLGetCategory` / `URLGetPubTemplateTitles`；`SendNewSubscribeMsgRequest` 新增 `MiniprogramState string`（`json:"miniprogram_state,omitempty"`）；原 `Miniprogram` 字段的 json tag 修正为 `miniprogram`（跳转小程序配置，原误用为 `miniprogram_state`） |
+| 14 | `CallAPI` 用 `http.DefaultClient`；重试不清缓存 | ✅ 已修复 | `auth_client.go`：`CallAPI` 改用 `c.authClient.client.req.MakeRaw(req)`（注入的 HTTP 客户端生效），并补充非 2xx 状态码校验；`CallAPIWithRetry` 遇 40001/42001 调用 `storage.DeleteAuthorizerToken` 清除本地缓存后重试，非 token 错误直接返回 |
+| 15 | JSAPI ticket 无缓存 | ✅ 已修复 | `openplatform.Client` 新增 `jsapiTicketMu sync.Mutex` + `jsapiTicketMap`（按 `authorizerAppID` 缓存）；`JSSDKManager.getJSAPITicket` 优先读缓存，缓存有效期按接口返回的 `expires_in` 减 5 分钟余量计算，过期自动清理 |
+
+**验证方式**：临时探针测试校验了限频器（间隔拦截/日限拦截/跨天重置）、stable token 缓存命中、core 脱敏、`NewE` 错误传播链路，跑通后已按惯例删除。`go build`、`go vet`、`gofmt -l`、全量 `go test ./...` 通过（race 检测因 Windows 环境缺 CGO 编译器跳过，并发逻辑已由探针的 64 并发用例覆盖）。
 
 **第三批 —— 规范与清理（P2）**
 16. 删除已下线接口常量
