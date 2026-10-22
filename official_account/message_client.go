@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"reflect"
 
 	"github.com/jcbowen/wego/core"
 )
@@ -61,11 +62,140 @@ type MassMsgGetResponse struct {
 	MsgStatus string `json:"msg_status"`
 }
 
+// MassContent 群发/预览消息的内容体接口
+//
+// 官方文档要求：群发与预览接口的内容体**以消息类型命名**，与 msgtype 平级，例如
+//
+//	{"touser":["OPENID"],"msgtype":"text","text":{"content":"hello"}}
+//	{"filter":{"is_to_all":true},"msgtype":"mpnews","mpnews":{"media_id":"xxx"}}
+//
+// 早期版本用统一的 "content" 字段承载，微信侧无法识别，会直接报错。
+type MassContent interface {
+	// ContentKey 返回内容体在请求体中的键名，同时作为 msgtype 的取值
+	// 取值范围：text / image / voice / mpnews / mpvideo / wxcard
+	ContentKey() string
+}
+
+// MassTextContent 文本消息内容体
+type MassTextContent struct {
+	Content string `json:"content"`
+}
+
+func (c MassTextContent) ContentKey() string { return "text" }
+
+// MassImageContent 图片消息内容体
+type MassImageContent struct {
+	MediaID string `json:"media_id"`
+}
+
+func (c MassImageContent) ContentKey() string { return "image" }
+
+// MassVoiceContent 语音消息内容体
+type MassVoiceContent struct {
+	MediaID string `json:"media_id"`
+}
+
+func (c MassVoiceContent) ContentKey() string { return "voice" }
+
+// MassMPNewsContent 图文消息内容体
+type MassMPNewsContent struct {
+	MediaID string `json:"media_id"`
+}
+
+func (c MassMPNewsContent) ContentKey() string { return "mpnews" }
+
+// MassMPVideoContent 视频消息内容体
+type MassMPVideoContent struct {
+	MediaID     string `json:"media_id"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+func (c MassMPVideoContent) ContentKey() string { return "mpvideo" }
+
+// MassWXCardContent 卡券消息内容体
+type MassWXCardContent struct {
+	CardID  string `json:"card_id"`
+	CardExt string `json:"card_ext,omitempty"`
+}
+
+func (c MassWXCardContent) ContentKey() string { return "wxcard" }
+
+// derefMassContent 将指针形态的内容体归一化为值形态，便于统一 switch 处理；
+// 类型化 nil 指针（如 (*MassTextContent)(nil)）同样归一为 nil
+func derefMassContent(content MassContent) MassContent {
+	if content == nil {
+		return nil
+	}
+	v := reflect.ValueOf(content)
+	if v.Kind() != reflect.Ptr {
+		return content
+	}
+	if v.IsNil() {
+		return nil
+	}
+	if deref, ok := v.Elem().Interface().(MassContent); ok {
+		return deref
+	}
+	return content
+}
+
+// MassContentFields 群发/预览请求体中「按类型命名」的内容字段
+//
+// 该结构以匿名方式嵌入各请求体，序列化后与 msgtype 平级，符合官方格式。
+type MassContentFields struct {
+	Text    *MassTextContent    `json:"text,omitempty"`
+	Image   *MassImageContent   `json:"image,omitempty"`
+	Voice   *MassVoiceContent   `json:"voice,omitempty"`
+	MPNews  *MassMPNewsContent  `json:"mpnews,omitempty"`
+	MPVideo *MassMPVideoContent `json:"mpvideo,omitempty"`
+	WXCard  *MassWXCardContent  `json:"wxcard,omitempty"`
+}
+
+// setContent 根据内容体类型填充对应字段
+// content 为 nil 或类型化 nil 指针（如 (*MassTextContent)(nil)）时返回错误
+func (f *MassContentFields) setContent(content MassContent) error {
+	c := derefMassContent(content)
+	if c == nil {
+		return fmt.Errorf("群发消息内容不能为空")
+	}
+	switch c := c.(type) {
+	case MassTextContent:
+		f.Text = &c
+	case MassImageContent:
+		f.Image = &c
+	case MassVoiceContent:
+		f.Voice = &c
+	case MassMPNewsContent:
+		f.MPNews = &c
+	case MassMPVideoContent:
+		f.MPVideo = &c
+	case MassWXCardContent:
+		f.WXCard = &c
+	default:
+		return fmt.Errorf("不支持的群发消息类型: %T", content)
+	}
+	return nil
+}
+
 // MassSendRequest 根据OpenID群发消息请求
 type MassSendRequest struct {
-	Touser  []string    `json:"touser"`
-	MsgType string      `json:"msgtype"`
-	Content interface{} `json:"content"`
+	MassContentFields
+	Touser  []string `json:"touser"`
+	MsgType string   `json:"msgtype"`
+}
+
+// NewMassSendRequest 构造按 OpenID 群发的请求体
+func NewMassSendRequest(touser []string, content MassContent) (*MassSendRequest, error) {
+	if len(touser) == 0 {
+		return nil, fmt.Errorf("touser不能为空")
+	}
+	req := &MassSendRequest{Touser: touser}
+	if err := req.setContent(content); err != nil {
+		return nil, err
+	}
+	req.MsgType = content.ContentKey()
+	return req, nil
 }
 
 // MassSendResponse 根据OpenID群发消息响应
@@ -76,9 +206,22 @@ type MassSendResponse struct {
 
 // PreviewRequest 预览消息请求
 type PreviewRequest struct {
-	Touser  string      `json:"touser"`
-	MsgType string      `json:"msgtype"`
-	Content interface{} `json:"content"`
+	MassContentFields
+	Touser  string `json:"touser"`
+	MsgType string `json:"msgtype"`
+}
+
+// NewPreviewRequest 构造预览请求体
+func NewPreviewRequest(touser string, content MassContent) (*PreviewRequest, error) {
+	if touser == "" {
+		return nil, fmt.Errorf("touser不能为空")
+	}
+	req := &PreviewRequest{Touser: touser}
+	if err := req.setContent(content); err != nil {
+		return nil, err
+	}
+	req.MsgType = content.ContentKey()
+	return req, nil
 }
 
 // PreviewResponse 预览消息响应
@@ -89,15 +232,25 @@ type PreviewResponse struct {
 
 // SendAllRequest 根据标签群发消息请求
 type SendAllRequest struct {
-	Filter  Filter      `json:"filter"`
-	MsgType string      `json:"msgtype"`
-	Content interface{} `json:"content"`
+	MassContentFields
+	Filter  Filter `json:"filter"`
+	MsgType string `json:"msgtype"`
+}
+
+// NewSendAllRequest 构造按标签群发的请求体
+func NewSendAllRequest(filter Filter, content MassContent) (*SendAllRequest, error) {
+	req := &SendAllRequest{Filter: filter}
+	if err := req.setContent(content); err != nil {
+		return nil, err
+	}
+	req.MsgType = content.ContentKey()
+	return req, nil
 }
 
 // Filter 筛选条件
 type Filter struct {
 	IsToAll bool `json:"is_to_all"`
-	TagID   int  `json:"tag_id"`
+	TagID   int  `json:"tag_id,omitempty"`
 }
 
 // SendAllResponse 根据标签群发消息响应
@@ -293,16 +446,17 @@ func (c *MessageClient) MassMsgGet(ctx context.Context, msgID int64) (*MassMsgGe
 }
 
 // MassSend 根据OpenID群发消息
-func (c *MessageClient) MassSend(ctx context.Context, touser []string, msgType string, content interface{}) (*MassSendResponse, error) {
+// content 需传入类型化内容体（如 &MassTextContent{Content:"hello"}），
+// 内部会按官方格式展开为 {"touser":[...],"msgtype":"text","text":{"content":"hello"}}
+func (c *MessageClient) MassSend(ctx context.Context, touser []string, content MassContent) (*MassSendResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	request := MassSendRequest{
-		Touser:  touser,
-		MsgType: msgType,
-		Content: content,
+	request, err := NewMassSendRequest(touser, content)
+	if err != nil {
+		return nil, err
 	}
 
 	var result MassSendResponse
@@ -325,16 +479,15 @@ func (c *MessageClient) MassSend(ctx context.Context, touser []string, msgType s
 }
 
 // Preview 预览消息
-func (c *MessageClient) Preview(ctx context.Context, touser, msgType string, content interface{}) (*PreviewResponse, error) {
+func (c *MessageClient) Preview(ctx context.Context, touser string, content MassContent) (*PreviewResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	request := PreviewRequest{
-		Touser:  touser,
-		MsgType: msgType,
-		Content: content,
+	request, err := NewPreviewRequest(touser, content)
+	if err != nil {
+		return nil, err
 	}
 
 	var result PreviewResponse
@@ -357,16 +510,15 @@ func (c *MessageClient) Preview(ctx context.Context, touser, msgType string, con
 }
 
 // SendAll 根据标签群发消息
-func (c *MessageClient) SendAll(ctx context.Context, filter Filter, msgType string, content interface{}) (*SendAllResponse, error) {
+func (c *MessageClient) SendAll(ctx context.Context, filter Filter, content MassContent) (*SendAllResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	request := SendAllRequest{
-		Filter:  filter,
-		MsgType: msgType,
-		Content: content,
+	request, err := NewSendAllRequest(filter, content)
+	if err != nil {
+		return nil, err
 	}
 
 	var result SendAllResponse

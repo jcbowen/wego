@@ -53,6 +53,9 @@ const (
 	URLTemplateDelPrivateTemplate    = core.BaseAPIURL + "/cgi-bin/template/del_private_template"
 	URLTemplateGetAllPrivateTemplate = core.BaseAPIURL + "/cgi-bin/template/get_all_private_template"
 	URLTemplateSetIndustry           = core.BaseAPIURL + "/cgi-bin/template/api_set_industry"
+	// URLQueryBlockTmplMsg 查询被拦截的模板消息记录
+	// 参考：https://developers.weixin.qq.com/doc/offiaccount/Message_Management/Template_Message_Interface.html
+	URLQueryBlockTmplMsg = core.BaseAPIURL + "/cgi-bin/message/template/query_block_tmpl_msg"
 
 	// 客服消息
 	URLMessageCustomSend       = core.BaseAPIURL + "/cgi-bin/message/custom/send"

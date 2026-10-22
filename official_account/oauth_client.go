@@ -79,10 +79,11 @@ func (o *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthAc
 	}
 
 	var resp OAuthAccessTokenResponse
+	// 官方 sns/oauth2/access_token 仅接受 Query String 参数，不能用 JSON Body
 	err := o.client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    URLSnsOAuth2AccessToken,
-		Body:   req,
+		Query:  req,
 		Result: &resp,
 	})
 	if err != nil {
@@ -115,10 +116,11 @@ func (o *OAuthClient) RefreshAccessToken(ctx context.Context, refreshToken strin
 	}
 
 	var resp OAuthAccessTokenResponse
+	// 官方 sns/oauth2/refresh_token 仅接受 Query String 参数，不能用 JSON Body
 	err := o.client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    URLSnsOAuth2RefreshToken,
-		Body:   req,
+		Query:  req,
 		Result: &resp,
 	})
 	if err != nil {
@@ -197,10 +199,11 @@ func (o *OAuthClient) ValidateAccessToken(ctx context.Context, accessToken, open
 	}
 
 	var resp core.APIResponse
+	// 官方 sns/auth 仅接受 Query String 参数，不能用 JSON Body
 	err := o.client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    URLSnsAuth,
-		Body:   req,
+		Query:  req,
 		Result: &resp,
 	})
 	if err != nil {

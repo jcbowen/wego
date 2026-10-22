@@ -16,11 +16,16 @@ type OAuthAuthorizeRequest struct {
 }
 
 // OAuthAccessTokenRequest 获取网页授权access_token请求参数
+// 参考文档：https://developers.weixin.qq.com/doc/offiaccount/OA_Web_Apps/Wechat_webpage_authorization.html
+// 接口地址：GET https://api.weixin.qq.com/sns/oauth2/access_token
+// 注意：该系列接口参数全部走 Query String，不传 JSON Body。
+// 结构体标签同时用于 Query 拼装（core.Request.Make 使用 json tag 作为参数名），
+// 因此**不要**加 omitempty 等选项，否则参数名会变成 "appid,omitempty"。
 type OAuthAccessTokenRequest struct {
-	AppID     string // 公众号的唯一标识
-	Secret    string // 公众号的appsecret
-	Code      string // 填写第一步获取的code参数
-	GrantType string // 填写为authorization_code
+	AppID     string `json:"appid"`      // 公众号的唯一标识
+	Secret    string `json:"secret"`     // 公众号的appsecret
+	Code      string `json:"code"`       // 填写第一步获取的code参数
+	GrantType string `json:"grant_type"` // 填写为authorization_code
 }
 
 // OAuthAccessTokenResponse 获取网页授权access_token响应
@@ -35,17 +40,19 @@ type OAuthAccessTokenResponse struct {
 }
 
 // OAuthRefreshTokenRequest 刷新网页授权access_token请求参数
+// 接口地址：GET https://api.weixin.qq.com/sns/oauth2/refresh_token
 type OAuthRefreshTokenRequest struct {
-	AppID        string // 公众号的唯一标识
-	RefreshToken string // 填写通过access_token获取到的refresh_token参数
-	GrantType    string // 填写为refresh_token
+	AppID        string `json:"appid"`         // 公众号的唯一标识
+	RefreshToken string `json:"refresh_token"` // 填写通过access_token获取到的refresh_token参数
+	GrantType    string `json:"grant_type"`    // 填写为refresh_token
 }
 
 // OAuthUserInfoRequest 获取用户信息请求参数
+// 接口地址：GET https://api.weixin.qq.com/sns/userinfo
 type OAuthUserInfoRequest struct {
-	AccessToken string // 网页授权接口调用凭证
-	OpenID      string // 用户的唯一标识
-	Lang        string // 返回国家地区语言版本，zh_CN 简体，zh_TW 繁体，en 英语
+	AccessToken string `json:"access_token"` // 网页授权接口调用凭证
+	OpenID      string `json:"openid"`       // 用户的唯一标识
+	Lang        string `json:"lang"`         // 返回国家地区语言版本，zh_CN 简体，zh_TW 繁体，en 英语
 }
 
 // OAuthUserInfo 用户信息
@@ -68,9 +75,10 @@ type OAuthUserInfoResponse struct {
 }
 
 // OAuthAuthRequest 检验授权凭证（access_token）是否有效请求参数
+// 接口地址：GET https://api.weixin.qq.com/sns/auth
 type OAuthAuthRequest struct {
-	AccessToken string // 网页授权接口调用凭证
-	OpenID      string // 用户的唯一标识
+	AccessToken string `json:"access_token"` // 网页授权接口调用凭证
+	OpenID      string `json:"openid"`       // 用户的唯一标识
 }
 
 // StableAccessTokenRequest 获取稳定版access_token请求参数

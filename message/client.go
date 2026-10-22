@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/jcbowen/wego/core"
@@ -23,18 +24,64 @@ func NewMessageClient(client *openplatform.Client) *MessageClient {
 	}
 }
 
+// CryptoConfigProvider 授权方消息加解密配置提供者
+//
+// 第三方平台场景下，每个授权方都有独立的「消息校验Token」与「消息加解密EncodingAESKey」，
+// 需要在授权流程中持久化（授权事件回调里可拿到），SDK 不假设存储方式，由宿主注入。
+type CryptoConfigProvider interface {
+	// GetCryptoConfig 返回指定授权方的消息校验Token与消息加解密EncodingAESKey
+	GetCryptoConfig(authorizerAppID string) (token, encodingAESKey string, err error)
+}
+
+// CryptoConfigProviderFunc 函数式形式的 CryptoConfigProvider，便于快速注入
+type CryptoConfigProviderFunc func(authorizerAppID string) (string, string, error)
+
+// GetCryptoConfig 实现 CryptoConfigProvider
+func (f CryptoConfigProviderFunc) GetCryptoConfig(authorizerAppID string) (string, string, error) {
+	return f(authorizerAppID)
+}
+
 // SecureMessageProcessor 安全消息处理器（支持加解密）
 type SecureMessageProcessor struct {
-	processor   *MessageProcessor
-	cryptoCache map[string]*crypto.WXBizMsgCrypt // 按授权方AppID缓存加解密实例
+	processor      *MessageProcessor
+	mu             sync.RWMutex
+	cryptoCache    map[string]*crypto.WXBizMsgCrypt // 按授权方AppID缓存加解密实例
+	configProvider CryptoConfigProvider             // 授权方加解密配置来源
+	defaultToken   string                           // 默认消息校验Token（单授权方/自建公众号场景）
+	defaultAESKey  string                           // 默认消息加解密EncodingAESKey
+}
+
+// SecureOption 安全消息处理器的可选配置
+type SecureOption func(*SecureMessageProcessor)
+
+// WithCryptoConfigProvider 注入授权方加解密配置提供者（第三方平台多授权方场景必填）
+func WithCryptoConfigProvider(provider CryptoConfigProvider) SecureOption {
+	return func(p *SecureMessageProcessor) {
+		p.configProvider = provider
+	}
+}
+
+// WithDefaultCryptoConfig 设置默认的消息校验Token与EncodingAESKey
+// 适用于只有一个授权方、或自建公众号/小程序直接使用官方配置的场景
+func WithDefaultCryptoConfig(token, encodingAESKey string) SecureOption {
+	return func(p *SecureMessageProcessor) {
+		p.defaultToken = token
+		p.defaultAESKey = encodingAESKey
+	}
 }
 
 // NewSecureMessageProcessor 创建安全消息处理器
-func NewSecureMessageProcessor() *SecureMessageProcessor {
-	return &SecureMessageProcessor{
+func NewSecureMessageProcessor(opts ...SecureOption) *SecureMessageProcessor {
+	p := &SecureMessageProcessor{
 		processor:   NewMessageProcessor(),
 		cryptoCache: make(map[string]*crypto.WXBizMsgCrypt),
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(p)
+		}
+	}
+	return p
 }
 
 // ProcessSecureMessage 处理安全消息（包含加解密，符合微信官方规范）
@@ -123,21 +170,70 @@ func (p *SecureMessageProcessor) EncryptReply(
 	return encryptedReply, nil
 }
 
-// getCryptoInstance 获取加解密实例
+// getCryptoInstance 获取加解密实例（并发安全）
 func (p *SecureMessageProcessor) getCryptoInstance(authorizerAppID string) (*crypto.WXBizMsgCrypt, error) {
+	if authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+
+	// 先读锁查询缓存，命中直接返回
+	p.mu.RLock()
+	if cryptoInstance, exists := p.cryptoCache[authorizerAppID]; exists {
+		p.mu.RUnlock()
+		return cryptoInstance, nil
+	}
+	p.mu.RUnlock()
+
+	// 未命中，解析该授权方的 Token 与 EncodingAESKey
+	token, encodingAESKey, err := p.resolveCryptoConfig(authorizerAppID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 加写锁，双重检查后写入缓存，避免并发重复创建
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if cryptoInstance, exists := p.cryptoCache[authorizerAppID]; exists {
 		return cryptoInstance, nil
 	}
-
-	// 从授权方信息中获取Token和EncodingAESKey
-	// 这里需要实现获取授权方配置的逻辑
-	token := "your_token"                     // 需要从配置或数据库中获取
-	encodingAESKey := "your_encoding_aes_key" // 需要从配置或数据库中获取
 
 	cryptoInstance := crypto.NewWXBizMsgCrypt(token, encodingAESKey, authorizerAppID)
 	p.cryptoCache[authorizerAppID] = cryptoInstance
 
 	return cryptoInstance, nil
+}
+
+// resolveCryptoConfig 解析指定授权方的消息校验Token与EncodingAESKey
+func (p *SecureMessageProcessor) resolveCryptoConfig(authorizerAppID string) (string, string, error) {
+	if p.configProvider != nil {
+		token, encodingAESKey, err := p.configProvider.GetCryptoConfig(authorizerAppID)
+		if err != nil {
+			return "", "", fmt.Errorf("获取授权方(%s)加解密配置失败: %w", authorizerAppID, err)
+		}
+		if token == "" || encodingAESKey == "" {
+			return "", "", fmt.Errorf("授权方(%s)的消息校验Token或EncodingAESKey为空", authorizerAppID)
+		}
+		return token, encodingAESKey, nil
+	}
+
+	// 未注入 Provider 时回退到默认配置
+	if p.defaultToken == "" || p.defaultAESKey == "" {
+		return "", "", fmt.Errorf(
+			"未配置消息校验Token/EncodingAESKey，请通过 WithCryptoConfigProvider 或 WithDefaultCryptoConfig 注入")
+	}
+	return p.defaultToken, p.defaultAESKey, nil
+}
+
+// ClearCryptoCache 清空加解密实例缓存
+// 授权方重新授权、Token/EncodingAESKey 变更时需要调用，否则会继续使用旧配置
+func (p *SecureMessageProcessor) ClearCryptoCache(authorizerAppID string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if authorizerAppID == "" {
+		p.cryptoCache = make(map[string]*crypto.WXBizMsgCrypt)
+		return
+	}
+	delete(p.cryptoCache, authorizerAppID)
 }
 
 // validateTimestamp 验证时间戳（防止重放攻击，符合微信官方规范）

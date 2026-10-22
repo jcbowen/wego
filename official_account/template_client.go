@@ -164,7 +164,7 @@ func (c *TemplateClient) QueryBlockTmplMsg(ctx context.Context, beginDate, endDa
 	}
 
 	var result QueryBlockTmplMsgResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateGetIndustry, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLQueryBlockTmplMsg, url.QueryEscape(accessToken))
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,

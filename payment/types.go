@@ -125,11 +125,11 @@ type CodePaySceneInfo struct {
 //     两种写法，本结构当前仅被付款码支付（codepay）使用，按其官方文档口径使用 wxpay_goods_id；
 //     若后续复用到 JSAPI 下单等接口，需核对该接口文档的拼写
 type GoodsDetail struct {
-	MerchantGoodsID string `json:"merchant_goods_id"`           // 商户侧商品编码
-	WxpayGoodsID    string `json:"wxpay_goods_id,omitempty"`    // 微信支付商品编码（官方统一商品编号，没有可不传）
-	GoodsName       string `json:"goods_name,omitempty"`        // 商品名称
-	Quantity        int    `json:"quantity"`                    // 商品数量
-	UnitPrice       int    `json:"unit_price"`                  // 商品单价，单位为分（如有优惠传优惠后单价）
+	MerchantGoodsID string `json:"merchant_goods_id"`        // 商户侧商品编码
+	WxpayGoodsID    string `json:"wxpay_goods_id,omitempty"` // 微信支付商品编码（官方统一商品编号，没有可不传）
+	GoodsName       string `json:"goods_name,omitempty"`     // 商品名称
+	Quantity        int    `json:"quantity"`                 // 商品数量
+	UnitPrice       int    `json:"unit_price"`               // 商品单价，单位为分（如有优惠传优惠后单价）
 }
 
 // OrderDetail 订单优惠信息（下单时的 detail 字段）
@@ -245,42 +245,42 @@ type AppPayParams struct {
 
 // PromotionGoodsDetail 优惠活动单品明细（PromotionDetail.GoodsDetail 元素）
 type PromotionGoodsDetail struct {
-	GoodsID       string `json:"goods_id"`                  // 商品编码
-	Quantity      int    `json:"quantity"`                  // 商品数量
-	UnitPrice     int    `json:"unit_price"`                // 商品单价，单位为分
-	DiscountAmount int   `json:"discount_amount"`           // 商品优惠金额，单位为分
-	GoodsRemark   string `json:"goods_remark,omitempty"`    // 商品备注
+	GoodsID        string `json:"goods_id"`               // 商品编码
+	Quantity       int    `json:"quantity"`               // 商品数量
+	UnitPrice      int    `json:"unit_price"`             // 商品单价，单位为分
+	DiscountAmount int    `json:"discount_amount"`        // 商品优惠金额，单位为分
+	GoodsRemark    string `json:"goods_remark,omitempty"` // 商品备注
 }
 
 // PromotionDetail 订单优惠信息（应答字段，下单走优惠活动时返回）
 type PromotionDetail struct {
-	CouponID            string                 `json:"coupon_id"`                    // 券 ID
-	Name                string                 `json:"name,omitempty"`               // 优惠名称
-	Scope               string                 `json:"scope,omitempty"`              // 优惠范围：GLOBAL 全场代金券 / SINGLE 单品优惠
-	Type                string                 `json:"type,omitempty"`               // 优惠类型：CASH 充值型 / NOCASH 免充值型
-	Amount              int                    `json:"amount"`                       // 优惠券面额，单位为分
-	StockID             string                 `json:"stock_id,omitempty"`           // 活动 ID（批次 ID）
+	CouponID            string                 `json:"coupon_id"`                      // 券 ID
+	Name                string                 `json:"name,omitempty"`                 // 优惠名称
+	Scope               string                 `json:"scope,omitempty"`                // 优惠范围：GLOBAL 全场代金券 / SINGLE 单品优惠
+	Type                string                 `json:"type,omitempty"`                 // 优惠类型：CASH 充值型 / NOCASH 免充值型
+	Amount              int                    `json:"amount"`                         // 优惠券面额，单位为分
+	StockID             string                 `json:"stock_id,omitempty"`             // 活动 ID（批次 ID）
 	WechatpayContribute int                    `json:"wechatpay_contribute,omitempty"` // 微信出资，单位为分
 	MerchantContribute  int                    `json:"merchant_contribute,omitempty"`  // 商户出资，单位为分
 	OtherContribute     int                    `json:"other_contribute,omitempty"`     // 其他出资，单位为分
-	Currency            string                 `json:"currency,omitempty"`           // 优惠货币类型
-	GoodsDetail         []PromotionGoodsDetail `json:"goods_detail,omitempty"`       // 单品列表
+	Currency            string                 `json:"currency,omitempty"`             // 优惠货币类型
+	GoodsDetail         []PromotionGoodsDetail `json:"goods_detail,omitempty"`         // 单品列表
 }
 
 // Order 查询订单响应
 type Order struct {
-	AppID           string            `json:"appid"`                  // 应用 ID
-	MchID           string            `json:"mchid"`                  // 商户号
-	OutTradeNo      string            `json:"out_trade_no"`           // 商户订单号
-	TransactionID   string            `json:"transaction_id"`         // 微信支付订单号
-	TradeType       string            `json:"trade_type,omitempty"`   // 交易类型
-	TradeState      string            `json:"trade_state"`            // 交易状态
-	TradeStateDesc  string            `json:"trade_state_desc"`       // 交易状态描述
-	BankType        string            `json:"bank_type,omitempty"`    // 付款银行
-	Attach          string            `json:"attach,omitempty"`       // 附加数据
-	SuccessTime     time.Time         `json:"success_time,omitempty"` // 支付完成时间
-	Amount          *Amount           `json:"amount,omitempty"`       // 订单金额
-	Payer           *Payer            `json:"payer,omitempty"`        // 支付者信息
+	AppID           string            `json:"appid"`                      // 应用 ID
+	MchID           string            `json:"mchid"`                      // 商户号
+	OutTradeNo      string            `json:"out_trade_no"`               // 商户订单号
+	TransactionID   string            `json:"transaction_id"`             // 微信支付订单号
+	TradeType       string            `json:"trade_type,omitempty"`       // 交易类型
+	TradeState      string            `json:"trade_state"`                // 交易状态
+	TradeStateDesc  string            `json:"trade_state_desc"`           // 交易状态描述
+	BankType        string            `json:"bank_type,omitempty"`        // 付款银行
+	Attach          string            `json:"attach,omitempty"`           // 附加数据
+	SuccessTime     time.Time         `json:"success_time,omitempty"`     // 支付完成时间
+	Amount          *Amount           `json:"amount,omitempty"`           // 订单金额
+	Payer           *Payer            `json:"payer,omitempty"`            // 支付者信息
 	PromotionDetail []PromotionDetail `json:"promotion_detail,omitempty"` // 优惠信息（走优惠活动时返回）
 }
 

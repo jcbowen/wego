@@ -123,14 +123,23 @@ type BasicConfigInfo struct {
 }
 
 // ClearQuotaRequest 重置API调用次数请求
+// 参考文档：https://developers.weixin.qq.com/doc/service/api/apimanage/api_clearquota.html
+// 接口说明：POST https://api.weixin.qq.com/cgi-bin/clear_quota?access_token=ACCESS_TOKEN
+// 请求体只包含一个字段 {"appid":"要被清空的账号的appid"}
+// 注意事项：
+//  1. access_token 需与被清空的账号类型一致：清第三方平台用 component_access_token，
+//     代公众号/小程序清则用 authorizer_access_token
+//  2. 每个账号每月共 10 次清零机会
 type ClearQuotaRequest struct {
-	ComponentAppID string `json:"component_appid"`
+	AppID string `json:"appid"` // 要被清空的账号的appid
 }
 
 // GetApiQuotaRequest 查询API调用额度请求
+// 参考文档：https://developers.weixin.qq.com/doc/service/api/apimanage/api_quota_get.html
+// 接口说明：POST https://api.weixin.qq.com/cgi-bin/openapi/quota/get?access_token=ACCESS_TOKEN
+// 请求体同样只有 {"appid":"..."}
 type GetApiQuotaRequest struct {
-	ComponentAppID  string `json:"component_appid"`
-	AuthorizerAppID string `json:"authorizer_appid"`
+	AppID string `json:"appid"` // 要查询的账号的appid
 }
 
 // QuotaItem API调用额度项
@@ -171,9 +180,21 @@ type GetRidInfoResponse struct {
 }
 
 // ClearComponentQuotaRequest 使用AppSecret重置第三方平台API调用次数请求
+// 参考文档：https://developers.weixin.qq.com/doc/oplatform/openApi/openapi/api_componentclearquota_v2.html
+// 接口说明：POST https://api.weixin.qq.com/cgi-bin/component/clear_quota/v2（**无 query 参数**，仅支持 POST）
+// 请求体：
+//
+//	重置第三方平台自身：{"component_appid":"...","appsecret":"..."}
+//	代公众号/小程序重置：{"appid":"...","component_appid":"...","appsecret":"..."}
+//
+// 注意事项：
+//  1. 该接口通过 appsecret 调用，用于解决 access_token 已耗尽无法调用 clear_quota 的场景
+//  2. 与 clear_quota 共用每月 10 次清零机会
+//  3. 字段名是 appsecret，不是 component_appsecret
 type ClearComponentQuotaRequest struct {
-	ComponentAppID     string `json:"component_appid"`
-	ComponentAppSecret string `json:"component_appsecret"`
+	ComponentAppID string `json:"component_appid"` // 第三方平台appid
+	AppSecret      string `json:"appsecret"`       // 第三方平台appsecret
+	AppID          string `json:"appid,omitempty"` // 代重置时填写已授权的公众号/小程序appid，留空表示重置第三方平台自身
 }
 
 // SetAuthorizerOptionRequest 设置授权方选项信息请求

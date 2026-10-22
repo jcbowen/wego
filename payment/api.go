@@ -188,9 +188,9 @@ func (c *Client) AppPay(ctx context.Context, req *AppRequest) (*PrepayResponse, 
 //
 // 使用示例:
 //   - order, err := client.CodePay(ctx, &payment.CodePayRequest{
-//         OutTradeNo: "ORDER_001", Amount: payment.Amount{Total: 100}, Description: "商品",
-//         Payer: payment.CodePayer{AuthCode: "1345235315201154982642655744"},
-//         SceneInfo: &payment.CodePaySceneInfo{StoreInfo: &payment.CodePayStoreInfo{ID: "0001"}},
+//     OutTradeNo: "ORDER_001", Amount: payment.Amount{Total: 100}, Description: "商品",
+//     Payer: payment.CodePayer{AuthCode: "1345235315201154982642655744"},
+//     SceneInfo: &payment.CodePaySceneInfo{StoreInfo: &payment.CodePayStoreInfo{ID: "0001"}},
 //     })
 //   - if order.TradeState == payment.TradeStateUserPaying { /* 轮询查单 */ }
 //

@@ -947,22 +947,45 @@ func (c *Client) GenerateMobileAuthURL(preAuthCode string, authType int, bizAppI
 	return c.GenerateAuthURL(preAuthCode, authType, bizAppID, "mobile")
 }
 
-// ClearQuota 重置API调用次数
+// ClearQuota 重置第三方平台自身的API调用次数
+// 参考文档：https://developers.weixin.qq.com/doc/service/api/apimanage/api_clearquota.html
+// 注意事项：清第三方平台自身quota需用 component_access_token，每个账号每月共10次机会
 func (c *Client) ClearQuota(ctx context.Context) (*core.APIResponse, error) {
 	componentToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
 		return nil, err
 	}
 
+	return c.clearQuota(ctx, componentToken.AccessToken, c.config.ComponentAppID)
+}
+
+// ClearAuthorizerQuota 代授权方（公众号/小程序）重置API调用次数
+// 注意事项：代商家清除 quota 必须使用 authorizer_access_token，且消耗的是授权方自身的清零机会
+func (c *Client) ClearAuthorizerQuota(ctx context.Context, authorizerAppID string) (*core.APIResponse, error) {
+	if authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+
+	authorizerToken, err := c.GetAuthorizerAccessToken(ctx, authorizerAppID)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.clearQuota(ctx, authorizerToken, authorizerAppID)
+}
+
+// clearQuota 重置API调用次数的实际实现
+// 官方请求体仅包含 {"appid":"要被清空的账号的appid"}
+func (c *Client) clearQuota(ctx context.Context, accessToken, appID string) (*core.APIResponse, error) {
 	request := ClearQuotaRequest{
-		ComponentAppID: c.config.ComponentAppID,
+		AppID: appID,
 	}
 
 	var result core.APIResponse
-	clearQuotaUrl := fmt.Sprintf("%s?access_token=%s", URLClearQuota, url.QueryEscape(componentToken.AccessToken))
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	clearQuotaURL := fmt.Sprintf("%s?access_token=%s", URLClearQuota, url.QueryEscape(accessToken))
+	err := c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
-		URL:    clearQuotaUrl,
+		URL:    clearQuotaURL,
 		Body:   request,
 		Result: &result,
 	})
@@ -978,22 +1001,37 @@ func (c *Client) ClearQuota(ctx context.Context) (*core.APIResponse, error) {
 }
 
 // GetApiQuota 查询API调用额度
+// authorizerAppID 为空时查询第三方平台自身额度（component_access_token），
+// 非空时查询授权方额度（authorizer_access_token）
+// 参考文档：https://developers.weixin.qq.com/doc/service/api/apimanage/api_quota_get.html
 func (c *Client) GetApiQuota(ctx context.Context, authorizerAppID string) (*GetApiQuotaResponse, error) {
-	componentToken, err := c.GetComponentAccessToken(ctx, "")
-	if err != nil {
-		return nil, err
+	accessToken := ""
+	targetAppID := c.config.ComponentAppID
+
+	if authorizerAppID != "" {
+		authorizerToken, err := c.GetAuthorizerAccessToken(ctx, authorizerAppID)
+		if err != nil {
+			return nil, err
+		}
+		accessToken = authorizerToken
+		targetAppID = authorizerAppID
+	} else {
+		componentToken, err := c.GetComponentAccessToken(ctx, "")
+		if err != nil {
+			return nil, err
+		}
+		accessToken = componentToken.AccessToken
 	}
 
 	request := GetApiQuotaRequest{
-		ComponentAppID:  c.config.ComponentAppID,
-		AuthorizerAppID: authorizerAppID,
+		AppID: targetAppID,
 	}
 
 	var result GetApiQuotaResponse
-	getApiQuotaUrl := fmt.Sprintf("%s?access_token=%s", URLGetApiQuota, url.QueryEscape(componentToken.AccessToken))
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	getApiQuotaURL := fmt.Sprintf("%s?access_token=%s", URLGetApiQuota, url.QueryEscape(accessToken))
+	err := c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
-		URL:    getApiQuotaUrl,
+		URL:    getApiQuotaURL,
 		Body:   request,
 		Result: &result,
 	})
@@ -1038,15 +1076,35 @@ func (c *Client) GetRidInfo(ctx context.Context, rid string) (*GetRidInfoRespons
 	return &result, nil
 }
 
-// ClearComponentQuota 使用AppSecret重置第三方平台API调用次数
+// ClearComponentQuota 使用AppSecret重置第三方平台自身API调用次数
+// 参考文档：https://developers.weixin.qq.com/doc/oplatform/openApi/openapi/api_componentclearquota_v2.html
+// 注意事项：
+//  1. 该接口无 query 参数，仅支持 POST，路径为 /cgi-bin/component/clear_quota/v2
+//  2. 请求体字段为 appsecret（不是 component_appsecret）
+//  3. 与 clear_quota 共用每月10次清零机会
 func (c *Client) ClearComponentQuota(ctx context.Context) (*core.APIResponse, error) {
+	return c.clearComponentQuota(ctx, "")
+}
+
+// ClearAuthorizerQuotaBySecret 使用AppSecret代授权方（公众号/小程序）重置API调用次数
+// 该接口通过 appsecret 调用，可在授权方 access_token 已耗尽时使用，appid 必须是已授权的账号
+func (c *Client) ClearAuthorizerQuotaBySecret(ctx context.Context, authorizerAppID string) (*core.APIResponse, error) {
+	if authorizerAppID == "" {
+		return nil, fmt.Errorf("授权方AppID不能为空")
+	}
+	return c.clearComponentQuota(ctx, authorizerAppID)
+}
+
+// clearComponentQuota 使用AppSecret重置API调用次数的实际实现
+func (c *Client) clearComponentQuota(ctx context.Context, authorizerAppID string) (*core.APIResponse, error) {
 	request := ClearComponentQuotaRequest{
-		ComponentAppID:     c.config.ComponentAppID,
-		ComponentAppSecret: c.config.ComponentAppSecret,
+		ComponentAppID: c.config.ComponentAppID,
+		AppSecret:      c.config.ComponentAppSecret,
+		AppID:          authorizerAppID,
 	}
 
 	var result core.APIResponse
-	err := core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	err := c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    URLClearComponentQuota,
 		Body:   request,

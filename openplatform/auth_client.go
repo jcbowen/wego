@@ -1003,7 +1003,9 @@ func (oc *OAuthClient) GetAccessToken(ctx context.Context, code string) (*OAuthT
 		return nil, fmt.Errorf("ComponentAccessToken为空，请先获取有效的组件令牌")
 	}
 
-	oc.authorizerClient.authClient.client.logger.Info(fmt.Sprintf("获取到ComponentAccessToken: %s", componentToken.AccessToken))
+	oc.authorizerClient.authClient.client.logger.Info("已获取ComponentAccessToken", map[string]interface{}{
+		"component_access_token": "[REDACTED]",
+	})
 
 	// 严格按照微信官方文档要求的参数格式
 	params := map[string]string{
@@ -1320,10 +1322,13 @@ func (oc *OAuthClient) RefreshToken(ctx context.Context, refreshToken string) (*
 		return nil, fmt.Errorf("ComponentAccessToken为空，请先获取有效的组件令牌")
 	}
 
-	oc.authorizerClient.authClient.client.logger.Info(fmt.Sprintf("获取到ComponentAccessToken: %s", componentToken.AccessToken))
+	oc.authorizerClient.authClient.client.logger.Info("已获取ComponentAccessToken", map[string]interface{}{
+		"component_access_token": "[REDACTED]",
+	})
 
-	// 使用微信官方文档指定的URL
-	apiURL := URLRefreshComponentAccessToken
+	// 刷新网页授权 token 走 sns/oauth2/component/refresh_token，
+	// 而非 api_authorizer_token（后者用于刷新授权方 access_token）
+	apiURL := URLSnsOAuth2ComponentRefreshToken
 
 	// 严格按照微信官方文档要求的参数格式
 	params := map[string]string{

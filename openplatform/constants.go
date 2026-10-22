@@ -20,7 +20,9 @@ const (
 	URLGetAuthorizerOption = core.BaseAPIURL + "/cgi-bin/component/api_get_authorizer_option"
 	URLSetAuthorizerOption = core.BaseAPIURL + "/cgi-bin/component/api_set_authorizer_option"
 	URLStartPushTicket     = core.BaseAPIURL + "/cgi-bin/component/api_start_push_ticket"
-	URLClearComponentQuota = core.BaseAPIURL + "/cgi-bin/component/clear_quota"
+	// URLClearComponentQuota 使用AppSecret重置第三方平台API调用次数（v2 版本，无 query 参数）
+	// 参考：https://developers.weixin.qq.com/doc/oplatform/openApi/openapi/api_componentclearquota_v2.html
+	URLClearComponentQuota = core.BaseAPIURL + "/cgi-bin/component/clear_quota/v2"
 	URLModifyServerDomain  = core.BaseAPIURL + "/cgi-bin/component/modify_wxa_server_domain"
 	URLGetJumpDomainFile   = core.BaseAPIURL + "/cgi-bin/component/get_domain_confirmfile"
 	URLModifyJumpDomain    = core.BaseAPIURL + "/cgi-bin/component/modify_wxa_jump_domain"
@@ -42,8 +44,16 @@ const (
 	// 用户信息
 	URLGetUserInfo = core.BaseAPIURL + "/cgi-bin/user/info"
 
-	// 刷新令牌
+	// URLRefreshComponentAccessToken 已废弃：该地址实为「刷新授权方 access_token」（api_authorizer_token），
+	// 不能用于刷新网页授权 token，保留仅为兼容旧引用，请勿在新代码中使用。
+	//
+	// Deprecated: 请使用 URLSnsOAuth2ComponentRefreshToken（刷新网页授权 token）
+	// 或 URLAuthorizerToken（刷新授权方 access_token）。
 	URLRefreshComponentAccessToken = core.BaseAPIURL + "/cgi-bin/component/api_authorizer_token"
+
+	// URLSnsOAuth2ComponentRefreshToken 第三方平台代公众号刷新**网页授权** access_token
+	// 参考：https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/official_account/refresh_token.html
+	URLSnsOAuth2ComponentRefreshToken = core.BaseAPIURL + "/sns/oauth2/component/refresh_token"
 )
 
 // 授权类型常量
