@@ -8,7 +8,6 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 	"reflect"
 
 	"github.com/jcbowen/wego/core"
@@ -304,7 +303,7 @@ func (c *MessageClient) UploadImage(ctx context.Context, filename string, imageD
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLUploadImage, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLUploadImage, accessToken)
 
 	// 创建multipart/form-data请求
 	body := &bytes.Buffer{}
@@ -347,6 +346,11 @@ func (c *MessageClient) UploadImage(ctx context.Context, filename string, imageD
 		return nil, fmt.Errorf("读取响应失败: %v", err)
 	}
 
+	// 非 2xx 状态码提前判错，避免把网关/代理层错误当响应体解析
+	if err := core.CheckRawResponseStatus(resp.StatusCode, respBody); err != nil {
+		return nil, err
+	}
+
 	var result UploadImageResponse
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("解析响应失败: %v", err)
@@ -372,7 +376,7 @@ func (c *MessageClient) DeleteMassMsg(ctx context.Context, msgID int64, articleI
 	}
 
 	var result DeleteMassMsgResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteMassMsg, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteMassMsg, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -398,7 +402,7 @@ func (c *MessageClient) GetSpeed(ctx context.Context) (*GetSpeedResponse, error)
 	}
 
 	var result GetSpeedResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetSpeed, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetSpeed, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -427,7 +431,7 @@ func (c *MessageClient) MassMsgGet(ctx context.Context, msgID int64) (*MassMsgGe
 	}
 
 	var result MassMsgGetResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLMassMsgGet, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLMassMsgGet, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -460,7 +464,7 @@ func (c *MessageClient) MassSend(ctx context.Context, touser []string, content M
 	}
 
 	var result MassSendResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLMassSend, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLMassSend, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -491,7 +495,7 @@ func (c *MessageClient) Preview(ctx context.Context, touser string, content Mass
 	}
 
 	var result PreviewResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLPreview, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLPreview, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -522,7 +526,7 @@ func (c *MessageClient) SendAll(ctx context.Context, filter Filter, content Mass
 	}
 
 	var result SendAllResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLSendAll, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLSendAll, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -552,7 +556,7 @@ func (c *MessageClient) SetSpeed(ctx context.Context, speed int) (*SetSpeedRespo
 	}
 
 	var result SetSpeedResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLSetSpeed, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLSetSpeed, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -582,7 +586,7 @@ func (c *MessageClient) UploadNewsMsg(ctx context.Context, articles []Article) (
 	}
 
 	var result UploadNewsMsgResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLUploadNewsMsg, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLUploadNewsMsg, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -653,7 +657,7 @@ func (c *MessageClient) GetCurrentAutoreplyInfo(ctx context.Context) (*GetCurren
 	}
 
 	var result GetCurrentAutoreplyInfoResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCurrentAutoreplyInfo, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCurrentAutoreplyInfo, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,

@@ -480,10 +480,11 @@ func (w *WeGo) OfficialAccountMaterialE() (*official_account.MaterialClient, err
 	return official_account.NewMaterialClient(w.OfficialAccountClient), nil
 }
 
-// OfficialAccountSubscribe 返回公众号订阅消息相关功能
-// 功能：获取订阅消息客户端实例，用于管理订阅消息相关功能
-// 返回值：*official_account.SubscribeClient 订阅消息客户端指针
-// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OfficialAccountSubscribeE。
+// OfficialAccountSubscribe 返回公众号订阅通知相关功能（兼容层）
+// 功能：获取订阅通知客户端实例（方法转发到 SubscribeNotifyClient）
+// 返回值：*official_account.SubscribeClient 兼容层客户端指针
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，且本入口指向兼容层，
+// 请改用 OfficialAccountSubscribeNotifyE（返回 *official_account.SubscribeNotifyClient）。
 func (w *WeGo) OfficialAccountSubscribe() *official_account.SubscribeClient {
 	subscribeClient, err := w.OfficialAccountSubscribeE()
 	if err != nil {
@@ -492,13 +493,41 @@ func (w *WeGo) OfficialAccountSubscribe() *official_account.SubscribeClient {
 	return subscribeClient
 }
 
-// OfficialAccountSubscribeE 返回公众号订阅消息相关功能（E 版：未初始化时返回 error）
+// OfficialAccountSubscribeE 返回公众号订阅通知相关功能（兼容层，E 版：未初始化时返回 error）
+//
+// Deprecated: 本入口指向兼容层，请改用 OfficialAccountSubscribeNotifyE
+// （返回 *official_account.SubscribeNotifyClient，语义化方法名）。
 func (w *WeGo) OfficialAccountSubscribeE() (*official_account.SubscribeClient, error) {
 	if w.OfficialAccountClient == nil {
 		return nil, fmt.Errorf("未初始化公众号客户端")
 	}
 	apiClient := official_account.NewMPAPIClient(w.OfficialAccountClient)
 	return apiClient.GetSubscribeClient(), nil
+}
+
+// OfficialAccountSubscribeNotify 返回公众号订阅通知相关功能
+// Deprecated: 客户端未初始化时会直接 panic 终止进程，请改用 OfficialAccountSubscribeNotifyE。
+func (w *WeGo) OfficialAccountSubscribeNotify() *official_account.SubscribeNotifyClient {
+	notifyClient, err := w.OfficialAccountSubscribeNotifyE()
+	if err != nil {
+		panic(err.Error())
+	}
+	return notifyClient
+}
+
+// OfficialAccountSubscribeNotifyE 返回公众号订阅通知相关功能（E 版：未初始化时返回 error）
+// 功能：公众号「订阅通知」全套接口（类目/模板管理 + bizsend 发送）；
+// 小程序订阅消息请使用 MiniProgramE 客户端的 SendSubscribeMessage。
+//
+// 返回:
+//   - *official_account.SubscribeNotifyClient 订阅通知客户端
+//   - error 未初始化公众号客户端时返回错误
+func (w *WeGo) OfficialAccountSubscribeNotifyE() (*official_account.SubscribeNotifyClient, error) {
+	if w.OfficialAccountClient == nil {
+		return nil, fmt.Errorf("未初始化公众号客户端")
+	}
+	apiClient := official_account.NewMPAPIClient(w.OfficialAccountClient)
+	return apiClient.GetSubscribeNotifyClient(), nil
 }
 
 // OfficialAccountUser 返回公众号用户管理相关功能
@@ -599,34 +628,6 @@ func (w *WeGo) Crypto() *crypto.CryptoClient {
 func (w *WeGo) Storage() *storage.StorageClient {
 	return storage.NewStorageClient()
 }
-
-// 导出常用类型和常量
-var (
-// API相关 - 这些常量需要在实际使用时定义
-// APIComponentTokenURL     = api.APIComponentTokenURL
-// APICreatePreAuthCodeURL = api.APICreatePreAuthCodeURL
-// APIQueryAuthURL         = api.APIQueryAuthURL
-// APIComponentAPIURL      = api.APIComponentAPIURL
-// APIComponentAPIURLV2    = api.APIComponentAPIURLV2
-
-// 消息类型 - 这些常量需要在实际使用时定义
-// MsgTypeText       = message.MsgTypeText
-// MsgTypeImage      = message.MsgTypeImage
-// MsgTypeVoice      = message.MsgTypeVoice
-// MsgTypeVideo      = message.MsgTypeVideo
-// MsgTypeShortVideo = message.MsgTypeShortVideo
-// MsgTypeLocation   = message.MsgTypeLocation
-// MsgTypeLink       = message.MsgTypeLink
-// MsgTypeEvent      = message.MsgTypeEvent
-
-// 事件类型 - 这些常量需要在实际使用时定义
-// EventSubscribe   = message.EventSubscribe
-// EventUnsubscribe = message.EventUnsubscribe
-// EventScan        = message.EventScan
-// EventLocation    = message.EventLocation
-// EventClick       = message.EventClick
-// EventView        = message.EventView
-)
 
 // 导出常用结构体类型
 type (

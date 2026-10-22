@@ -3,6 +3,7 @@ package crypto
 import (
 	"context"
 	"crypto/sha1"
+	"crypto/subtle"
 	"fmt"
 	"sort"
 	"strings"
@@ -236,7 +237,8 @@ func (c *WXBizMsgCrypt) GenerateSignature(timestamp, nonce, encryptedMsg string)
 // validateSignature 验证签名
 func validateSignature(token, timestamp, nonce, encrypted, msgSignature string) bool {
 	expectedSignature := genSignature(token, timestamp, nonce, encrypted)
-	return expectedSignature == msgSignature
+	// 常量时间比较防时序侧信道；长度不同时返回 0（视为不匹配）
+	return subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(msgSignature)) == 1
 }
 
 // genSignature 生成签名（符合微信官方规范：token、timestamp、nonce、msg_encrypt）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>

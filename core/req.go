@@ -141,9 +141,13 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 		return fmt.Errorf("创建请求失败: %w", err)
 	}
 
-	// 设置默认 Content-Type（有请求体时）
-	if len(reqBody) > 0 {
-		req.Header.Set("Content-Type", "application/json")
+	// 设置默认 Content-Type：仅对携带请求体的写方法（POST/PUT/PATCH）生效；
+	// GET/HEAD/DELETE 等语义上无请求体，不设置该头，避免多余头触发网关拦截
+	switch req.Method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch:
+		if len(reqBody) > 0 {
+			req.Header.Set("Content-Type", "application/json")
+		}
 	}
 
 	// 设置自定义请求头（覆盖默认值）
@@ -243,4 +247,31 @@ func (r *Request) MakeRaw(req *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("发送请求失败: %w", err)
 	}
 	return resp, nil
+}
+
+// CheckRawResponseStatus 校验 MakeRaw 返回的响应状态码（MakeRaw 保持返回原始响应的语义，校验由调用方按需调用）。
+// 非 2xx 时返回错误：若响应体可解析出微信 errcode/errmsg 则附带业务错误信息，否则附加响应体前 512 字节原文，
+// 避免把网关/代理层错误（如 500/404 + HTML 页面）当成功响应体处理导致报错信息失真。
+//
+// 参数:
+//   - statusCode: HTTP 状态码
+//   - body: 已读取的响应体
+//
+// 返回:
+//   - error: 非 2xx 时返回错误，2xx 返回 nil
+//
+// 使用示例:
+//
+//	resp, _ := req.MakeRaw(httpReq)
+//	body, _ := io.ReadAll(resp.Body)
+//	if err := core.CheckRawResponseStatus(resp.StatusCode, body); err != nil { ... }
+func CheckRawResponseStatus(statusCode int, body []byte) error {
+	if statusCode >= 200 && statusCode < 300 {
+		return nil
+	}
+	var apiResp APIResponse
+	if json.Unmarshal(body, &apiResp) == nil && apiResp.ErrCode != 0 {
+		return fmt.Errorf("HTTP请求失败，状态码: %d, errcode: %d, errmsg: %s", statusCode, apiResp.ErrCode, apiResp.ErrMsg)
+	}
+	return fmt.Errorf("HTTP请求失败，状态码: %d, 响应体: %.512s", statusCode, body)
 }

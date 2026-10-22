@@ -52,16 +52,19 @@ type ConfirmInfo struct {
 
 // AuthorizerInfo 授权方信息
 type AuthorizerInfo struct {
-	NickName        string           `json:"nick_name"`
-	HeadImg         string           `json:"head_img"`
-	ServiceTypeInfo ServiceTypeInfo  `json:"service_type_info"`
-	VerifyTypeInfo  VerifyTypeInfo   `json:"verify_type_info"`
-	UserName        string           `json:"user_name"`
-	PrincipalName   string           `json:"principal_name"`
-	BusinessInfo    BusinessInfo     `json:"business_info"`
-	Alias           string           `json:"alias"`
-	QrcodeURL       string           `json:"qrcode_url"`
-	Signature       string           `json:"signature"`
+	NickName        string          `json:"nick_name"`
+	HeadImg         string          `json:"head_img"`
+	ServiceTypeInfo ServiceTypeInfo `json:"service_type_info"`
+	VerifyTypeInfo  VerifyTypeInfo  `json:"verify_type_info"`
+	UserName        string          `json:"user_name"`
+	PrincipalName   string          `json:"principal_name"`
+	BusinessInfo    BusinessInfo    `json:"business_info"`
+	Alias           string          `json:"alias"`
+	QrcodeURL       string          `json:"qrcode_url"`
+	Signature       string          `json:"signature"`
+	// MiniProgramInfo 小程序信息。
+	// 注意：官方接口返回的 JSON 键即为首字母大写的 "MiniProgramInfo"（微信历史原因），
+	// 请勿「修正」为小写，否则该字段永远解析不到。
 	MiniProgramInfo *MiniProgramInfo `json:"MiniProgramInfo,omitempty"`
 	RegisterType    int              `json:"register_type"`
 	AccountStatus   int              `json:"account_status"`
@@ -102,6 +105,7 @@ type MiniProgramInfo struct {
 
 // NetworkInfo 网络信息
 type NetworkInfo struct {
+	// 以下字段官方返回的 JSON 键均为首字母大写（微信历史原因），请勿改为下划线/小写，否则解析不到
 	RequestDomain   []string `json:"RequestDomain"`
 	WsRequestDomain []string `json:"WsRequestDomain"`
 	UploadDomain    []string `json:"UploadDomain"`
@@ -344,6 +348,25 @@ const (
 	// https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/component_verify_ticket.html
 	InfoTypeComponentVerifyTicket = "component_verify_ticket"
 )
+
+// EventErrorCallback 开放平台事件处理异常回调。
+// 当授权事件解析/解密/验签失败、票据存储失败或事件处理器返回错误时被同步调用，
+// 用于上层落盘排障；不影响微信官方要求的「返回 success」行为。
+// 不设置则维持原行为（仅记录日志）。
+//
+// 参数 source 为失败环节标识，当前取值：
+//   - "parse_encrypted_xml" / "decrypt"：加密消息解析或解密失败
+//   - "parse_event_xml" / "validate_event"：事件 XML 解析或验签失败
+//   - "parse_<事件类型>_event" / "handle_<事件类型>"：具体事件的解析或处理器执行失败
+//     （事件类型：authorized / unauthorized / updateauthorized / component_verify_ticket / encoding_aes_key_changed）
+//   - "save_component_verify_ticket" / "set_prev_encoding_aes_key"：票据存储、历史密钥保存失败
+//
+// 使用示例:
+//
+//	openplatform.NewClientE(cfg, func(source string, err error) {
+//	    // 落盘/告警等排障处理
+//	})
+type EventErrorCallback func(source string, err error)
 
 // EventHandler 事件处理器接口
 type EventHandler interface {

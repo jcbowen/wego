@@ -38,6 +38,14 @@ P1 批次：
 P2 批次：
 9. 删除导出常量 `openplatform.URLRefreshComponentAccessToken`（与 `URLAuthorizerToken` 同址，见第三批 #16）——引用该常量的下游代码需改用 `URLAuthorizerToken`（刷新授权方 access_token）或 `URLSnsOAuth2ComponentRefreshToken`（刷新网页授权 token）
 
+第八批（P1/P2 遗留清尾）：
+10. `TemplateMessageRequest.MiniProgram` 字段类型由值类型改为 `*TemplateMessageMiniProgram` 指针（配合 `omitempty`，nil 时不再序列化 `miniprogram` 键）——直接对 `request.MiniProgram.AppID` 赋值/取值的下游代码需改为指针写法或先判空
+11. 删除 `official_account` 中 59 个已下线接口导出常量（device/wifi/shakearound/semantic/printer/invoice/merchant 等，见第七节第八批 #10）——引用这些常量的下游代码将编译失败，相关官方接口均已下线
+12. 公众号订阅通知拆分为独立的 `SubscribeNotifyClient`（语义化方法名），旧 `SubscribeClient`/`GetSubscribeClient` 及其 `Wxa/New` 系列方法保留为兼容层并全部标 `Deprecated`，方法内部转发新实现，接口路径与序列化行为完全一致；建议迁移到 `GetSubscribeNotifyClient()`
+
+> 2026-10-22 补充：经全量代码级复核，原报告仍有 12 项 P1/P2 问题未处理且未标记去向（P1 #16/#20/#21/#22/#23、P2 #24-#30），已集中登记为「第八批 —— 遗留清尾」（见第七节末尾）。
+> 2026-10-22 追记：第八批 12 项已全部执行完毕（#10 用户决策直接删除、#11 用户决策采用拆分方案、#12 新增 `EventErrorCallback`），`go build`/`go vet`/`gofmt -l`/全量 `go test ./...` 通过，序列化改动经临时探针校验后删除。
+
 ---
 
 ## 一、总体结论
@@ -47,11 +55,11 @@ P2 批次：
 | payment 模块 | 质量最高：签名/验签、错误码、证书缓存、E 版构造函数、注释规范均已对齐官方 APIv3 规范，可作为全库标杆 |
 | miniprogram 模块 | 较好：带 token 互斥锁 + 5 分钟过期余量，结构清晰，但能力覆盖度低 |
 | storage 模块 | 较好：文件存储有 RWMutex + 临时文件原子替换，多后端抽象干净 |
-| **official_account 模块** | **问题最集中**：存在多处「请求一定失败」的 P0 缺陷，且多为早期代码未随官方接口演进 |
-| **openplatform 模块** | **次严重**：URL/参数名/请求体字段多处与官方不符，且存在 token 明文打日志的安全问题 |
-| **message 模块** | **未完成**：`getCryptoInstance` 是硬编码占位实现，且 map 无锁并发读写 |
-| 工程化 | 仓库缺 `go.sum`，当前无法 `go build` / `go vet` |
-| 文档 | README 与代码存在多处实质性不一致（类型名、函数名、行为描述均对不上） |
+| **official_account 模块** | **问题最集中**：存在多处「请求一定失败」的 P0 缺陷，且多为早期代码未随官方接口演进（审查时状态；P0~P8 批次已全部修复，能力也已补齐） |
+| **openplatform 模块** | **次严重**：URL/参数名/请求体字段多处与官方不符，且存在 token 明文打日志的安全问题（审查时状态；已全部修复） |
+| **message 模块** | **未完成**：`getCryptoInstance` 是硬编码占位实现，且 map 无锁并发读写（审查时状态；P0 #7 已修复：`CryptoConfigProvider` 注入 + `cryptoCache` 加锁，见修复进度表） |
+| 工程化 | 审查时仓库缺 `go.sum` 无法构建，已修复（P0 #8，`go.sum` 因 `.gitignore` 约定不随库分发）；`go build`/`go vet`/`gofmt -l`/全量 `go test` 当前全绿 |
+| 文档 | README 与代码存在多处实质性不一致（类型名、函数名、行为描述均对不上）（审查时状态；各批次已同步修正，最近一次为第八批同步订阅通知拆分与 EventErrorCallback） |
 
 **一句话总结**：支付链路可信，公众号/开放平台链路「看起来能跑，实际大量接口调不通」。优先修 P0，再补能力覆盖。
 
@@ -240,7 +248,7 @@ P2 批次：
 
 **验证方式**：临时探针测试校验了限频器（间隔拦截/日限拦截/跨天重置）、stable token 缓存命中、core 脱敏、`NewE` 错误传播链路，跑通后已按惯例删除。`go build`、`go vet`、`gofmt -l`、全量 `go test ./...` 通过（race 检测因 Windows 环境缺 CGO 编译器跳过，并发逻辑已由探针的 64 并发用例覆盖）。
 
-**第三批 —— 规范与清理（P2）：部分完成（2026-10-22）**
+**第三批 —— 规范与清理：已完成 4 项（2026-10-22）；其余 P1/P2 项移交第八批**
 
 | # | P2 问题 | 状态 | 主要改动 |
 |---|---|---|---|
@@ -248,6 +256,8 @@ P2 批次：
 | 17 | 抽离公共 opts 解析 | ✅ 已完成 | 新增 `core/opts.go` 的 `ApplyClientOptions`（回调式，支持模块扩展 handler）；`official_account`/`miniprogram`/`payment`/`openplatform` 四个模块构造函数的重复 switch 全部替换，openplatform 通过 extraHandler 处理 `EventHandler` |
 | 18 | 修正 README 全部不一致项 | ✅ 已完成 | `MPConfig`→`OfficialAccountConfig`（3 处）、`NewWeGo`→`NewE`、删除不存在的「内存存储自动回退」描述、稳定版 token 说明更新（内置缓存 + `SetStableTokenStorage` 持久化注入 + force_refresh 限频）、依赖版本对齐 go.mod（Go 1.26.0 / jcbaseGo v0.16.3 / gorm v1.31.2）、新增「E 版构造函数（推荐）」章节、模块说明中过时类型名（`WegoClient`/`MPClient`）修正、示例代码与当前 API 对齐 |
 | 19 | 补齐第五节缺失能力 | ✅ 已完成 | 方案 A（最小闭环）：① `GetMaterial` 视频素材 JSON 返回修复（新增 `GetMaterialResponse`，二进制走 Data、视频解析 title/description/down_url）；② `OpenPlatformOAuthE` 补全 `authorizerAppID` 参数（空值显式报错）；③ 新增 `UserClient`（用户信息/批量/关注列表/备注/标签 CRUD/打标/取标签粉丝/用户标签）；④ 公众号 `GetJSAPITicket`/`InvalidateJSAPITicket`（内存缓存 + 5 分钟余量）；⑤ 小程序订阅消息 `SendSubscribeMessage`、内容安全 `MsgSecCheck`/`MediaCheckAsync`（v2）；⑥ 小程序码 `GetWxaCode`/`GetWxaCodeUnlimit`/`CreateWxaQrcode`（二进制/JSON 混合响应处理）；⑦ `wego.go` 新增 `OfficialAccountUser(E)`/`OfficialAccount(E)` getter；⑧ 删除已下线的 `URLShortURL` 常量 |
+
+> 编号说明：本批表内 #16-#19 为批次内序号，对应原问题分别为 P1 #20（已下线接口常量，本批仅删除 `URLRefreshComponentAccessToken` 一个常量，merchant/*、device/*、wifi/*、shakearound/*、semantic/*、printer/*、invoice/* 等其余已下线常量未清理）、P2 #31（opts 解析抽离）、第六节（README 一致性）、第五节（能力补齐）。原 P1 #16/#21/#22/#23 与 P2 #24-#30 未在本批处理，已移交「第八批 —— 遗留清尾」集中登记。
 
 **第四批 —— 能力补齐（P2-19）：已完成 ✅（2026-10-22，方案 A 最小闭环）**
 
@@ -311,6 +321,29 @@ P2 批次：
 破坏性变更：#1 为客户端前置校验，仅拦截原本会被微信以 400 拒绝的请求，属第五批未提交代码的批内修正；#2 仅增强错误信息，无签名变化。
 
 补记（同日）：探针过程中发现 `TransferAfterUserAuth` 缺 `transfer_remark` 必填校验（官方必填，`CreateTransferBill` 已有），已补齐，校验顺序与其对齐（金额 → remark → 报备信息 → 二选一）。
+
+**第八批 —— P1/P2 遗留清尾：已完成 ✅（2026-10-22）**
+
+> 2026-10-22 对全部批次做代码级复核：下列 12 项在 P0~P7 各批次中均未处理且此前未明确标记去向，现集中登记。其中 4 项需要决策取舍（#10/#11/#12 及可选能力），其余按既定方案执行。
+> 2026-10-22 追记：经用户确认「全部执行」，#10 采用方案 a（直接删除）、#11 采用方案 a（拆分独立 Client）、#12 采用方案 a（新增错误回调），全部 12 项已完成，验证全部通过（`go build`/`go vet`/`gofmt -l`/全量 `go test ./...`，序列化改动经临时探针校验后删除）。
+> 另：第五节保留的可选能力（miniprogram 云函数触发等、payment 旧版批量转账/商家券/消费卡/代金券/支付即服务/combine 合单支付）不属于缺陷修复，是否补齐由后续需求决定。
+
+| # | 原问题编号 | 问题 | 核实位置 | 修复方案 | 风险/备注 |
+|---|---|---|---|---|---|
+| 1 | P1-21 | `Make` 对 GET 也设置 Content-Type | `core/req.go:145-147` | ✅ 仅 POST/PUT/PATCH 且 body 非空时设置 | 低风险 |
+| 2 | P1-22 | `MakeRaw` 不校验状态码 | `core/req.go:240-246`；受影响调用方：official_account 各上传方法 | ✅ 新增公共 helper `core.CheckRawResponseStatus`，10 处 `MakeRaw` 调用点（上传/取素材/取二维码）对非 2xx 判错；`MakeRaw` 保持返回原始响应的语义 | 低风险 |
+| 3 | P2-29 | `validateSignature` 用 `==` 比较 | `crypto/client.go:239` | ✅ 改用 `subtle.ConstantTimeCompare` 防时序侧信道 | 低风险 |
+| 4 | P2-30 | nonceStr 用 `math/rand` | `openplatform/auth_client.go:13,1250-1251` | ✅ 改用 `crypto/rand` 生成 16 位字母数字（对齐 payment 的 generateNonce 实现），熵源失败回退时间戳 | 低风险 |
+| 5 | P2-25 | `TemplateMessageRequest.MiniProgram` 值类型 + omitempty | `official_account/api_template.go:28` | ✅ 改为 `*TemplateMessageMiniProgram` 指针，空值不再序列化（经探针验证：nil 无 miniprogram 键、非 nil 正确输出） | 破坏性变更：字段类型变化 |
+| 6 | P2-28 | wego.go 全注释 var 块 | `wego.go:604-629` | ✅ 删除废弃注释代码块；同批新增 `OfficialAccountSubscribeNotify/OfficialAccountSubscribeNotifyE` 便捷入口 | 无风险 |
+| 7 | P1-23 | `url.QueryEscape(accessToken)` 滥用 | official_account/openplatform/miniprogram 全量 100+ 处 | ✅ 移除 token 类参数的 QueryEscape（共 14 个文件），非 token 参数转义全部保留，path 中 `PathEscape` 保留 | diff 大但无功能变化 |
+| 8 | P2-24 | openplatform 反复 new Request | `openplatform/client.go` 共 13 处 `Make` 调用 | ✅ 全部替换为 `c.req`（`SetHTTPClient`/`SetLogger` 已同步重建 `c.req`）；另 3 处为构造/setter 合法初始化，保留 | 低风险 |
+| 9 | P2-27 | `AuthorizerInfo` 字段大小写混用 | `openplatform/types.go:65,105-111` | ✅ 补充注释说明官方返回为首字母大写（历史原因），防止后人「修正」 | 无风险 |
+| 10 | P1-20 | 已下线接口常量未清理 | `official_account/constants.go:113-245`：merchant/*、device/*、wifi/*、shakearound/*、semantic/*、printer/*、invoice/* | ✅ 删除 8 个分组 59 个常量（删除前 grep 确认全库零引用）；保留卡券/用户/数据分析/二维码等在用常量 | 破坏性变更：删除导出常量 |
+| 11 | P1-16 | 公众号/小程序订阅消息体系混用 | `official_account/subscribe_client.go` 整体 | ✅ 拆分独立的 `SubscribeNotifyClient`（语义化方法名 GetNotifyCategory/GetPubTemplateTitles/... 等 8 个），旧 `SubscribeClient` 保留为兼容层转发新实现并全部标 `Deprecated`；接口路径与序列化行为零变化 | 破坏性变更：结构重构（兼容层保留） |
+| 12 | P2-26 | 事件解析失败一律吞异常返回 success | `openplatform/client.go:512-552` | ✅ 新增可选 `EventErrorCallback`（`SetEventErrorCallback` 设置，不影响官方「返回 success」行为），13 个失败分支接入 `notifyEventError`（含 recover 保护），source 取值见 `openplatform/types.go` | 低风险 |
+
+验证方式：`go build`、`go vet`、`gofmt -l`、全量 `go test ./...`；序列化类改动用临时探针校验请求体后删除。
 
 ---
 

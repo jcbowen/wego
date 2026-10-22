@@ -111,7 +111,7 @@ func (c *MenuClient) CreateMenu(ctx context.Context, menu *Menu) (*CreateMenuRes
 	}
 
 	var result CreateMenuResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLCreateMenu, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLCreateMenu, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -137,7 +137,7 @@ func (c *MenuClient) GetCurrentSelfmenuInfo(ctx context.Context) (*GetCurrentMen
 	}
 
 	var result GetCurrentMenuResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCurrentMenu, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCurrentMenu, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -162,7 +162,7 @@ func (c *MenuClient) GetMenu(ctx context.Context) (*GetMenuResponse, error) {
 	}
 
 	var result GetMenuResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetMenu, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetMenu, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -187,7 +187,7 @@ func (c *MenuClient) DeleteMenu(ctx context.Context) (*DeleteMenuResponse, error
 	}
 
 	var result DeleteMenuResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteMenu, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteMenu, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -212,7 +212,7 @@ func (c *MenuClient) AddConditionalMenu(ctx context.Context, menu *ConditionalMe
 	}
 
 	var result AddConditionalMenuResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddConditionalMenu, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddConditionalMenu, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -238,7 +238,7 @@ func (c *MenuClient) DeleteConditionalMenu(ctx context.Context, menuID string) (
 	}
 
 	var result DeleteConditionalMenuResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s&menuid=%s", URLDeleteConditionalMenu, url.QueryEscape(accessToken), url.QueryEscape(menuID))
+	apiURL := fmt.Sprintf("%s?access_token=%s&menuid=%s", URLDeleteConditionalMenu, accessToken, url.QueryEscape(menuID))
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -267,7 +267,7 @@ func (c *MenuClient) TryMatchMenu(ctx context.Context, userID string) (*TryMatch
 	}
 
 	var result TryMatchMenuResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLTryMatchMenu, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTryMatchMenu, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,

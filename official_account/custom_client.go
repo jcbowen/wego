@@ -3,7 +3,6 @@ package official_account
 import (
 	"context"
 	"fmt"
-	"net/url"
 
 	"github.com/jcbowen/wego/core"
 )
@@ -395,7 +394,7 @@ func (c *CustomClient) SendCustomMessage(ctx context.Context, touser string, mes
 	}
 
 	var result SendCustomMessageResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLMessageCustomSend, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLMessageCustomSend, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -426,7 +425,7 @@ func (c *CustomClient) AddCustomAccount(ctx context.Context, kfAccount, nickname
 	}
 
 	var result AddCustomAccountResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddCustomAccount, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddCustomAccount, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -457,7 +456,7 @@ func (c *CustomClient) UpdateCustomAccount(ctx context.Context, kfAccount, nickn
 	}
 
 	var result UpdateCustomAccountResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLUpdateCustomAccount, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLUpdateCustomAccount, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -487,7 +486,7 @@ func (c *CustomClient) DeleteCustomAccount(ctx context.Context, kfAccount string
 	}
 
 	var result DeleteCustomAccountResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteCustomAccount, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteCustomAccount, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -517,7 +516,7 @@ func (c *CustomClient) SetCustomAccountHeadImg(ctx context.Context, kfAccount st
 	}
 
 	var result SetCustomAccountHeadImgResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLSetCustomAccountHeadImg, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLSetCustomAccountHeadImg, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -543,7 +542,7 @@ func (c *CustomClient) GetAllCustomAccounts(ctx context.Context) (*GetAllCustomA
 	}
 
 	var result GetAllCustomAccountsResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetAllCustomAccounts, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetAllCustomAccounts, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -568,7 +567,7 @@ func (c *CustomClient) GetOnlineCustomAccounts(ctx context.Context) (*GetOnlineC
 	}
 
 	var result GetOnlineCustomAccountsResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetOnlineCustomAccounts, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetOnlineCustomAccounts, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -598,7 +597,7 @@ func (c *CustomClient) CreateCustomSession(ctx context.Context, kfAccount, openi
 	}
 
 	var result CreateCustomSessionResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLCreateCustomSession, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLCreateCustomSession, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -629,7 +628,7 @@ func (c *CustomClient) CloseCustomSession(ctx context.Context, kfAccount, openid
 	}
 
 	var result CloseCustomSessionResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLCloseCustomSession, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLCloseCustomSession, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -659,7 +658,7 @@ func (c *CustomClient) GetCustomSession(ctx context.Context, openid string) (*Ge
 	}
 
 	var result GetCustomSessionResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCustomSession, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCustomSession, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -689,7 +688,7 @@ func (c *CustomClient) GetCustomSessionList(ctx context.Context, kfAccount strin
 	}
 
 	var result GetCustomSessionListResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCustomSessionList, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCustomSessionList, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -715,7 +714,7 @@ func (c *CustomClient) GetWaitCase(ctx context.Context) (*GetWaitCaseResponse, e
 	}
 
 	var result GetWaitCaseResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetWaitCase, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetWaitCase, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -763,7 +762,7 @@ func (c *CustomClient) Typing(ctx context.Context, toUser, command string) (*Typ
 	}
 
 	var result TypingResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLTyping, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTyping, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -812,7 +811,7 @@ func (c *CustomClient) GetMsgRecord(ctx context.Context, startTime, endTime int6
 	}
 
 	var result GetMsgRecordResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetMsgRecord, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetMsgRecord, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,

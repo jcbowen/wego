@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/jcbowen/wego/core"
@@ -149,7 +148,7 @@ func (c *Client) postWXACodeBinary(ctx context.Context, apiURL string, body inte
 		return nil, err
 	}
 
-	fullURL := fmt.Sprintf("%s?access_token=%s", apiURL, url.QueryEscape(accessToken))
+	fullURL := fmt.Sprintf("%s?access_token=%s", apiURL, accessToken)
 
 	requestBody, err := json.Marshal(body)
 	if err != nil {
@@ -171,6 +170,11 @@ func (c *Client) postWXACodeBinary(ctx context.Context, apiURL string, body inte
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %v", err)
+	}
+
+	// 非 2xx 状态码提前判错，避免把网关/代理层错误当小程序码数据返回
+	if err := core.CheckRawResponseStatus(resp.StatusCode, respBody); err != nil {
+		return nil, err
 	}
 
 	contentType := resp.Header.Get("Content-Type")

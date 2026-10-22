@@ -8,7 +8,6 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/jcbowen/wego/core"
@@ -165,7 +164,7 @@ func (c *MaterialClient) UploadMaterial(ctx context.Context, materialType Materi
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s&type=%s", URLUploadMaterial, url.QueryEscape(accessToken), materialType)
+	apiURL := fmt.Sprintf("%s?access_token=%s&type=%s", URLUploadMaterial, accessToken, materialType)
 
 	// 创建multipart/form-data请求
 	body := &bytes.Buffer{}
@@ -206,6 +205,11 @@ func (c *MaterialClient) UploadMaterial(ctx context.Context, materialType Materi
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %v", err)
+	}
+
+	// 非 2xx 状态码提前判错，避免把网关/代理层错误当响应体解析
+	if err := core.CheckRawResponseStatus(resp.StatusCode, respBody); err != nil {
+		return nil, err
 	}
 
 	var result UploadMaterialResponse
@@ -253,7 +257,7 @@ func (c *MaterialClient) GetMaterial(ctx context.Context, mediaID string) (*GetM
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetMaterial, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetMaterial, accessToken)
 
 	// 素材接口的响应可能是二进制流，必须走 MakeRaw 并按 Content-Type 区分处理
 	requestBody, err := json.Marshal(map[string]string{"media_id": mediaID})
@@ -276,6 +280,11 @@ func (c *MaterialClient) GetMaterial(ctx context.Context, mediaID string) (*GetM
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %v", err)
+	}
+
+	// 非 2xx 状态码提前判错，避免把网关/代理层错误当素材数据返回
+	if err := core.CheckRawResponseStatus(resp.StatusCode, respBody); err != nil {
+		return nil, err
 	}
 
 	contentType := resp.Header.Get("Content-Type")
@@ -312,7 +321,7 @@ func (c *MaterialClient) DeleteMaterial(ctx context.Context, mediaID string) (*D
 	}
 
 	var result DeleteMaterialResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteMaterial, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteMaterial, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -344,7 +353,7 @@ func (c *MaterialClient) UpdateMaterial(ctx context.Context, mediaID string, ind
 	}
 
 	var result UpdateNewsResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLUpdateNews, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLUpdateNews, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -370,7 +379,7 @@ func (c *MaterialClient) GetMaterialCount(ctx context.Context) (*GetMaterialCoun
 	}
 
 	var result GetMaterialCountResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetMaterialCount, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetMaterialCount, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -401,7 +410,7 @@ func (c *MaterialClient) BatchGetMaterial(ctx context.Context, materialType Mate
 	}
 
 	var result BatchGetMaterialResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLBatchGetMaterial, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLBatchGetMaterial, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -431,7 +440,7 @@ func (c *MaterialClient) AddNews(ctx context.Context, articles []NewsArticle) (*
 	}
 
 	var result AddNewsResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddNews, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddNews, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -460,7 +469,7 @@ func (c *MaterialClient) UploadImage(ctx context.Context, filename string, data 
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLMaterialUploadImage, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLMaterialUploadImage, accessToken)
 
 	// 创建multipart/form-data请求
 	body := &bytes.Buffer{}
@@ -501,6 +510,11 @@ func (c *MaterialClient) UploadImage(ctx context.Context, filename string, data 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %v", err)
+	}
+
+	// 非 2xx 状态码提前判错，避免把网关/代理层错误当响应体解析
+	if err := core.CheckRawResponseStatus(resp.StatusCode, respBody); err != nil {
+		return nil, err
 	}
 
 	var result MaterialUploadImageResponse
@@ -547,7 +561,7 @@ func (c *MaterialClient) AddMaterial(ctx context.Context, materialType MaterialT
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s&type=%s", URLUploadVideo, url.QueryEscape(accessToken), materialType)
+	apiURL := fmt.Sprintf("%s?access_token=%s&type=%s", URLUploadVideo, accessToken, materialType)
 
 	// 创建multipart/form-data请求
 	body := &bytes.Buffer{}
@@ -590,6 +604,11 @@ func (c *MaterialClient) AddMaterial(ctx context.Context, materialType MaterialT
 		return nil, fmt.Errorf("读取响应失败: %v", err)
 	}
 
+	// 非 2xx 状态码提前判错，避免把网关/代理层错误当响应体解析
+	if err := core.CheckRawResponseStatus(resp.StatusCode, respBody); err != nil {
+		return nil, err
+	}
+
 	var result AddMaterialResponse
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("解析响应失败: %v", err)
@@ -616,7 +635,7 @@ func (c *MaterialClient) UploadVideo(ctx context.Context, mediaID, title, descri
 	}
 
 	var result UploadVideoResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLUploadVideo, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLUploadVideo, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -665,7 +684,7 @@ func (c *MaterialClient) GetHDVoice(ctx context.Context, mediaID string) (*GetHD
 		MediaID: mediaID,
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetHDVoice, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetHDVoice, accessToken)
 
 	// 创建HTTP请求
 	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, nil)
@@ -694,6 +713,11 @@ func (c *MaterialClient) GetHDVoice(ctx context.Context, mediaID string) (*GetHD
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %v", err)
+	}
+
+	// 非 2xx 状态码提前判错，避免把网关/代理层错误当语音数据返回
+	if err := core.CheckRawResponseStatus(resp.StatusCode, respBody); err != nil {
+		return nil, err
 	}
 
 	// 检查响应类型
@@ -896,7 +920,7 @@ func (c *MaterialClient) AddDraft(ctx context.Context, articles []DraftArticle) 
 	}
 
 	var result AddDraftResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddDraft, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddDraft, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -931,7 +955,7 @@ func (c *MaterialClient) GetDraft(ctx context.Context, mediaID string) (*GetDraf
 	}
 
 	var result GetDraftResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetDraft, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetDraft, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -966,7 +990,7 @@ func (c *MaterialClient) DeleteDraft(ctx context.Context, mediaID string) (*Dele
 	}
 
 	var result DeleteDraftResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteDraft, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteDraft, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -996,7 +1020,7 @@ func (c *MaterialClient) GetDraftCount(ctx context.Context) (*GetDraftCountRespo
 	}
 
 	var result GetDraftCountResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetDraftCount, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetDraftCount, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -1033,7 +1057,7 @@ func (c *MaterialClient) BatchGetDraft(ctx context.Context, offset, count, noCon
 	}
 
 	var result BatchGetDraftResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLBatchGetDraft, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLBatchGetDraft, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -1070,7 +1094,7 @@ func (c *MaterialClient) UpdateDraft(ctx context.Context, mediaID string, index 
 	}
 
 	var result UpdateDraftResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLUpdateDraft, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLUpdateDraft, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,

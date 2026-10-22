@@ -59,7 +59,7 @@ func (q *Qrcode) Create(ctx context.Context, qrCode *QRCodeRequest, accessToken 
 		return nil, fmt.Errorf("二维码动作名称不能为空")
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLQRCodeCreate, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLQRCodeCreate, accessToken)
 
 	var result QRCodeResponse
 	err := q.req.Make(ctx, &core.ReqMakeOpt{
@@ -152,14 +152,8 @@ func (c *Client) GetQRCodeImage(ctx context.Context, ticket string) ([]byte, err
 	}
 
 	// 官方对非法/过期 ticket 返回 404 等非 2xx 状态码，需按错误处理而非当图片返回
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// 尝试从响应体提取微信错误信息（如 {"errcode":40097,"errmsg":"invalid ticket"}）
-		var apiResp core.APIResponse
-		if json.Unmarshal(data, &apiResp) == nil && apiResp.ErrCode != 0 {
-			return nil, fmt.Errorf("HTTP请求失败，状态码: %d, errcode: %d, errmsg: %s",
-				resp.StatusCode, apiResp.ErrCode, apiResp.ErrMsg)
-		}
-		return nil, fmt.Errorf("HTTP请求失败，状态码: %d, 响应体: %.512s", resp.StatusCode, data)
+	if err := core.CheckRawResponseStatus(resp.StatusCode, data); err != nil {
+		return nil, err
 	}
 
 	// 微信错误时返回 JSON 而非图片，检测并抛出错误码（以 Content-Type 为准，避免误判图片字节）

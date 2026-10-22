@@ -4,17 +4,18 @@ package openplatform
 import (
 	"bytes"
 	"context"
+	crand "crypto/rand"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -111,7 +112,7 @@ func (c *AuthorizerClient) SendCustomMessage(ctx context.Context, toUser string,
 		return err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLMessageCustomSend, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLMessageCustomSend, accessToken)
 
 	request := map[string]interface{}{
 		"touser":  toUser,
@@ -187,7 +188,7 @@ func (c *AuthorizerClient) CreateMenu(ctx context.Context, menu *Menu) error {
 		return err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLCreateMenu, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLCreateMenu, accessToken)
 
 	var result core.APIResponse
 	err = c.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
@@ -214,7 +215,7 @@ func (c *AuthorizerClient) GetMenu(ctx context.Context) (*Menu, error) {
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLGetMenu, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLGetMenu, accessToken)
 
 	var result struct {
 		core.APIResponse
@@ -244,7 +245,7 @@ func (c *AuthorizerClient) DeleteMenu(ctx context.Context) error {
 		return err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLDeleteMenu, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLDeleteMenu, accessToken)
 
 	var result core.APIResponse
 	err = c.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
@@ -687,7 +688,7 @@ func (c *AuthorizerClient) GetUserInfo(ctx context.Context, openID string) (*Use
 	}
 
 	apiURL := fmt.Sprintf("%s?access_token=%s&openid=%s&lang=zh_CN",
-		official_account.URLUserInfo, url.QueryEscape(accessToken), url.QueryEscape(openID))
+		official_account.URLUserInfo, accessToken, url.QueryEscape(openID))
 
 	var result UserInfo
 	err = c.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
@@ -724,7 +725,7 @@ func (c *AuthorizerClient) GetUserList(ctx context.Context, nextOpenID string) (
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLGetUserList, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", official_account.URLGetUserList, accessToken)
 	if nextOpenID != "" {
 		apiURL += "&next_openid=" + url.QueryEscape(nextOpenID)
 	}
@@ -790,7 +791,7 @@ func (c *AuthorizerClient) UploadMedia(ctx context.Context, mediaType, filename 
 	}
 
 	apiURL := fmt.Sprintf("%s?access_token=%s&type=%s",
-		official_account.URLUploadMaterial, url.QueryEscape(accessToken), url.QueryEscape(mediaType))
+		official_account.URLUploadMaterial, accessToken, url.QueryEscape(mediaType))
 
 	// 创建multipart/form-data请求
 	body := &bytes.Buffer{}
@@ -833,6 +834,11 @@ func (c *AuthorizerClient) UploadMedia(ctx context.Context, mediaType, filename 
 		return nil, fmt.Errorf("读取响应失败: %v", err)
 	}
 
+	// 非 2xx 状态码提前判错，避免把网关/代理层错误当响应体解析
+	if err := core.CheckRawResponseStatus(resp.StatusCode, respBody); err != nil {
+		return nil, err
+	}
+
 	var result MediaResponse
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("解析响应失败: %v", err)
@@ -861,7 +867,7 @@ func (c *AuthorizerClient) GetMedia(ctx context.Context, mediaID string) ([]byte
 	}
 
 	apiURL := fmt.Sprintf("%s?access_token=%s&media_id=%s",
-		official_account.URLGetMaterial, url.QueryEscape(accessToken), url.QueryEscape(mediaID))
+		official_account.URLGetMaterial, accessToken, url.QueryEscape(mediaID))
 
 	// 创建HTTP请求
 	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
@@ -876,15 +882,19 @@ func (c *AuthorizerClient) GetMedia(ctx context.Context, mediaID string) ([]byte
 	}
 	defer resp.Body.Close()
 
-	// 检查响应类型
-	contentType := resp.Header.Get("Content-Type")
-	if strings.Contains(contentType, "application/json") {
-		// 如果是JSON响应，说明有错误
-		respBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("读取响应失败: %v", err)
-		}
+	// 统一读取响应体，便于状态码与 JSON 错误判定
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应失败: %v", err)
+	}
 
+	// 非 2xx 状态码提前判错，避免把网关/代理层错误当媒体数据返回
+	if err := core.CheckRawResponseStatus(resp.StatusCode, respBody); err != nil {
+		return nil, err
+	}
+
+	// JSON 响应说明有错误（媒体接口正常返回二进制）
+	if strings.Contains(resp.Header.Get("Content-Type"), "application/json") {
 		var result core.APIResponse
 		if err := json.Unmarshal(respBody, &result); err != nil {
 			return nil, fmt.Errorf("解析响应失败: %v", err)
@@ -895,13 +905,7 @@ func (c *AuthorizerClient) GetMedia(ctx context.Context, mediaID string) ([]byte
 		}
 	}
 
-	// 读取媒体文件数据
-	mediaData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取媒体文件失败: %v", err)
-	}
-
-	return mediaData, nil
+	return respBody, nil
 }
 
 // OAuthClient 网页授权客户端
@@ -1246,22 +1250,20 @@ func (jm *JSSDKManager) generateSignature(url, ticket string, jsAPIList []string
 	}
 }
 
-var (
-	randSrc = rand.NewSource(time.Now().UnixNano())
-	randGen = rand.New(randSrc)
-	randMu  sync.Mutex
-)
-
-// generateNonceStr 生成随机字符串 - 线程安全版本
+// generateNonceStr 生成随机字符串（crypto/rand 密码学安全实现，线程安全）
+//
+// 返回:
+//   - string: 16 位字母数字随机串；熵源不可用（极罕见）时回退时间戳保证可用性
 func generateNonceStr() string {
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	bts := make([]byte, 16)
 
-	randMu.Lock()
-	for i := range bts {
-		bts[i] = letters[randGen.Intn(len(letters))]
+	if _, err := crand.Read(bts); err != nil {
+		return strconv.FormatInt(time.Now().UnixNano(), 36)
 	}
-	randMu.Unlock()
+	for i := range bts {
+		bts[i] = letters[bts[i]%byte(len(letters))]
+	}
 
 	return string(bts)
 }
@@ -1328,7 +1330,7 @@ func (mpc *MiniProgramClient) GetWXACode(ctx context.Context, request *WXACodeRe
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetWxaCode, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetWxaCode, accessToken)
 
 	var result WXACodeResponse
 	err = mpc.authorizerClient.authClient.client.req.Make(ctx, &core.ReqMakeOpt{

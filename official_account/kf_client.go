@@ -50,7 +50,7 @@ func (c *Client) UploadKfAccountHeadImage(ctx context.Context, kfAccount, filena
 	}
 
 	apiURL := fmt.Sprintf("%s?access_token=%s&kf_account=%s",
-		URLSetCustomAccountHeadImg, url.QueryEscape(token), url.QueryEscape(kfAccount))
+		URLSetCustomAccountHeadImg, token, url.QueryEscape(kfAccount))
 
 	var result core.APIResponse
 	err = c.req.Make(ctx, &core.ReqMakeOpt{

@@ -2,393 +2,87 @@ package official_account
 
 import (
 	"context"
-	"fmt"
-	"net/url"
-
-	"github.com/jcbowen/wego/core"
 )
 
-// SubscribeClient 订阅通知客户端
+// SubscribeClient 订阅通知客户端（兼容层）
+//
+// Deprecated: 请改用 SubscribeNotifyClient 及其语义化方法（GetNotifyCategory/GetPubTemplateTitles/
+// GetPubTemplateKeywords/GetPersonalTemplateList/AddPersonalTemplate/DeletePersonalTemplate/
+// SendSubscribeNotify），旧方法名中的 Wxa/New 字样易与小程序订阅消息混淆。
+// 本类型仅作过渡兼容：结构保留，方法全部转发到 SubscribeNotifyClient，接口路径与序列化行为完全一致。
 type SubscribeClient struct {
 	Client *Client
+	notify *SubscribeNotifyClient
 }
 
 // NewSubscribeClient 创建新的订阅通知客户端
+//
+// Deprecated: 请改用 NewSubscribeNotifyClient。
+//
+// 参数:
+//   - client *Client 公众号客户端实例
+//
+// 返回:
+//   - *SubscribeClient 兼容层客户端（方法转发到 SubscribeNotifyClient）
 func NewSubscribeClient(client *Client) *SubscribeClient {
 	return &SubscribeClient{
 		Client: client,
+		notify: NewSubscribeNotifyClient(client),
 	}
-}
-
-// CategoryInfo 分类信息
-type CategoryInfo struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-}
-
-// GetCategoryResponse 获取分类列表响应
-type GetCategoryResponse struct {
-	core.APIResponse
-	Data []CategoryInfo `json:"data"`
-}
-
-// PubTemplateTitleInfo 公共模板标题信息
-type PubTemplateTitleInfo struct {
-	TID        int    `json:"tid"`
-	Title      string `json:"title"`
-	Type       int    `json:"type"`
-	CategoryID int    `json:"categoryId"`
-}
-
-// GetPubNewTemplateTitlesResponse 获取公共模板标题列表响应
-type GetPubNewTemplateTitlesResponse struct {
-	core.APIResponse
-	Count int                    `json:"count"`
-	Data  []PubTemplateTitleInfo `json:"data"`
-}
-
-// PubTemplateKeywordInfo 公共模板关键词信息
-type PubTemplateKeywordInfo struct {
-	Kid     int    `json:"kid"`
-	Name    string `json:"name"`
-	Example string `json:"example"`
-	Rule    string `json:"rule"`
-}
-
-// GetPubNewTemplateKeywordsResponse 获取公共模板关键词列表响应
-type GetPubNewTemplateKeywordsResponse struct {
-	core.APIResponse
-	Data []PubTemplateKeywordInfo `json:"data"`
-}
-
-// WxaPubNewTemplateInfo 小程序公共模板信息
-type WxaPubNewTemplateInfo struct {
-	PriTmplID string `json:"priTmplId"`
-	Title     string `json:"title"`
-	Content   string `json:"content"`
-	Example   string `json:"example"`
-	Type      int    `json:"type"`
-}
-
-// GetWxaPubNewTemplateResponse 获取小程序公共模板列表响应
-type GetWxaPubNewTemplateResponse struct {
-	core.APIResponse
-	Data []WxaPubNewTemplateInfo `json:"data"`
-}
-
-// AddWxaNewTemplateRequest 添加小程序模板请求
-type AddWxaNewTemplateRequest struct {
-	TID       int    `json:"tid"`
-	KidList   []int  `json:"kidList"`
-	SceneDesc string `json:"sceneDesc"`
-}
-
-// AddWxaNewTemplateResponse 添加小程序模板响应
-type AddWxaNewTemplateResponse struct {
-	core.APIResponse
-	PriTmplID string `json:"priTmplId"`
-}
-
-// DelWxaNewTemplateRequest 删除小程序模板请求
-type DelWxaNewTemplateRequest struct {
-	PriTmplID string `json:"priTmplId"`
-}
-
-// DelWxaNewTemplateResponse 删除小程序模板响应
-type DelWxaNewTemplateResponse struct {
-	core.APIResponse
-}
-
-// SubscribeMsgData 订阅消息数据
-type SubscribeMsgData struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
-
-// SendNewSubscribeMsgRequest 发送订阅消息请求
-// 参考文档：https://developers.weixin.qq.com/doc/offiaccount/Subscription_Messages/Message_Send_API.html
-type SendNewSubscribeMsgRequest struct {
-	Touser     string                      `json:"touser"`
-	TemplateID string                      `json:"template_id"`
-	Page       string                      `json:"page,omitempty"`
-	Data       map[string]SubscribeMsgData `json:"data"`
-	// MiniprogramState 小程序状态，官方为 string：
-	// developer-开发版 / trial-体验版 / formal-正式版（默认）
-	MiniprogramState string `json:"miniprogram_state,omitempty"`
-	// Lang 进入小程序查看的语言：zh_CN / zh_TW / zh_HK / en
-	Lang string `json:"lang,omitempty"`
-	// Miniprogram 跳转小程序配置（可选）
-	Miniprogram *TemplateMessageMiniProgram `json:"miniprogram,omitempty"`
-}
-
-// SendNewSubscribeMsgResponse 发送订阅消息响应
-type SendNewSubscribeMsgResponse struct {
-	core.APIResponse
 }
 
 // GetCategory 获取订阅通知分类列表
-// 接口文档：https://developers.weixin.qq.com/doc/offiaccount/Subscription_Messages/Category_list_API.html
-// 功能：获取公众号订阅通知的类目
-// 请求方式：GET /wxaapi/newtmpl/getcategory
+//
+// Deprecated: 请改用 SubscribeNotifyClient.GetNotifyCategory。
 func (c *SubscribeClient) GetCategory(ctx context.Context) (*GetCategoryResponse, error) {
-	accessToken, err := c.Client.GetAccessToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var result GetCategoryResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCategory, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "GET",
-		URL:    apiURL,
-		Result: &result,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if !result.IsSuccess() {
-		return nil, &result.APIResponse
-	}
-
-	return &result, nil
+	return c.notify.GetNotifyCategory(ctx)
 }
 
 // GetPubNewTemplateTitles 获取公共模板标题列表
-// 接口文档：https://developers.weixin.qq.com/doc/offiaccount/Subscription_Messages/Template_API.html
-// 功能：获取公共模板标题列表
-// 请求方式：GET /wxaapi/newtmpl/getpubtemplatetitles
+//
+// Deprecated: 请改用 SubscribeNotifyClient.GetPubTemplateTitles。
 func (c *SubscribeClient) GetPubNewTemplateTitles(ctx context.Context, categoryID int, start, limit int) (*GetPubNewTemplateTitlesResponse, error) {
-	accessToken, err := c.Client.GetAccessToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var result GetPubNewTemplateTitlesResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s&ids=%d&start=%d&limit=%d",
-		URLGetPubTemplateTitles, url.QueryEscape(accessToken), categoryID, start, limit)
-	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "GET",
-		URL:    apiURL,
-		Result: &result,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if !result.IsSuccess() {
-		return nil, &result.APIResponse
-	}
-
-	return &result, nil
+	return c.notify.GetPubTemplateTitles(ctx, categoryID, start, limit)
 }
 
 // GetPubNewTemplateKeywords 获取公共模板关键词列表
-// 接口文档：https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/subscribe-message/subscribeMessage.getPubTemplateKeyWordsById.html
-// 功能：获取模板标题下的关键词列表
-// 请求方式：GET
+//
+// Deprecated: 请改用 SubscribeNotifyClient.GetPubTemplateKeywords。
 func (c *SubscribeClient) GetPubNewTemplateKeywords(ctx context.Context, tid int) (*GetPubNewTemplateKeywordsResponse, error) {
-	accessToken, err := c.Client.GetAccessToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var result GetPubNewTemplateKeywordsResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s&tid=%d",
-		URLGetPubTemplateKeywords, url.QueryEscape(accessToken), tid)
-	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "GET",
-		URL:    apiURL,
-		Result: &result,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if !result.IsSuccess() {
-		return nil, &result.APIResponse
-	}
-
-	return &result, nil
+	return c.notify.GetPubTemplateKeywords(ctx, tid)
 }
 
-// GetWxaPubNewTemplate 获取小程序公共模板列表
-// 接口文档：https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/subscribe-message/subscribeMessage.getTemplateList.html
-// 功能：获取当前帐号下的个人模板列表
-// 请求方式：GET
+// GetWxaPubNewTemplate 获取当前帐号下的个人模板列表
+//
+// Deprecated: 请改用 SubscribeNotifyClient.GetPersonalTemplateList。
 func (c *SubscribeClient) GetWxaPubNewTemplate(ctx context.Context) (*GetWxaPubNewTemplateResponse, error) {
-	accessToken, err := c.Client.GetAccessToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var result GetWxaPubNewTemplateResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetWxaPubTemplate, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "GET",
-		URL:    apiURL,
-		Result: &result,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if !result.IsSuccess() {
-		return nil, &result.APIResponse
-	}
-
-	return &result, nil
+	return c.notify.GetPersonalTemplateList(ctx)
 }
 
-// AddWxaNewTemplate 添加小程序模板
-// 接口文档：https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/subscribe-message/subscribeMessage.addTemplate.html
-// 功能：组合模板并添加至帐号下的个人模板库
-// 请求方式：POST
+// AddWxaNewTemplate 添加个人模板
+//
+// Deprecated: 请改用 SubscribeNotifyClient.AddPersonalTemplate。
 func (c *SubscribeClient) AddWxaNewTemplate(ctx context.Context, tid int, kidList []int, sceneDesc string) (*AddWxaNewTemplateResponse, error) {
-	accessToken, err := c.Client.GetAccessToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	request := AddWxaNewTemplateRequest{
-		TID:       tid,
-		KidList:   kidList,
-		SceneDesc: sceneDesc,
-	}
-
-	var result AddWxaNewTemplateResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddWxaNewTemplate, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "POST",
-		URL:    apiURL,
-		Body:   request,
-		Result: &result,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if !result.IsSuccess() {
-		return nil, &result.APIResponse
-	}
-
-	return &result, nil
+	return c.notify.AddPersonalTemplate(ctx, tid, kidList, sceneDesc)
 }
 
-// DelWxaNewTemplate 删除小程序模板
-// 接口文档：https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/subscribe-message/subscribeMessage.deleteTemplate.html
-// 功能：删除帐号下的个人模板
-// 请求方式：POST
+// DelWxaNewTemplate 删除个人模板
+//
+// Deprecated: 请改用 SubscribeNotifyClient.DeletePersonalTemplate。
 func (c *SubscribeClient) DelWxaNewTemplate(ctx context.Context, priTmplID string) (*DelWxaNewTemplateResponse, error) {
-	accessToken, err := c.Client.GetAccessToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	request := DelWxaNewTemplateRequest{
-		PriTmplID: priTmplID,
-	}
-
-	var result DelWxaNewTemplateResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLDelWxaNewTemplate, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "POST",
-		URL:    apiURL,
-		Body:   request,
-		Result: &result,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if !result.IsSuccess() {
-		return nil, &result.APIResponse
-	}
-
-	return &result, nil
+	return c.notify.DeletePersonalTemplate(ctx, priTmplID)
 }
 
-// SendNewSubscribeMsg 发送订阅消息
-// 接口文档：https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/subscribe-message/subscribeMessage.send.html
-// 功能：发送订阅消息
-// 请求方式：POST
+// SendNewSubscribeMsg 发送订阅通知
+//
+// Deprecated: 请改用 SubscribeNotifyClient.SendSubscribeNotify。
 func (c *SubscribeClient) SendNewSubscribeMsg(ctx context.Context, request *SendNewSubscribeMsgRequest) (*SendNewSubscribeMsgResponse, error) {
-	accessToken, err := c.Client.GetAccessToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var result SendNewSubscribeMsgResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLSendNewSubscribeMsg, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "POST",
-		URL:    apiURL,
-		Body:   request,
-		Result: &result,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if !result.IsSuccess() {
-		return nil, &result.APIResponse
-	}
-
-	return &result, nil
-}
-
-// TemplateSubscribeData 一次性订阅消息数据
-type TemplateSubscribeData struct {
-	Value string `json:"value"`
-	Color string `json:"color,omitempty"`
-}
-
-// TemplateSubscribeRequest 一次性订阅消息请求
-// 接口文档：https://developers.weixin.qq.com/doc/offiaccount/Message_Management/One-time_subscription_info.html
-// 功能：发送一次性订阅消息
-// 请求方式：POST
-// 注意：一次性订阅消息只能发送给已经授权订阅的用户
-// 用户授权订阅的URL格式：%s?action=get_confirm&appid=APPID&scene=SCENE&template_id=TEMPLATE_ID&redirect_url=REDIRECT_URL&reserved=RESERVED#wechat_redirect
-type TemplateSubscribeRequest struct {
-	Touser     string                           `json:"touser"`
-	TemplateID string                           `json:"template_id"`
-	URL        string                           `json:"url,omitempty"`
-	Scene      string                           `json:"scene"`
-	Title      string                           `json:"title"`
-	Data       map[string]TemplateSubscribeData `json:"data"`
-}
-
-// TemplateSubscribeResponse 一次性订阅消息响应
-type TemplateSubscribeResponse struct {
-	core.APIResponse
+	return c.notify.SendSubscribeNotify(ctx, request)
 }
 
 // TemplateSubscribe 发送一次性订阅消息
-// 接口文档：https://developers.weixin.qq.com/doc/offiaccount/Message_Management/One-time_subscription_info.html
-// 功能：发送一次性订阅消息
-// 请求方式：POST
-// 注意：此接口用于发送一次性订阅消息，用户需要先通过授权URL进行订阅授权
+//
+// Deprecated: 请改用 SubscribeNotifyClient.TemplateSubscribe。
 func (c *SubscribeClient) TemplateSubscribe(ctx context.Context, request *TemplateSubscribeRequest) (*TemplateSubscribeResponse, error) {
-	accessToken, err := c.Client.GetAccessToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var result TemplateSubscribeResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateSubscribe, url.QueryEscape(accessToken))
-	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "POST",
-		URL:    apiURL,
-		Body:   request,
-		Result: &result,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if !result.IsSuccess() {
-		return nil, &result.APIResponse
-	}
-
-	return &result, nil
+	return c.notify.TemplateSubscribe(ctx, request)
 }

@@ -389,15 +389,15 @@ func main() {
 		panic(err)
 	}
 
-	// 获取订阅消息客户端（E版getter，未初始化时返回error）
-	subscribeClient, err := wegoClient.OfficialAccountSubscribeE()
+	// 获取公众号订阅通知客户端（E版getter，未初始化时返回error）
+	subscribeClient, err := wegoClient.OfficialAccountSubscribeNotifyE()
 	if err != nil {
 		panic(err)
 	}
 
 	// 获取订阅通知分类列表
 	ctx := context.Background()
-	categoryResp, err := subscribeClient.GetCategory(ctx)
+	categoryResp, err := subscribeClient.GetNotifyCategory(ctx)
 	if err != nil {
 		fmt.Printf("获取分类列表失败: %v\n", err)
 		return
@@ -405,7 +405,7 @@ func main() {
 	fmt.Printf("分类列表: %+v\n", categoryResp.Data)
 
 	// 获取公共模板标题列表
-	titlesResp, err := subscribeClient.GetPubNewTemplateTitles(ctx, 1, 0, 10)
+	titlesResp, err := subscribeClient.GetPubTemplateTitles(ctx, 1, 0, 10)
 	if err != nil {
 		fmt.Printf("获取模板标题失败: %v\n", err)
 		return
@@ -443,6 +443,7 @@ func main() {
 - 代小程序代码管理：`CommitWxaCode`（上传代码+体验版）、`GetWxaTrialQrcode`（体验版二维码）、`GetWxaCategory`（类目）、`SubmitWxaAudit`（提审）、`UploadWxaAuditMedia`（提审素材）、`GetWxaAuditStatus`（审核状态）、`ReleaseWxaCode`（发布）、`RevertWxaCodeRelease`（版本回退）
 - 域名设置：`ModifyWxaServerDomain`（服务器域名）、`ModifyWxaJumpDomain`（业务域名）
 - `StartPushTicket`（启动 component_verify_ticket 推送服务）
+- 事件回调：`EventHandler` 处理授权事件；可选 `SetEventErrorCallback`（或 `EventErrorCallback` 选项）在事件解析/校验/处理失败时收到 `(source, err)` 通知，source 取值见 `openplatform/types.go`，不影响对微信返回 success 的官方行为
 - API地址常量定义
 - API响应结构体
 - 授权信息数据结构
@@ -463,7 +464,7 @@ func main() {
 - `MaterialClient` - 素材管理客户端（含视频素材元数据返回）
 - `UserClient` - 用户管理客户端（用户信息/标签管理）
 - `StableTokenClient` - 稳定版access_token客户端（内置缓存与force_refresh限频）
-- `SubscribeClient` - 订阅消息客户端
+- `SubscribeNotifyClient` - 公众号订阅通知客户端（`/wxaapi/newtmpl/*` + bizsend 全套接口；旧的 `SubscribeClient` 保留为兼容层并标 `Deprecated`，方法全部转发新实现）
 - `OAuthClient` - 网页授权客户端
 - 带参数二维码：`CreateQRCode`（Client 级入口）、`GetQRCodeImage`（ticket 换图片二进制）
 - 数据分析：`GetUserSummary`/`GetUserCumulate`、`GetArticleSummary`/`GetArticleTotal`、`GetUserRead(Hour)`、`GetUserShare(Hour)`、`GetInterfaceSummary(Hour)`（含日期跨度校验）
@@ -476,7 +477,7 @@ func main() {
 - `OfficialAccountTemplate()` - 获取模板消息客户端
 - `OfficialAccountCustom()` - 获取客服消息客户端
 - `OfficialAccountMaterial()` - 获取素材管理客户端
-- `OfficialAccountSubscribe()` - 获取订阅消息客户端
+- `OfficialAccountSubscribeNotify()` - 获取公众号订阅通知客户端（`OfficialAccountSubscribe()` 已标 `Deprecated`，返回兼容层）
 - `OfficialAccountUser()` - 获取用户管理客户端
 - `OfficialAccount()` - 获取公众号基础客户端（`GetJSAPITicket()` 获取 JSSDK ticket）
 - 以上均有`XxxE`变体（未初始化时返回error而非panic，推荐）

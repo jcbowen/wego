@@ -481,7 +481,7 @@ func (c *Client) GetWxaTrialQrcode(ctx context.Context, authorizerAppID, path st
 	}
 
 	// path 需 urlencode：如 page/index?action=1 需填入 page%2Findex%3Faction%3D1
-	fullURL := fmt.Sprintf("%s?access_token=%s", URLWxaGetQrcode, url.QueryEscape(token))
+	fullURL := fmt.Sprintf("%s?access_token=%s", URLWxaGetQrcode, token)
 	if path != "" {
 		fullURL += "&path=" + url.QueryEscape(path)
 	}
@@ -500,6 +500,11 @@ func (c *Client) GetWxaTrialQrcode(ctx context.Context, authorizerAppID, path st
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
+	}
+
+	// 非 2xx 状态码提前判错，避免把网关/代理层错误当二维码数据返回
+	if err := core.CheckRawResponseStatus(resp.StatusCode, respBody); err != nil {
+		return nil, err
 	}
 
 	contentType := resp.Header.Get("Content-Type")

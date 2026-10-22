@@ -3,7 +3,6 @@ package official_account
 import (
 	"context"
 	"fmt"
-	"net/url"
 
 	"github.com/jcbowen/wego/core"
 )
@@ -131,7 +130,7 @@ func (c *TemplateClient) AddTemplate(ctx context.Context, templateIDShort string
 	}
 
 	var result AddTemplateResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateAddTemplate, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateAddTemplate, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -164,7 +163,7 @@ func (c *TemplateClient) QueryBlockTmplMsg(ctx context.Context, beginDate, endDa
 	}
 
 	var result QueryBlockTmplMsgResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLQueryBlockTmplMsg, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLQueryBlockTmplMsg, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -194,7 +193,7 @@ func (c *TemplateClient) DeleteTemplate(ctx context.Context, templateID string) 
 	}
 
 	var result DeleteTemplateResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateDelPrivateTemplate, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateDelPrivateTemplate, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -220,7 +219,7 @@ func (c *TemplateClient) GetAllTemplates(ctx context.Context) (*GetAllTemplatesR
 	}
 
 	var result GetAllTemplatesResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateGetAllPrivateTemplate, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateGetAllPrivateTemplate, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -245,7 +244,7 @@ func (c *TemplateClient) GetIndustry(ctx context.Context) (*GetIndustryResponse,
 	}
 
 	var result GetIndustryResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateGetIndustry, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateGetIndustry, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -275,7 +274,7 @@ func (c *TemplateClient) SetIndustry(ctx context.Context, industryID1, industryI
 	}
 
 	var result SetIndustryResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateSetIndustry, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLTemplateSetIndustry, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,

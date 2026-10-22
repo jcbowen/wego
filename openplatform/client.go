@@ -29,6 +29,8 @@ type Client struct {
 	crypt        *crypto.WXBizMsgCrypt // 消息加解密实例
 	req          *core.Request
 
+	eventErrorCallback EventErrorCallback // 事件处理异常回调（可选，用于上层落盘排障）
+
 	jsapiTicketMu  sync.Mutex
 	jsapiTicketMap map[string]*jsapiTicketInfo // JSAPI Ticket 缓存（按授权方appid区分）
 }
@@ -39,6 +41,7 @@ type Client struct {
 //   - debugger.LoggerInterface: 自定义日志器
 //   - HTTPClient: 自定义HTTP客户端
 //   - EventHandler: 自定义事件处理器
+//   - EventErrorCallback: 事件处理异常回调（可选，用于上层落盘排障）
 //
 // @return *Client API客户端实例
 // @return error 文件存储创建失败或配置校验失败时返回错误
@@ -90,6 +93,10 @@ func NewClientWithStorageE(config *Config, tokenStorage storage.TokenStorage, op
 		func(option any) (handled bool) {
 			if handler, ok := option.(EventHandler); ok {
 				client.SetEventHandler(handler)
+				return true
+			}
+			if cb, ok := option.(EventErrorCallback); ok {
+				client.SetEventErrorCallback(cb)
 				return true
 			}
 			return false
@@ -151,6 +158,32 @@ func (c *Client) GetEventHandler() EventHandler {
 		return &DefaultEventHandler{}
 	}
 	return c.eventHandler
+}
+
+// SetEventErrorCallback 设置事件处理异常回调（可选）
+//
+// 参数:
+//   - cb EventErrorCallback 事件处理异常回调；事件解析/解密/验签失败或处理器返回错误时被同步调用，
+//     不影响微信官方要求的「返回 success」行为
+func (c *Client) SetEventErrorCallback(cb EventErrorCallback) {
+	c.eventErrorCallback = cb
+}
+
+// notifyEventError 通过回调通知事件处理异常（未设置回调时为空操作；回调自身 panic 时恢复并记日志，防影响主流程）
+//
+// 参数:
+//   - source string 失败环节标识（取值见 EventErrorCallback 注释）
+//   - err error 原始错误
+func (c *Client) notifyEventError(source string, err error) {
+	if c.eventErrorCallback == nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			c.logger.Error(fmt.Sprintf("事件错误回调自身发生panic: %v", r))
+		}
+	}()
+	c.eventErrorCallback(source, err)
 }
 
 // GetConfig 获取配置信息
@@ -403,7 +436,7 @@ func (c *Client) GetComponentAccessToken(ctx context.Context, verifyTicket strin
 		ExpiresIn            int    `json:"expires_in"`
 	}
 
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    URLComponentToken,
 		Body:   request,
@@ -452,8 +485,8 @@ func (c *Client) GetPreAuthCodeFromAPI(ctx context.Context) (*PreAuthCodeRespons
 	}
 
 	var result PreAuthCodeResponse
-	apiURL := fmt.Sprintf("%s?component_access_token=%s", URLPreAuthCode, url.QueryEscape(componentToken.AccessToken))
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	apiURL := fmt.Sprintf("%s?component_access_token=%s", URLPreAuthCode, componentToken.AccessToken)
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
 		Body:   request,
@@ -509,6 +542,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 		// 尝试解析XML获取加密内容
 		if err := xml.Unmarshal(xmlData, &encryptedMsg); err != nil {
 			c.logger.Error(fmt.Sprintf("解析加密消息XML失败: %v", err))
+			c.notifyEventError("parse_encrypted_xml", err)
 			return "success", nil // 即使解析失败也返回success
 		}
 
@@ -523,6 +557,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 		decryptedData, err := c.DecryptMessage(encryptedMsg.Encrypt, msgSignature, timestamp, nonce)
 		if err != nil {
 			c.logger.Error(fmt.Sprintf("解密授权事件消息失败: %v", err))
+			c.notifyEventError("decrypt", err)
 			return "success", nil // 即使解密失败也返回success
 		}
 
@@ -543,12 +578,14 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 	err := xml.Unmarshal(xmlData, &baseEvent)
 	if err != nil {
 		c.logger.Error(fmt.Sprintf("解析授权事件XML失败: %v", err))
+		c.notifyEventError("parse_event_xml", err)
 		return "success", nil // 即使解析失败也返回success
 	}
 
 	// 验证事件签名和时间戳
 	if err = c.validateAuthorizationEvent(&baseEvent); err != nil {
 		c.logger.Error(fmt.Sprintf("授权事件验证失败: %v", err))
+		c.notifyEventError("validate_event", err)
 		return "success", nil // 即使验证失败也返回success
 	}
 
@@ -559,11 +596,13 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 		err = xml.Unmarshal(xmlData, &event)
 		if err != nil {
 			c.logger.Error(fmt.Sprintf("解析授权成功事件失败: %v", err))
+			c.notifyEventError("parse_authorized_event", err)
 			break
 		}
 		c.logger.Info(fmt.Sprintf("解析授权成功事件成功，事件内容: %+v", event))
 		if err := c.GetEventHandler().HandleAuthorized(ctx, &event); err != nil {
 			c.logger.Error(fmt.Sprintf("处理授权成功事件失败: %v", err))
+			c.notifyEventError("handle_authorized", err)
 		}
 
 	case "unauthorized":
@@ -571,11 +610,13 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 		err = xml.Unmarshal(xmlData, &event)
 		if err != nil {
 			c.logger.Error(fmt.Sprintf("解析取消授权事件失败: %v", err))
+			c.notifyEventError("parse_unauthorized_event", err)
 			break
 		}
 		c.logger.Info(fmt.Sprintf("解析取消授权事件成功，事件内容: %+v", event))
 		if err := c.GetEventHandler().HandleUnauthorized(ctx, &event); err != nil {
 			c.logger.Error(fmt.Sprintf("处理取消授权事件失败: %v", err))
+			c.notifyEventError("handle_unauthorized", err)
 		}
 
 	case "updateauthorized":
@@ -583,11 +624,13 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 		err := xml.Unmarshal(xmlData, &event)
 		if err != nil {
 			c.logger.Error(fmt.Sprintf("解析授权更新事件失败: %v", err))
+			c.notifyEventError("parse_updateauthorized_event", err)
 			break
 		}
 		c.logger.Info(fmt.Sprintf("解析授权更新事件成功，事件内容: %+v", event))
 		if err = c.GetEventHandler().HandleUpdateAuthorized(ctx, &event); err != nil {
 			c.logger.Error(fmt.Sprintf("处理授权更新事件失败: %v", err))
+			c.notifyEventError("handle_updateauthorized", err)
 		}
 
 	case "component_verify_ticket":
@@ -595,6 +638,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 		err := xml.Unmarshal(xmlData, &event)
 		if err != nil {
 			c.logger.Error(fmt.Sprintf("解析验证票据事件失败: %v", err))
+			c.notifyEventError("parse_component_verify_ticket_event", err)
 			// 根据微信官方文档要求，即使解析失败也必须返回success
 			break
 		}
@@ -602,11 +646,13 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 		// 存储验证票据
 		if err := c.storage.SaveComponentVerifyTicket(ctx, event.ComponentVerifyTicket); err != nil {
 			c.logger.Error(fmt.Sprintf("存储验证票据失败: %v", err))
+			c.notifyEventError("save_component_verify_ticket", err)
 			// 根据微信官方文档要求，即使存储失败也必须返回success
 		}
 
 		if err := c.GetEventHandler().HandleComponentVerifyTicket(ctx, &event); err != nil {
 			c.logger.Error(fmt.Sprintf("处理验证票据事件失败: %v", err))
+			c.notifyEventError("handle_component_verify_ticket", err)
 			// 根据微信官方文档要求，即使处理失败也必须返回success
 		}
 
@@ -615,6 +661,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 		err := xml.Unmarshal(xmlData, &event)
 		if err != nil {
 			c.logger.Error(fmt.Sprintf("解析EncodingAESKey变更事件失败: %v", err))
+			c.notifyEventError("parse_encoding_aes_key_changed_event", err)
 			break
 		}
 		c.logger.Info(fmt.Sprintf("解析EncodingAESKey变更事件成功，事件内容: %+v", event))
@@ -623,6 +670,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 			err2 := c.crypt.SetPrevEncodingAESKey(c.config.EncodingAESKey)
 			if err2 != nil {
 				c.logger.Error(fmt.Sprintf("设置上一次EncodingAESKey失败: %v", err2))
+				c.notifyEventError("set_prev_encoding_aes_key", err2)
 				break
 			}
 		}
@@ -632,6 +680,7 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 
 		if err := c.GetEventHandler().HandleEncodingAESKeyChanged(ctx, &event); err != nil {
 			c.logger.Error(fmt.Sprintf("处理EncodingAESKey变更事件失败: %v", err))
+			c.notifyEventError("handle_encoding_aes_key_changed", err)
 		}
 
 	default:
@@ -717,8 +766,8 @@ func (c *Client) QueryAuth(ctx context.Context, authorizationCode string) (*Quer
 	}
 
 	var result QueryAuthResponse
-	queryAuthUrl := fmt.Sprintf("%s?component_access_token=%s", URLQueryAuth, url.QueryEscape(componentToken.AccessToken))
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	queryAuthUrl := fmt.Sprintf("%s?component_access_token=%s", URLQueryAuth, componentToken.AccessToken)
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    queryAuthUrl,
 		Body:   request,
@@ -764,9 +813,9 @@ func (c *Client) RefreshAuthorizerToken(ctx context.Context, authorizerAppID, re
 	}
 
 	apiURL := fmt.Sprintf("%s?component_access_token=%s", URLAuthorizerToken,
-		url.QueryEscape(componentToken.AccessToken))
+		componentToken.AccessToken)
 
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
 		Body:   request,
@@ -806,8 +855,8 @@ func (c *Client) GetAuthorizerInfo(ctx context.Context, authorizerAppID string) 
 	}
 
 	var result GetAuthorizerInfoResponse
-	getAuthorizerInfoUrl := fmt.Sprintf("%s?component_access_token=%s", URLGetAuthorizerInfo, url.QueryEscape(componentToken.AccessToken))
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	getAuthorizerInfoUrl := fmt.Sprintf("%s?component_access_token=%s", URLGetAuthorizerInfo, componentToken.AccessToken)
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    getAuthorizerInfoUrl,
 		Body:   request,
@@ -838,8 +887,8 @@ func (c *Client) GetAuthorizerList(ctx context.Context, offset, count int) (*Get
 	}
 
 	var result GetAuthorizerListResponse
-	getAuthorizerListUrl := fmt.Sprintf("%s?component_access_token=%s", URLGetAuthorizerList, url.QueryEscape(componentToken.AccessToken))
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	getAuthorizerListUrl := fmt.Sprintf("%s?component_access_token=%s", URLGetAuthorizerList, componentToken.AccessToken)
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    getAuthorizerListUrl,
 		Body:   request,
@@ -1012,7 +1061,7 @@ func (c *Client) clearQuota(ctx context.Context, accessToken, appID string) (*co
 	}
 
 	var result core.APIResponse
-	clearQuotaURL := fmt.Sprintf("%s?access_token=%s", URLClearQuota, url.QueryEscape(accessToken))
+	clearQuotaURL := fmt.Sprintf("%s?access_token=%s", URLClearQuota, accessToken)
 	err := c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    clearQuotaURL,
@@ -1058,7 +1107,7 @@ func (c *Client) GetApiQuota(ctx context.Context, authorizerAppID string) (*GetA
 	}
 
 	var result GetApiQuotaResponse
-	getApiQuotaURL := fmt.Sprintf("%s?access_token=%s", URLGetApiQuota, url.QueryEscape(accessToken))
+	getApiQuotaURL := fmt.Sprintf("%s?access_token=%s", URLGetApiQuota, accessToken)
 	err := c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    getApiQuotaURL,
@@ -1088,8 +1137,8 @@ func (c *Client) GetRidInfo(ctx context.Context, rid string) (*GetRidInfoRespons
 	}
 
 	var result GetRidInfoResponse
-	getRidInfoUrl := fmt.Sprintf("%s?access_token=%s", URLGetRidInfo, url.QueryEscape(componentToken.AccessToken))
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	getRidInfoUrl := fmt.Sprintf("%s?access_token=%s", URLGetRidInfo, componentToken.AccessToken)
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    getRidInfoUrl,
 		Body:   request,
@@ -1166,8 +1215,8 @@ func (c *Client) SetAuthorizerOption(ctx context.Context, authorizerAppID, optio
 	}
 
 	var result core.APIResponse
-	setAuthorizerOptionUrl := fmt.Sprintf("%s?component_access_token=%s", URLSetAuthorizerOption, url.QueryEscape(componentToken.AccessToken))
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	setAuthorizerOptionUrl := fmt.Sprintf("%s?component_access_token=%s", URLSetAuthorizerOption, componentToken.AccessToken)
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    setAuthorizerOptionUrl,
 		Body:   request,
@@ -1198,8 +1247,8 @@ func (c *Client) GetAuthorizerOption(ctx context.Context, authorizerAppID, optio
 	}
 
 	var result GetAuthorizerOptionResponse
-	getAuthorizerOptionUrl := fmt.Sprintf("%s?component_access_token=%s", URLGetAuthorizerOption, url.QueryEscape(componentToken.AccessToken))
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	getAuthorizerOptionUrl := fmt.Sprintf("%s?component_access_token=%s", URLGetAuthorizerOption, componentToken.AccessToken)
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    getAuthorizerOptionUrl,
 		Body:   request,
@@ -1224,8 +1273,8 @@ func (c *Client) GetTemplateDraftList(ctx context.Context) (*GetTemplateDraftLis
 	}
 
 	var result GetTemplateDraftListResponse
-	getTemplateDraftListUrl := fmt.Sprintf("%s?access_token=%s", URLWxaGetTemplateDraftList, url.QueryEscape(componentToken.AccessToken))
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	getTemplateDraftListUrl := fmt.Sprintf("%s?access_token=%s", URLWxaGetTemplateDraftList, componentToken.AccessToken)
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    getTemplateDraftListUrl,
 		Result: &result,
@@ -1254,8 +1303,8 @@ func (c *Client) AddToTemplate(ctx context.Context, draftID int64, templateType 
 	}
 
 	var result core.APIResponse
-	addToTemplateUrl := fmt.Sprintf("%s?access_token=%s", URLWxaAddToTemplate, url.QueryEscape(componentToken.AccessToken))
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	addToTemplateUrl := fmt.Sprintf("%s?access_token=%s", URLWxaAddToTemplate, componentToken.AccessToken)
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    addToTemplateUrl,
 		Body:   request,
@@ -1280,8 +1329,8 @@ func (c *Client) GetTemplateList(ctx context.Context) (*GetTemplateListResponse,
 	}
 
 	var result GetTemplateListResponse
-	getTemplateListUrl := fmt.Sprintf("%s?access_token=%s", URLWxaGetTemplateList, url.QueryEscape(componentToken.AccessToken))
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	getTemplateListUrl := fmt.Sprintf("%s?access_token=%s", URLWxaGetTemplateList, componentToken.AccessToken)
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    getTemplateListUrl,
 		Result: &result,
@@ -1309,8 +1358,8 @@ func (c *Client) DeleteTemplate(ctx context.Context, templateID int64) (*core.AP
 	}
 
 	var result core.APIResponse
-	deleteTemplateUrl := fmt.Sprintf("%s?access_token=%s", URLWxaDeleteTemplate, url.QueryEscape(componentToken.AccessToken))
-	err = core.NewRequest(c.httpClient, c.logger).Make(ctx, &core.ReqMakeOpt{
+	deleteTemplateUrl := fmt.Sprintf("%s?access_token=%s", URLWxaDeleteTemplate, componentToken.AccessToken)
+	err = c.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    deleteTemplateUrl,
 		Body:   request,

@@ -3,7 +3,6 @@ package official_account
 import (
 	"context"
 	"fmt"
-	"net/url"
 
 	"github.com/jcbowen/wego/core"
 )
@@ -58,7 +57,7 @@ func (c *APIClient) CallbackCheck(ctx context.Context, action, checkOperator str
 	}
 
 	var result CallbackCheckResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLCallbackCheck, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLCallbackCheck, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
@@ -84,7 +83,7 @@ func (c *APIClient) GetApiDomainIp(ctx context.Context) (*GetApiDomainIpResponse
 	}
 
 	var result GetApiDomainIpResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetApiDomainIp, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetApiDomainIp, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -109,7 +108,7 @@ func (c *APIClient) GetCallbackIp(ctx context.Context) (*GetCallbackIpResponse, 
 	}
 
 	var result GetCallbackIpResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCallbackIp, url.QueryEscape(accessToken))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCallbackIp, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -126,9 +125,21 @@ func (c *APIClient) GetCallbackIp(ctx context.Context) (*GetCallbackIpResponse, 
 	return &result, nil
 }
 
-// GetSubscribeClient 获取订阅消息客户端
-// 功能：返回订阅消息客户端实例，用于管理订阅消息相关功能
-// 返回值：*SubscribeClient 订阅消息客户端指针
+// GetSubscribeClient 获取订阅通知客户端（兼容层）
+//
+// Deprecated: 请改用 GetSubscribeNotifyClient。
+//
+// 返回:
+//   - *SubscribeClient 兼容层客户端（方法转发到 SubscribeNotifyClient）
 func (c *APIClient) GetSubscribeClient() *SubscribeClient {
 	return NewSubscribeClient(c.Client)
+}
+
+// GetSubscribeNotifyClient 获取公众号订阅通知客户端
+// 功能：返回订阅通知客户端实例（/wxaapi/newtmpl/* + bizsend 全套接口）
+//
+// 返回:
+//   - *SubscribeNotifyClient 订阅通知客户端指针
+func (c *APIClient) GetSubscribeNotifyClient() *SubscribeNotifyClient {
+	return NewSubscribeNotifyClient(c.Client)
 }

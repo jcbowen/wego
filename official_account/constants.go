@@ -110,16 +110,6 @@ const (
 	URLQRCodeCreate = core.BaseAPIURL + "/cgi-bin/qrcode/create"
 	URLQRCodeShow   = core.MPBaseURL + "/cgi-bin/showqrcode"
 
-	// 设备功能
-	URLDeviceAuthorize    = core.BaseAPIURL + "/device/authorize"
-	URLDeviceCreateQRCode = core.BaseAPIURL + "/device/create_qrcode"
-	URLDeviceGetQRCode    = core.BaseAPIURL + "/device/getqrcode"
-	URLDeviceGetStatus    = core.BaseAPIURL + "/device/get_stat"
-	URLDeviceOpen         = core.BaseAPIURL + "/device/opendevice"
-	URLDeviceSend         = core.BaseAPIURL + "/device/transmsg"
-	URLDeviceUnbind       = core.BaseAPIURL + "/device/unbind"
-	URLDeviceUpdateStatus = core.BaseAPIURL + "/device/updatestatus"
-
 	// 用户管理
 	URLUserInfo         = core.BaseAPIURL + "/cgi-bin/user/info"
 	URLGetUserInfoBatch = core.BaseAPIURL + "/cgi-bin/user/info/batchget"
@@ -153,9 +143,6 @@ const (
 	URLDataCubeGetInterfaceSummary       = core.BaseAPIURL + "/datacube/getinterfacesummary"
 	URLDataCubeGetInterfaceSummaryHour   = core.BaseAPIURL + "/datacube/getinterfacesummaryhour"
 
-	// 语义理解
-	URLSemanticSearch = core.BaseAPIURL + "/semantic/semproxy/search"
-
 	// 微信卡券
 	URLCardCodeDecrypt        = core.BaseAPIURL + "/card/code/decrypt"
 	URLCardCodeGet            = core.BaseAPIURL + "/card/code/get"
@@ -175,74 +162,12 @@ const (
 	URLCardUpdate             = core.BaseAPIURL + "/card/update"
 	URLCardQrCodeCreate       = core.BaseAPIURL + "/card/qrcode/create"
 
-	// 微信小店
-	URLProductAdd             = core.BaseAPIURL + "/merchant/create"
-	URLProductCategoryGet     = core.BaseAPIURL + "/merchant/category/get"
-	URLProductDel             = core.BaseAPIURL + "/merchant/del"
-	URLProductGet             = core.BaseAPIURL + "/merchant/get"
-	URLProductUpdate          = core.BaseAPIURL + "/merchant/update"
-	URLProductStockGet        = core.BaseAPIURL + "/merchant/stock/get"
-	URLProductStockUpdate     = core.BaseAPIURL + "/merchant/stock/update"
-	URLProductPropertyGet     = core.BaseAPIURL + "/merchant/property/get"
-	URLProductSkuGet          = core.BaseAPIURL + "/merchant/sku/get"
-	URLProductGroupGet        = core.BaseAPIURL + "/merchant/group/get"
-	URLProductGroupAdd        = core.BaseAPIURL + "/merchant/group/add"
-	URLProductGroupUpdate     = core.BaseAPIURL + "/merchant/group/update"
-	URLProductGroupDel        = core.BaseAPIURL + "/merchant/group/del"
-	URLProductGroupProductAdd = core.BaseAPIURL + "/merchant/group/addproduct"
-	URLProductGroupProductDel = core.BaseAPIURL + "/merchant/group/delproduct"
-	URLOrderGetByID           = core.BaseAPIURL + "/merchant/order/getbyid"
-	URLOrderGetByStatus       = core.BaseAPIURL + "/merchant/order/getbyfilter"
-	URLOrderDelivery          = core.BaseAPIURL + "/merchant/order/setdelivery"
-	URLOrderClose             = core.BaseAPIURL + "/merchant/order/close"
-	URLUploadShopProductImage = core.BaseAPIURL + "/merchant/common/upload_img"
-
-	// 微信小店图片
-	URLUploadShopImage = core.BaseAPIURL + "/merchant/common/upload_img"
-
 	// 微信支付
 	// TODO: 后续移至payment包或公共常量文件
 	URLPayNotify = core.PayAPIURL + "/pay/unifiedorder"
 
 	// 微信扫一扫
 	URLScanCodePush = core.BaseAPIURL + "/cgi-bin/message/custom/send"
-
-	// 微信发票
-	URLInvoiceTitleGet = core.BaseAPIURL + "/card/invoice/reimburse/gettitle"
-
-	// 微信打印
-	URLAddPrinter     = core.BaseAPIURL + "/device/printer/addprinter"
-	URLDelPrinter     = core.BaseAPIURL + "/device/printer/delprinter"
-	URLGetPrinter     = core.BaseAPIURL + "/device/printer/getprinter"
-	URLPrint          = core.BaseAPIURL + "/device/printer/print"
-	URLGetPrintStatus = core.BaseAPIURL + "/device/printer/getprintstatus"
-
-	// 微信连Wi-Fi
-	URLWifiGetQrCode     = core.BaseAPIURL + "/wifi/qrcode/get"
-	URLWifiSetHomepage   = core.BaseAPIURL + "/wifi/homepage/set"
-	URLWifiGetHomepage   = core.BaseAPIURL + "/wifi/homepage/get"
-	URLWifiAddShop       = core.BaseAPIURL + "/wifi/shop/add"
-	URLWifiGetShop       = core.BaseAPIURL + "/wifi/shop/get"
-	URLWifiListShop      = core.BaseAPIURL + "/wifi/shop/list"
-	URLWifiUpdateShop    = core.BaseAPIURL + "/wifi/shop/update"
-	URLWifiAddDevice     = core.BaseAPIURL + "/wifi/device/add"
-	URLWifiDeleteDevice  = core.BaseAPIURL + "/wifi/device/delete"
-	URLWifiGetDevice     = core.BaseAPIURL + "/wifi/device/get"
-	URLWifiListDevice    = core.BaseAPIURL + "/wifi/device/list"
-	URLWifiUpdateDevice  = core.BaseAPIURL + "/wifi/device/update"
-	URLWifiGetStatistics = core.BaseAPIURL + "/wifi/statistics/get"
-
-	// 摇一摇周边
-	URLBeaconGetDevice      = core.BaseAPIURL + "/shakearound/device/search"
-	URLBeaconRegisterDevice = core.BaseAPIURL + "/shakearound/device/register"
-	URLBeaconUpdateDevice   = core.BaseAPIURL + "/shakearound/device/update"
-	URLBeaconDeleteDevice   = core.BaseAPIURL + "/shakearound/device/delete"
-	URLBeaconBindPage       = core.BaseAPIURL + "/shakearound/device/bindpage"
-	URLBeaconGetPage        = core.BaseAPIURL + "/shakearound/page/search"
-	URLBeaconAddPage        = core.BaseAPIURL + "/shakearound/page/add"
-	URLBeaconUpdatePage     = core.BaseAPIURL + "/shakearound/page/update"
-	URLBeaconDeletePage     = core.BaseAPIURL + "/shakearound/page/delete"
-	URLBeaconGetStatistics  = core.BaseAPIURL + "/shakearound/statistics/devicelist"
 
 	// 开放平台相关
 	// TODO: 后续移至openplatform包
