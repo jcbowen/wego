@@ -13,6 +13,7 @@ import (
 // https://developers.weixin.qq.com/doc/service/api/base/api_getstableaccesstoken.html）：
 //   - 普通模式：有效期内重复调用返回相同 token，不刷新（可放心本地缓存）
 //   - 强制刷新：每天最多 20 次，且两次强制刷新需间隔 30 秒
+//   - 注意：稳定版 access_token 接口不支持第三方平台代调用（官方限制）
 const (
 	forceRefreshDailyLimit  = 20
 	forceRefreshMinInterval = 30 * time.Second

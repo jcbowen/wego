@@ -160,6 +160,42 @@ func (c *Client) DecryptNotificationResource(resource *Resource) ([]byte, error)
 	return []byte(plainText), nil
 }
 
+// NotificationSuccess 写出微信支付回调处理成功的应答
+//
+// 参数:
+//   - w: HTTP 响应写入器
+//
+// 说明:
+//   - 官方规范：处理成功应答为 HTTP 204 + 空响应体，不要返回 {"code":"SUCCESS"} 之类的 JSON
+//   - 未按规范应答时，微信会按固定频率重试通知（最多 15 次）
+//
+// 使用示例:
+//   - payment.NotificationSuccess(w)
+func NotificationSuccess(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// NotificationFail 写出微信支付回调处理失败的应答
+//
+// 参数:
+//   - w: HTTP 响应写入器
+//   - statusCode: HTTP 状态码（4xx/5xx，如 http.StatusInternalServerError）
+//   - message: 失败原因描述
+//
+// 说明:
+//   - 官方规范：失败应答体仅允许 {"code":"FAIL","message":"..."}，FAIL 为唯一合法取值
+//
+// 使用示例:
+//   - payment.NotificationFail(w, http.StatusInternalServerError, "验签失败")
+func NotificationFail(w http.ResponseWriter, statusCode int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"code":    NotificationAckCodeFail,
+		"message": message,
+	})
+}
+
 // absInt64 返回 int64 绝对值
 func absInt64(n int64) int64 {
 	if n < 0 {

@@ -44,17 +44,21 @@ func (o *OAuthClient) GenerateAuthorizeURL(ctx context.Context, req *OAuthAuthor
 		return "", fmt.Errorf("无效的scope值: %s", req.Scope)
 	}
 
-	params := url.Values{}
-	params.Set("appid", req.AppID)
-	params.Set("redirect_uri", req.RedirectURI)
-	params.Set("response_type", core.ResponseTypeCode)
-	params.Set("scope", req.Scope)
+	// 按官方文档示例顺序拼接参数（appid → redirect_uri → response_type → scope → state），
+	// 不使用 url.Values.Encode()（其按 key 字典序输出，官方对授权链接做正则强匹配校验）；
+	// 官方链接格式不含 connect_redirect 参数，故不再附加。
+	authorizeURL := fmt.Sprintf(
+		"%s?appid=%s&redirect_uri=%s&response_type=%s&scope=%s",
+		URLConnectOAuth2Authorize,
+		url.QueryEscape(req.AppID),
+		url.QueryEscape(req.RedirectURI),
+		core.ResponseTypeCode,
+		url.QueryEscape(req.Scope),
+	)
 	if req.State != "" {
-		params.Set("state", req.State)
+		authorizeURL += "&state=" + url.QueryEscape(req.State)
 	}
-	params.Set("connect_redirect", "1")
-
-	authorizeURL := URLConnectOAuth2Authorize + "?" + params.Encode() + "#wechat_redirect"
+	authorizeURL += "#wechat_redirect"
 
 	o.logger.Info("生成网页授权URL", map[string]interface{}{"url": authorizeURL})
 	return authorizeURL, nil

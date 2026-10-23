@@ -100,7 +100,7 @@ type GetArticleTotalResponse struct {
 // UserReadItem 图文分析-阅读数据项（按日）
 type UserReadItem struct {
 	RefDate          string `json:"ref_date"`            // 数据日期
-	UserSource       int    `json:"user_source"`         // 用户来源渠道（同 UserSummaryItem.UserSource 枚举）
+	UserSource       int    `json:"user_source"`         // 用户从哪里进入来阅读该图文（99999999-全部；0-会话；1-好友；2-朋友圈；4-历史消息页；5-其他；6-看一看；7-搜一搜；官方未完整公开其余枚举值，以官方文档为准）
 	IntPageReadUser  int    `json:"int_page_read_user"`  // 图文页的到达人数
 	IntPageReadCount int    `json:"int_page_read_count"` // 图文页的到达次数
 	OriPageReadUser  int    `json:"ori_page_read_user"`  // 原文页的到达人数
@@ -182,6 +182,57 @@ type InterfaceSummaryHourItem struct {
 type GetInterfaceSummaryHourResponse struct {
 	core.APIResponse
 	List []InterfaceSummaryHourItem `json:"list"`
+}
+
+// UpstreamMsgItem 消息发送概况数据项（分消息类型）
+type UpstreamMsgItem struct {
+	RefDate  string `json:"ref_date"`  // 数据日期（yyyy-MM-dd）
+	MsgType  int    `json:"msg_type"`  // 消息类型（1文字/2图片/3语音/4视频/6第三方应用消息-链接消息）
+	MsgUser  int    `json:"msg_user"`  // 上行发送了（向公众号发送了）消息的用户数
+	MsgCount int    `json:"msg_count"` // 上行发送了消息的消息总数
+}
+
+// UpstreamMsgHourItem 消息发送概况数据项（分小时）
+type UpstreamMsgHourItem struct {
+	UpstreamMsgItem
+	RefHour int `json:"ref_hour"` // 数据的小时（0-23）
+}
+
+// UpstreamMsgDistItem 消息发送分布数据项
+type UpstreamMsgDistItem struct {
+	RefDate       string `json:"ref_date"`       // 数据日期（yyyy-MM-dd）
+	CountInterval int    `json:"count_interval"` // 当日发送消息量分布的区间（0-"0"/1-"1-5"/2-"6-10"/3-"10次以上"）
+	MsgUser       int    `json:"msg_user"`       // 上行发送了（向公众号发送了）消息的用户数
+}
+
+// GetUpStreamMsgResponse 消息发送概况数据响应（getupstreammsg，最大时间跨度 7 天）
+type GetUpStreamMsgResponse struct {
+	core.APIResponse
+	List []UpstreamMsgItem `json:"list"`
+}
+
+// GetUpStreamMsgHourResponse 消息发送分时数据响应（getupstreammsghour，最大时间跨度 1 天）
+type GetUpStreamMsgHourResponse struct {
+	core.APIResponse
+	List []UpstreamMsgHourItem `json:"list"`
+}
+
+// GetUpStreamMsgDistResponse 消息发送分布数据响应（getupstreammsgdist，最大时间跨度 15 天）
+type GetUpStreamMsgDistResponse struct {
+	core.APIResponse
+	List []UpstreamMsgDistItem `json:"list"`
+}
+
+// GetUpStreamMsgDistWeekResponse 消息发送分布周数据响应（getupstreammsgdistweek，最大时间跨度 15 天）
+type GetUpStreamMsgDistWeekResponse struct {
+	core.APIResponse
+	List []UpstreamMsgDistItem `json:"list"`
+}
+
+// GetUpStreamMsgDistMonthResponse 消息发送分布月数据响应（getupstreammsgdistmonth，最大时间跨度 15 天）
+type GetUpStreamMsgDistMonthResponse struct {
+	core.APIResponse
+	List []UpstreamMsgDistItem `json:"list"`
 }
 
 // validateDateRange 校验日期范围参数：格式 yyyy-MM-dd 且跨度不超过 maxDays 天
@@ -499,6 +550,146 @@ func (c *Client) GetInterfaceSummaryHour(ctx context.Context, beginDate, endDate
 
 	var result GetInterfaceSummaryHourResponse
 	if err := c.postDateRange(ctx, URLDataCubeGetInterfaceSummaryHour, beginDate, endDate, &result); err != nil {
+		return nil, err
+	}
+	if !result.IsSuccess() {
+		return nil, &result.APIResponse
+	}
+	return &result, nil
+}
+
+// GetUpStreamMsg 获取消息发送概况数据（分消息类型，最大时间跨度 7 天）
+//
+// 参数:
+//   - ctx: 上下文
+//   - beginDate: 起始日期（yyyy-MM-dd）
+//   - endDate: 结束日期（yyyy-MM-dd）
+//
+// 返回:
+//   - *GetUpStreamMsgResponse: 分消息类型的消息发送概况数据
+//   - error: 请求失败或微信返回错误时返回错误
+//
+// 文档:
+//   - https://developers.weixin.qq.com/doc/service/api/wedata/mess/api_getupstreammsg.html
+func (c *Client) GetUpStreamMsg(ctx context.Context, beginDate, endDate string) (*GetUpStreamMsgResponse, error) {
+	if err := validateDateRange(beginDate, endDate, 7); err != nil {
+		return nil, err
+	}
+
+	var result GetUpStreamMsgResponse
+	if err := c.postDateRange(ctx, URLDataCubeGetUpStreamMsg, beginDate, endDate, &result); err != nil {
+		return nil, err
+	}
+	if !result.IsSuccess() {
+		return nil, &result.APIResponse
+	}
+	return &result, nil
+}
+
+// GetUpStreamMsgHour 获取消息发送分时数据（最大时间跨度 1 天）
+//
+// 参数:
+//   - ctx: 上下文
+//   - beginDate: 起始日期（yyyy-MM-dd）
+//   - endDate: 结束日期（yyyy-MM-dd，须与起始日期为同一天）
+//
+// 返回:
+//   - *GetUpStreamMsgHourResponse: 分小时的消息发送概况数据
+//   - error: 请求失败或微信返回错误时返回错误
+//
+// 文档:
+//   - https://developers.weixin.qq.com/doc/service/api/wedata/mess/api_getupstreammsghour.html
+func (c *Client) GetUpStreamMsgHour(ctx context.Context, beginDate, endDate string) (*GetUpStreamMsgHourResponse, error) {
+	if err := validateDateRange(beginDate, endDate, 1); err != nil {
+		return nil, err
+	}
+
+	var result GetUpStreamMsgHourResponse
+	if err := c.postDateRange(ctx, URLDataCubeGetUpStreamMsgHour, beginDate, endDate, &result); err != nil {
+		return nil, err
+	}
+	if !result.IsSuccess() {
+		return nil, &result.APIResponse
+	}
+	return &result, nil
+}
+
+// GetUpStreamMsgDist 获取消息发送分布数据（按消息量区间，最大时间跨度 15 天）
+//
+// 参数:
+//   - ctx: 上下文
+//   - beginDate: 起始日期（yyyy-MM-dd）
+//   - endDate: 结束日期（yyyy-MM-dd）
+//
+// 返回:
+//   - *GetUpStreamMsgDistResponse: 按发送消息量区间分布的数据
+//   - error: 请求失败或微信返回错误时返回错误
+//
+// 文档:
+//   - https://developers.weixin.qq.com/doc/service/api/wedata/mess/api_getupstreammsgdist.html
+func (c *Client) GetUpStreamMsgDist(ctx context.Context, beginDate, endDate string) (*GetUpStreamMsgDistResponse, error) {
+	if err := validateDateRange(beginDate, endDate, 15); err != nil {
+		return nil, err
+	}
+
+	var result GetUpStreamMsgDistResponse
+	if err := c.postDateRange(ctx, URLDataCubeGetUpStreamMsgDist, beginDate, endDate, &result); err != nil {
+		return nil, err
+	}
+	if !result.IsSuccess() {
+		return nil, &result.APIResponse
+	}
+	return &result, nil
+}
+
+// GetUpStreamMsgDistWeek 获取消息发送分布周数据（最大时间跨度 15 天）
+//
+// 参数:
+//   - ctx: 上下文
+//   - beginDate: 起始日期（yyyy-MM-dd）
+//   - endDate: 结束日期（yyyy-MM-dd）
+//
+// 返回:
+//   - *GetUpStreamMsgDistWeekResponse: 按发送消息量区间分布的周数据
+//   - error: 请求失败或微信返回错误时返回错误
+//
+// 文档:
+//   - https://developers.weixin.qq.com/doc/service/api/wedata/mess/api_getupstreammsgdistweek.html
+func (c *Client) GetUpStreamMsgDistWeek(ctx context.Context, beginDate, endDate string) (*GetUpStreamMsgDistWeekResponse, error) {
+	if err := validateDateRange(beginDate, endDate, 15); err != nil {
+		return nil, err
+	}
+
+	var result GetUpStreamMsgDistWeekResponse
+	if err := c.postDateRange(ctx, URLDataCubeGetUpStreamMsgDistWeekly, beginDate, endDate, &result); err != nil {
+		return nil, err
+	}
+	if !result.IsSuccess() {
+		return nil, &result.APIResponse
+	}
+	return &result, nil
+}
+
+// GetUpStreamMsgDistMonth 获取消息发送分布月数据（最大时间跨度 15 天）
+//
+// 参数:
+//   - ctx: 上下文
+//   - beginDate: 起始日期（yyyy-MM-dd）
+//   - endDate: 结束日期（yyyy-MM-dd）
+//
+// 返回:
+//   - *GetUpStreamMsgDistMonthResponse: 按发送消息量区间分布的月数据
+//   - error: 请求失败或微信返回错误时返回错误
+//
+// 文档:
+//   - https://developers.weixin.qq.com/doc/service/api/wedata/mess/api_getupstreammsgdistmonth.html
+func (c *Client) GetUpStreamMsgDistMonth(ctx context.Context, beginDate, endDate string) (*GetUpStreamMsgDistMonthResponse, error) {
+	if err := validateDateRange(beginDate, endDate, 15); err != nil {
+		return nil, err
+	}
+
+	var result GetUpStreamMsgDistMonthResponse
+	if err := c.postDateRange(ctx, URLDataCubeGetUpStreamMsgDistMonthly, beginDate, endDate, &result); err != nil {
 		return nil, err
 	}
 	if !result.IsSuccess() {

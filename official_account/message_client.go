@@ -45,8 +45,8 @@ type DeleteMassMsgResponse struct {
 // GetSpeedResponse 获取群发速度响应
 type GetSpeedResponse struct {
 	core.APIResponse
-	Speed     int `json:"speed"`
-	RealSpeed int `json:"real_speed"`
+	Speed     int `json:"speed"`     // 群发速度级别
+	RealSpeed int `json:"realspeed"` // 实时群发速度级别（官方字段名无下划线）
 }
 
 // MassMsgGetRequest 获取群发消息发送状态请求
@@ -82,12 +82,33 @@ type MassTextContent struct {
 
 func (c MassTextContent) ContentKey() string { return "text" }
 
-// MassImageContent 图片消息内容体
+// MassImageContent 图片消息内容体（旧格式，键 image + media_id 单图）
+//
+// Deprecated: 官方现行示例为 images 键 + media_ids 数组（见 MassImagesContent），
+// 旧格式是否仍被微信接受待真机验证，建议优先使用 MassImagesContent。
 type MassImageContent struct {
 	MediaID string `json:"media_id"`
 }
 
 func (c MassImageContent) ContentKey() string { return "image" }
+
+// MassImagesContent 图片消息内容体（官方现行示例格式，键 images）
+//
+// 官方示例（msgtype 仍为 image，内容键为 images）:
+//
+//	{"filter":{"is_to_all":true},"msgtype":"image","images":{"media_ids":["MEDIA_ID1"],"recommend":"...","title":"..."}}
+//
+// 文档:
+//   - https://developers.weixin.qq.com/doc/service/api/notify/message/api_sendall.html
+type MassImagesContent struct {
+	MediaIDs           []string `json:"media_ids"`                       // 用于群发的图片 media_id 列表
+	Recommend          string   `json:"recommend,omitempty"`             // 推荐语
+	Title              string   `json:"title,omitempty"`                 // 标题
+	NeedOpenComment    int      `json:"need_open_comment,omitempty"`     // 开启评论（1-开启，0-关闭）
+	OnlyFansCanComment int      `json:"only_fans_can_comment,omitempty"` // 只有粉丝能评论（1-开启，0-关闭）
+}
+
+func (c MassImagesContent) ContentKey() string { return "images" }
 
 // MassVoiceContent 语音消息内容体
 type MassVoiceContent struct {
@@ -145,6 +166,7 @@ func derefMassContent(content MassContent) MassContent {
 type MassContentFields struct {
 	Text    *MassTextContent    `json:"text,omitempty"`
 	Image   *MassImageContent   `json:"image,omitempty"`
+	Images  *MassImagesContent  `json:"images,omitempty"` // 官方现行图片格式
 	Voice   *MassVoiceContent   `json:"voice,omitempty"`
 	MPNews  *MassMPNewsContent  `json:"mpnews,omitempty"`
 	MPVideo *MassMPVideoContent `json:"mpvideo,omitempty"`
@@ -163,6 +185,8 @@ func (f *MassContentFields) setContent(content MassContent) error {
 		f.Text = &c
 	case MassImageContent:
 		f.Image = &c
+	case MassImagesContent:
+		f.Images = &c
 	case MassVoiceContent:
 		f.Voice = &c
 	case MassMPNewsContent:
@@ -177,11 +201,24 @@ func (f *MassContentFields) setContent(content MassContent) error {
 	return nil
 }
 
+// massMsgType 返回内容体对应的 msgtype 取值
+//
+// 说明:
+//   - MassImagesContent 的内容键为 images，但 msgtype 官方仍要求为 image，
+//     是唯一键名与 msgtype 不一致的类型
+func massMsgType(content MassContent) string {
+	if _, ok := derefMassContent(content).(MassImagesContent); ok {
+		return "image"
+	}
+	return content.ContentKey()
+}
+
 // MassSendRequest 根据OpenID群发消息请求
 type MassSendRequest struct {
 	MassContentFields
-	Touser  []string `json:"touser"`
-	MsgType string   `json:"msgtype"`
+	Touser      []string `json:"touser"`
+	MsgType     string   `json:"msgtype"`
+	ClientMsgID string   `json:"clientmsgid,omitempty"` // 开发者侧群发消息 id（长度限制 32 字节，用于避免重复推送；不填则后台以群发范围和内容摘要值作为 clientmsgid）
 }
 
 // NewMassSendRequest 构造按 OpenID 群发的请求体
@@ -193,7 +230,7 @@ func NewMassSendRequest(touser []string, content MassContent) (*MassSendRequest,
 	if err := req.setContent(content); err != nil {
 		return nil, err
 	}
-	req.MsgType = content.ContentKey()
+	req.MsgType = massMsgType(content)
 	return req, nil
 }
 
@@ -206,8 +243,11 @@ type MassSendResponse struct {
 // PreviewRequest 预览消息请求
 type PreviewRequest struct {
 	MassContentFields
-	Touser  string `json:"touser"`
-	MsgType string `json:"msgtype"`
+	Touser      string `json:"touser"` // 接收消息用户的 openid（touser、towxname 二选一）
+	MsgType     string `json:"msgtype"`
+	WxName      string `json:"towxname,omitempty"`    // 接收消息用户的微信号，实现对微信号的预览（touser、towxname 二选一，每日限 100 次）
+	MsgDataID   int64  `json:"msg_data_id,omitempty"` // 按消息 id 预览（图文分析数据接口中 msgid 的前半部分）
+	ClientMsgID string `json:"clientmsgid,omitempty"` // 开发者侧消息 id（长度限制 32 字节，用于避免重复推送）
 }
 
 // NewPreviewRequest 构造预览请求体
@@ -219,7 +259,7 @@ func NewPreviewRequest(touser string, content MassContent) (*PreviewRequest, err
 	if err := req.setContent(content); err != nil {
 		return nil, err
 	}
-	req.MsgType = content.ContentKey()
+	req.MsgType = massMsgType(content)
 	return req, nil
 }
 
@@ -232,8 +272,9 @@ type PreviewResponse struct {
 // SendAllRequest 根据标签群发消息请求
 type SendAllRequest struct {
 	MassContentFields
-	Filter  Filter `json:"filter"`
-	MsgType string `json:"msgtype"`
+	Filter      Filter `json:"filter"`
+	MsgType     string `json:"msgtype"`
+	ClientMsgID string `json:"clientmsgid,omitempty"` // 开发者侧群发消息 id（长度限制 32 字节，用于避免重复推送；不填则后台以群发范围和内容摘要值作为 clientmsgid）
 }
 
 // NewSendAllRequest 构造按标签群发的请求体
@@ -242,14 +283,19 @@ func NewSendAllRequest(filter Filter, content MassContent) (*SendAllRequest, err
 	if err := req.setContent(content); err != nil {
 		return nil, err
 	}
-	req.MsgType = content.ContentKey()
+	req.MsgType = massMsgType(content)
 	return req, nil
 }
 
 // Filter 筛选条件
+//
+// 说明:
+//   - is_to_all 官方参数表标注 string 但官方示例全部为布尔（文档自身矛盾），
+//     采用 FlexBool 双形态兼容：请求侧序列化为布尔（与示例一致），响应侧双形态均可解析
+//   - tag_id 官方参数表标注 string 但示例多为数字，保持数字形态（与官方示例多数一致）
 type Filter struct {
-	IsToAll bool `json:"is_to_all"`
-	TagID   int  `json:"tag_id,omitempty"`
+	IsToAll core.FlexBool `json:"is_to_all"`
+	TagID   int           `json:"tag_id,omitempty"`
 }
 
 // SendAllResponse 根据标签群发消息响应
@@ -404,7 +450,7 @@ func (c *MessageClient) GetSpeed(ctx context.Context) (*GetSpeedResponse, error)
 	var result GetSpeedResponse
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetSpeed, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "GET",
+		Method: "POST",
 		URL:    apiURL,
 		Result: &result,
 	})
@@ -612,11 +658,11 @@ type GetCurrentAutoreplyInfoResponse struct {
 	AddFriendReplyInfo   struct {
 		Type    string `json:"type"`    // 自动回复类型
 		Content string `json:"content"` // 对于文本类型，content是文本内容，对于图文、图片、语音、视频，是mediaID
-	} `json:"add_friend_reply_info"` // 关注后自动回复的信息
+	} `json:"add_friend_autoreply_info"` // 关注后自动回复的信息（官方字段名，原文为 autoreply 而非 reply）
 	MessageDefaultReplyInfo struct {
 		Type    string `json:"type"`    // 自动回复类型
 		Content string `json:"content"` // 对于文本类型，content是文本内容，对于图文、图片、语音、视频，是mediaID
-	} `json:"message_default_reply_info"` // 消息自动回复的信息
+	} `json:"message_default_autoreply_info"` // 消息自动回复的信息（官方字段名，原文为 autoreply 而非 reply）
 	KeywordAutoreplyInfo struct {
 		List []struct {
 			RuleName        string `json:"rule_name"`   // 规则名称

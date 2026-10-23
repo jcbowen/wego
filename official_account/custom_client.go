@@ -3,6 +3,7 @@ package official_account
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/jcbowen/wego/core"
 )
@@ -77,6 +78,21 @@ type (
 		AppID        string `json:"appid"`
 		PagePath     string `json:"pagepath"`
 		ThumbMediaID string `json:"thumb_media_id"`
+	}
+	// CustomServiceContent 客服转发消息内容体（将消息转发给指定客服账号接待）
+	CustomServiceContent struct {
+		KfAccount string `json:"kf_account"` // 完整客服账号，格式为 "账号前缀@公众号微信号"；为空时默认转发给其中一个客服账号
+	}
+	// CustomMsgMenuContent 菜型消息内容体（在消息尾部附菜单，引导用户点选）
+	CustomMsgMenuContent struct {
+		HeadContent string        `json:"head_content,omitempty"` // 菜单头部内容（可选，长度限制 60 字节）
+		List        []MsgMenuItem `json:"list,omitempty"`         // 菜单项列表（至少 1 项，最多 10 项）
+		TailContent string        `json:"tail_content,omitempty"` // 菜单尾部内容（可选，长度限制 60 字节）
+	}
+	// MsgMenuItem 菜型消息的菜单项
+	MsgMenuItem struct {
+		ID      string `json:"id,omitempty"` // 菜单 id（用户点选后通过事件推送返回，可选）
+		Content string `json:"content"`      // 菜单显示内容（长度限制 100 字节）
 	}
 )
 
@@ -178,6 +194,26 @@ func (m *MessageMiniProgramPage) GetMsgType() string {
 	return "miniprogrampage"
 }
 
+// MessageCustomService 客服转发消息
+type MessageCustomService struct {
+	MsgType       string               `json:"msgtype"`
+	CustomService CustomServiceContent `json:"customservice"`
+}
+
+func (m *MessageCustomService) GetMsgType() string {
+	return "customservice"
+}
+
+// MessageMsgMenu 菜型消息
+type MessageMsgMenu struct {
+	MsgType string               `json:"msgtype"`
+	MsgMenu CustomMsgMenuContent `json:"msgmenu"`
+}
+
+func (m *MessageMsgMenu) GetMsgType() string {
+	return "msgmenu"
+}
+
 // SendCustomMessageRequest 发送客服消息请求
 //
 // 结构必须与官方一致：msgtype 只在最外层出现，各类型字段承载**纯内容体**。
@@ -193,6 +229,8 @@ type SendCustomMessageRequest struct {
 	MPNews          *CustomMPNewsContent          `json:"mpnews,omitempty"`
 	WXCard          *CustomWXCardContent          `json:"wxcard,omitempty"`
 	MiniProgramPage *CustomMiniProgramPageContent `json:"miniprogrampage,omitempty"`
+	CustomService   *CustomServiceContent         `json:"customservice,omitempty"` // 转发给指定客服账号接待
+	MsgMenu         *CustomMsgMenuContent         `json:"msgmenu,omitempty"`       // 菜型消息
 }
 
 // SendCustomMessageResponse 发送客服消息响应
@@ -292,21 +330,11 @@ type CloseCustomSessionResponse struct {
 	core.APIResponse
 }
 
-// GetCustomSessionRequest 获取客服会话请求
-type GetCustomSessionRequest struct {
-	OpenID string `json:"openid"`
-}
-
 // GetCustomSessionResponse 获取客服会话响应
 type GetCustomSessionResponse struct {
 	core.APIResponse
 	KfAccount  string `json:"kf_account"`
 	Createtime int64  `json:"createtime"`
-}
-
-// GetCustomSessionListRequest 获取客服会话列表请求
-type GetCustomSessionListRequest struct {
-	KfAccount string `json:"kf_account"`
 }
 
 // GetCustomSessionListResponse 获取客服会话列表响应
@@ -389,6 +417,10 @@ func (c *CustomClient) SendCustomMessage(ctx context.Context, touser string, mes
 		request.WXCard = &msg.WXCard
 	case *MessageMiniProgramPage:
 		request.MiniProgramPage = &msg.MiniProgramPage
+	case *MessageCustomService:
+		request.CustomService = &msg.CustomService
+	case *MessageMsgMenu:
+		request.MsgMenu = &msg.MsgMenu
 	default:
 		return nil, fmt.Errorf("unsupported message type: %s", message.GetMsgType())
 	}
@@ -647,22 +679,19 @@ func (c *CustomClient) CloseCustomSession(ctx context.Context, kfAccount, openid
 }
 
 // GetCustomSession 获取客服会话
+//
+// 说明: 官方为 GET + query openid，不是 POST + body
 func (c *CustomClient) GetCustomSession(ctx context.Context, openid string) (*GetCustomSessionResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	request := GetCustomSessionRequest{
-		OpenID: openid,
-	}
-
 	var result GetCustomSessionResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCustomSession, accessToken)
+	apiURL := fmt.Sprintf("%s?access_token=%s&openid=%s", URLGetCustomSession, accessToken, url.QueryEscape(openid))
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "POST",
+		Method: "GET",
 		URL:    apiURL,
-		Body:   request,
 		Result: &result,
 	})
 	if err != nil {
@@ -677,22 +706,19 @@ func (c *CustomClient) GetCustomSession(ctx context.Context, openid string) (*Ge
 }
 
 // GetCustomSessionList 获取客服会话列表
+//
+// 说明: 官方为 GET + query kf_account，不是 POST + body
 func (c *CustomClient) GetCustomSessionList(ctx context.Context, kfAccount string) (*GetCustomSessionListResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	request := GetCustomSessionListRequest{
-		KfAccount: kfAccount,
-	}
-
 	var result GetCustomSessionListResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetCustomSessionList, accessToken)
+	apiURL := fmt.Sprintf("%s?access_token=%s&kf_account=%s", URLGetCustomSessionList, accessToken, url.QueryEscape(kfAccount))
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "POST",
+		Method: "GET",
 		URL:    apiURL,
-		Body:   request,
 		Result: &result,
 	})
 	if err != nil {

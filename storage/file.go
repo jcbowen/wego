@@ -260,31 +260,55 @@ func (s *FileStorage) Ping(ctx context.Context) error {
 	return nil
 }
 
-// saveToFile 将数据保存到文件
+// saveToFile 将数据原子化保存到文件
+//
+// 原子写流程:
+//  1. 通过 os.CreateTemp 在目标目录生成唯一临时文件，避免多进程写固定 .tmp 名互踩（Windows/Linux 通用）
+//  2. 写入 JSON 数据后调用 Sync 刷盘，再手动 Close（Windows 上 rename 前文件必须已关闭）
+//  3. 按目标文件原有权限模式修正临时文件权限（目标不存在时使用 0600，避免令牌等敏感数据宽权限落盘）
+//  4. 通过 Rename 原子替换目标文件；任一步骤失败时兜底清理（关闭并删除）临时文件，不影响原目标文件
 func (s *FileStorage) saveToFile(filename string, data interface{}) error {
-	// 创建临时文件
-	tempFile := filename + ".tmp"
-
-	file, err := os.Create(tempFile)
+	tmp, err := os.CreateTemp(filepath.Dir(filename), filepath.Base(filename)+".tmp")
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	tempFile := tmp.Name()
 
-	encoder := json.NewEncoder(file)
+	// 失败路径兜底清理；rename 成功后置空 tempFile 以跳过清理
+	defer func() {
+		if tempFile != "" {
+			_ = tmp.Close() // 已手动 Close 时重复调用返回错误，忽略即可
+			_ = os.Remove(tempFile)
+		}
+	}()
+
+	encoder := json.NewEncoder(tmp)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(data); err != nil {
-		os.Remove(tempFile)
 		return err
 	}
 
-	// 原子性替换文件
-	if err := file.Close(); err != nil {
-		os.Remove(tempFile)
+	if err := tmp.Sync(); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
 		return err
 	}
 
-	return os.Rename(tempFile, filename)
+	// 权限处理：目标文件已存在时保留其原有权限模式，否则使用 0600
+	mode := os.FileMode(0600)
+	if info, err := os.Stat(filename); err == nil {
+		mode = info.Mode().Perm()
+	}
+	if err := os.Chmod(tempFile, mode); err != nil {
+		return err
+	}
+
+	if err := os.Rename(tempFile, filename); err != nil {
+		return err
+	}
+	tempFile = ""
+	return nil
 }
 
 // loadFromFile 从文件加载数据

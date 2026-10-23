@@ -420,7 +420,7 @@ func main() {
 
 核心配置和客户端实现，包含：
 
-- `Request` - 统一HTTP请求封装（含敏感参数日志脱敏）
+- `Request` - 统一HTTP请求封装（含敏感参数、请求体及XML敏感字段的日志脱敏）
 - 令牌管理和HTTP客户端
 
 ### MiniProgram 模块
@@ -430,8 +430,9 @@ func main() {
 - 登录：`Code2Session`
 - 手机号：`GetPhoneNumber`
 - 订阅消息：`SendSubscribeMessage`
-- 内容安全：`MsgSecCheck`（文本，v2 同步）、`MediaCheckAsync`（音视频，v2 异步）
-- 小程序码：`GetWxaCode`、`GetWxaCodeUnlimit`（scene 参数，不限量）、`CreateWxaQrcode`（旧接口）
+- 内容安全：`MsgSecCheck`（文本，v2 同步，便捷方法）、`MsgSecCheckFull`（完整参数，透传 title/nickname/signature/head_avatar 头像画像检测）、`MediaCheckAsync`（音视频，v2 异步）
+- 稳定版 access_token：`GetStableAccessToken`（`/cgi-bin/stable_token`，不写入默认缓存）
+- 小程序码：`GetWxaCode`、`GetWxaCodeUnlimit`（scene 参数，不限量）、`CreateWxaQrcode`（旧接口）；`path` 为官方必填参数（空值会返回 40129/40159 错误）
 - 用户数据解密：`DecryptUserInfo`
 
 ### OpenPlatform 模块
@@ -443,7 +444,7 @@ func main() {
 - 代小程序代码管理：`CommitWxaCode`（上传代码+体验版）、`GetWxaTrialQrcode`（体验版二维码）、`GetWxaCategory`（类目）、`SubmitWxaAudit`（提审）、`UploadWxaAuditMedia`（提审素材）、`GetWxaAuditStatus`（审核状态）、`ReleaseWxaCode`（发布）、`RevertWxaCodeRelease`（版本回退）
 - 域名设置：`ModifyWxaServerDomain`（服务器域名）、`ModifyWxaJumpDomain`（业务域名）
 - `StartPushTicket`（启动 component_verify_ticket 推送服务）
-- 事件回调：`EventHandler` 处理授权事件；可选 `SetEventErrorCallback`（或 `EventErrorCallback` 选项）在事件解析/校验/处理失败时收到 `(source, err)` 通知，source 取值见 `openplatform/types.go`，不影响对微信返回 success 的官方行为
+- 事件回调：`EventHandler` 处理授权事件；可选 `SetEventErrorCallback`（或 `EventErrorCallback` 选项）在事件解析/校验/处理失败时收到 `(source, err)` 通知，source 取值见 `openplatform/types.go`，不影响对微信返回 success 的官方行为；`encoding_aes_key_changed` 事件自动持久化旧密钥（`SavePrevEncodingAESKey`），解密降级与密钥读写均有并发保护
 - API地址常量定义
 - API响应结构体
 - 授权信息数据结构
@@ -461,11 +462,11 @@ func main() {
 - `MessageClient` - 消息处理客户端（群发/预览）
 - `TemplateClient` - 模板消息客户端
 - `CustomClient` - 客服消息客户端
-- `MaterialClient` - 素材管理客户端（含视频素材元数据返回）
+- `MaterialClient` - 素材管理客户端（永久视频上传 `AddMaterialVideo` 按官方要求提交 description 表单字段 `{"title","introduction"}`）
 - `UserClient` - 用户管理客户端（用户信息/标签管理）
 - `StableTokenClient` - 稳定版access_token客户端（内置缓存与force_refresh限频）
 - `SubscribeNotifyClient` - 公众号订阅通知客户端（`/wxaapi/newtmpl/*` + bizsend 全套接口；旧的 `SubscribeClient` 保留为兼容层并标 `Deprecated`，方法全部转发新实现）
-- `OAuthClient` - 网页授权客户端
+- `OAuthClient` - 网页授权客户端（授权链接按官方示例参数顺序拼接，官方对链接做正则强匹配校验）
 - 带参数二维码：`CreateQRCode`（Client 级入口）、`GetQRCodeImage`（ticket 换图片二进制）
 - 数据分析：`GetUserSummary`/`GetUserCumulate`、`GetArticleSummary`/`GetArticleTotal`、`GetUserRead(Hour)`、`GetUserShare(Hour)`、`GetInterfaceSummary(Hour)`（含日期跨度校验）
 - 客服账号：`UploadKfAccountHeadImage`（头像 multipart 上传）
@@ -497,7 +498,7 @@ func main() {
 - 账单：`ApplyTradeBill`、`ApplyFundFlowBill`、`DownloadBill`
 - 分账：`ProfitSharing`、`ProfitSharingQuery`、`ProfitSharingReturn`、`ProfitSharingReturnQuery`、`ProfitSharingUnfreeze`、`ProfitSharingAmounts`
 - 商家转账（用户确认收款模式，单笔）：`CreateTransferBill`（发起，返回 package_info 拉起收款确认页）、`TransferAfterUserAuth`（用户授权后转账，独立请求 `TransferAfterUserAuthRequest`，authorization_id/out_authorization_no 二选一）、`CancelTransferBill`（撤销）、`QueryTransferBillByOutBillNo`/`QueryTransferBillByBillNo`（查单）、`ApplyForElecsignByOutBillNo`/`ApplyForElecsignByBillNo`、`QueryElecsignByOutBillNo`/`QueryElecsignByBillNo`（电子回单）
-- 回调：`VerifyNotification`、`VerifyNotificationByHeaders`、`DecryptNotificationResource`
+- 回调：`VerifyNotification`、`VerifyNotificationByHeaders`、`DecryptNotificationResource`；成功应答 `NotificationSuccess`（HTTP 204 空体，官方要求）、失败应答 `NotificationFail`
 - 错误处理：`APIError` + `AsAPIError` / `IsAPIError`，可提取微信错误码做差异化处理
 - 构造：`NewClientE`、`NewClientWithStorageE`（返回 error，推荐）；`NewClient`、`NewClientWithStorage` 已 Deprecated
 
@@ -510,13 +511,15 @@ func main() {
 - 消息类型常量
 - 消息结构体定义
 - 消息处理器接口
+- `SecureMessageProcessor` - 公众号加密消息处理器（可选 `WithTokenStorage` 注入存储，支持密钥轮换：解密成功使用哪个 AESKey，回包即用该 key 加密）
 
 ### Crypto 模块
 
 加密解密功能，包含：
 
 - AES密钥解码
-- 消息加密和解密
+- 消息加密和解密（`DecryptMsgWithKey`/`EncryptMsgWithKey` 支持密钥轮换场景：返回/指定实际使用的 AESKey）
+- 回调签名校验（含时间戳容差校验，超时判定为无效请求）
 - PKCS7填充处理
 
 ### Storage 模块
@@ -525,7 +528,7 @@ func main() {
 
 - `TokenStorage` 接口 - 定义组件令牌、预授权码、验证票据、授权方令牌等存储方法
 - `MemoryStorage` 内存存储实现 - 基于内存的临时存储
-- `FileStorage` 文件存储实现（默认存储） - 基于本地文件的持久化存储
+- `FileStorage` 文件存储实现（默认存储） - 基于本地文件的持久化存储（写入采用临时文件 + 重命名的原子写，避免并发损坏）
 - `DBStorage` 数据库存储实现 - 基于数据库的持久化存储
 - 支持自定义存储后端
 
@@ -552,6 +555,29 @@ func main() {
 - 消息加解密说明
 - Token生成介绍
 - 消息与事件处理
+
+## 更新记录
+
+### 2026-10-23 第十批（第九批审查问题修复）
+
+依据《问题核实报告单_第九批.md》与微信官方文档逐项核实后完成修复，共处理 P0 8 项、P1 25 项（另 2 项标注待复核）、P2 择要全部及 12 项待人工复核项的保守处理。全量验证通过（`go build` / `go vet` / `gofmt` / `go test`）。
+
+**破坏性变更**（升级前请逐条确认调用方适配）：
+
+- 删除：payment `NotificationAckJSON`/`NotificationAckCodeSuccess`（改用 `NotificationSuccess`/`NotificationFail`）、official_account `AddMaterial` 视频类型直接上传（改用 `AddMaterialVideo`）、`GetMaterialResponse.VideoURL`、openplatform 死常量与死类型
+- 类型变更：内容安全 `Version` 改 `int`；订阅消息 tid 全链 `int` → `string`；`SubmitWxaAuditResponse.AuditID` 改 `core.FlexString`；小程序码 `path` 去除 `omitempty`（官方必填）
+- 行为变更：网页授权链接回归官方标准格式（删除 `connect_redirect` 参数）；`GetWxaCode`/`CreateWxaQrcode` 空 path 直接报错；内容安全补 openid/scene 参数校验；支付回调成功应答改为 HTTP 204 空体；开放平台 token 获取加互斥锁与 5 分钟过期余量；公众号授权事件加密判定以 XML 实际内容为准
+
+**能力新增**：
+
+- 密钥轮换：`crypto.DecryptMsgWithKey`/`EncryptMsgWithKey`、开放平台旧密钥持久化（`SavePrevEncodingAESKey`）、message `WithTokenStorage`
+- miniprogram 稳定版 access_token：`GetStableAccessToken`
+- 公众号永久视频上传：`AddMaterialVideo`（title/introduction 必填）
+- 公众号订阅通知补全：bizsend 发送、`GetPubNewTemplateKeywords`、tid 全链对齐官方 string 类型
+- 数据分析补全：`GetUpStreamMsg` 系列 5 个方法
+- 保守兼容：`core.FlexString`/`core.FlexBool` 双形态解析、支付账单 GZIP 哈希双路径校验、回调时间戳容差校验
+
+完整修复明细见 [SDK封装审查报告](doc/SDK封装审查报告.md) 第十节。
 
 ## 依赖
 

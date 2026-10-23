@@ -3,7 +3,6 @@ package official_account
 import (
 	"context"
 	"fmt"
-	"net/url"
 
 	"github.com/jcbowen/wego/core"
 )
@@ -29,6 +28,7 @@ type Button struct {
 	MediaID   string   `json:"media_id,omitempty"`
 	AppID     string   `json:"appid,omitempty"`
 	PagePath  string   `json:"pagepath,omitempty"`
+	ArticleID string   `json:"article_id,omitempty"` // 发布文章 id（type 为 article_id 类型的菜单按钮使用，来自草稿箱/发布接口）
 	SubButton []Button `json:"sub_button,omitempty"`
 }
 
@@ -231,6 +231,8 @@ func (c *MenuClient) AddConditionalMenu(ctx context.Context, menu *ConditionalMe
 }
 
 // DeleteConditionalMenu 删除个性化菜单
+//
+// 说明: 官方要求 menuid 放在请求体（{"menuid":"208379533"}），不放 query
 func (c *MenuClient) DeleteConditionalMenu(ctx context.Context, menuID string) (*DeleteConditionalMenuResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
@@ -238,10 +240,11 @@ func (c *MenuClient) DeleteConditionalMenu(ctx context.Context, menuID string) (
 	}
 
 	var result DeleteConditionalMenuResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s&menuid=%s", URLDeleteConditionalMenu, accessToken, url.QueryEscape(menuID))
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLDeleteConditionalMenu, accessToken)
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "POST",
 		URL:    apiURL,
+		Body:   map[string]string{"menuid": menuID},
 		Result: &result,
 	})
 	if err != nil {

@@ -11,6 +11,9 @@ const (
 	// AccessTokenURL 获取小程序 access_token 地址
 	AccessTokenURL = "https://api.weixin.qq.com/cgi-bin/token"
 
+	// StableTokenURL 获取小程序稳定版 access_token 地址
+	StableTokenURL = "https://api.weixin.qq.com/cgi-bin/stable_token"
+
 	// GrantTypeAuthorizationCode 授权类型：authorization_code
 	GrantTypeAuthorizationCode = "authorization_code"
 

@@ -503,9 +503,30 @@ func (c *Client) doRequestRaw(ctx context.Context, method, url string, verifyRes
 //   - error: 微信格式错误返回 *APIError，否则返回 nil
 //
 // 说明:
-//   - 4xx/5xx 响应不参与验签（微信同样会签名，但本库只解析错误码，不做信任判断）
+//   - 4xx/5xx 响应同样参与验签（官方要求所有应答验签，防伪造失败响应诱导重复退款）
 func (c *Client) parseAPIError(statusCode int, headers http.Header, body []byte) error {
+	// 部分网关/代理层错误可能不携带 Wechatpay-* 签名头（该场景是否出现待实测），
+	// 仅在签名头齐全时验签，否则跳过验签仅做错误解析，避免误伤正常排障
+	if hasSignatureHeaders(headers) {
+		if err := c.verifyResponseSignature(context.Background(), statusCode, headers, body); err != nil {
+			return fmt.Errorf("非2xx应答验签失败: %w", err)
+		}
+	}
 	return parseWechatAPIError(statusCode, headers, body)
+}
+
+// hasSignatureHeaders 判断应答是否携带完整的 Wechatpay-* 签名头
+//
+// 参数:
+//   - headers: HTTP 响应头
+//
+// 返回:
+//   - bool: 四个签名头（Serial/Timestamp/Nonce/Signature）均非空时返回 true
+func hasSignatureHeaders(headers http.Header) bool {
+	return headers.Get("Wechatpay-Serial") != "" &&
+		headers.Get("Wechatpay-Timestamp") != "" &&
+		headers.Get("Wechatpay-Nonce") != "" &&
+		headers.Get("Wechatpay-Signature") != ""
 }
 
 // verifyResponseSignature 验证微信支付 V3 响应签名

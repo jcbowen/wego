@@ -25,11 +25,26 @@ type CallbackCheckRequest struct {
 	CheckOperator string `json:"check_operator"`
 }
 
-// CallbackCheckResponse 网络通信检测响应
+// CallbackDNSItem 网络通信检测 DNS 检测项
+//
+// 官方文档：https://developers.weixin.qq.com/doc/service/api/base/api_callbackcheck.html
+type CallbackDNSItem struct {
+	IP           string `json:"ip"`            // 本机出口IP
+	RealOperator string `json:"real_operator"` // 服务器出口IP使用的真实运营商
+}
+
+// CallbackPingItem 网络通信检测 Ping 检测项
+type CallbackPingItem struct {
+	IP           string  `json:"ip"`            // 本机出口IP
+	FromOperator string  `json:"from_operator"` // 服务器出口IP使用的运营商
+	PackageLoss  float64 `json:"package_loss"`  // 丢包率
+}
+
+// CallbackCheckResponse 网络通信检测响应（dns/ping 官方均为 objarray 结构）
 type CallbackCheckResponse struct {
 	core.APIResponse
-	DNS  []string `json:"dns"`
-	Ping []string `json:"ping"`
+	DNS  []CallbackDNSItem  `json:"dns"`
+	Ping []CallbackPingItem `json:"ping"`
 }
 
 // GetApiDomainIpResponse 获取微信API服务器IP响应

@@ -3,6 +3,7 @@ package official_account
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/jcbowen/wego/core"
 )
@@ -48,8 +49,10 @@ type GetCategoryResponse struct {
 }
 
 // PubTemplateTitleInfo 公共模板标题信息
+//
+// 说明: 官方 tid 为 string 类型
 type PubTemplateTitleInfo struct {
-	TID        int    `json:"tid"`
+	TID        string `json:"tid"`
 	Title      string `json:"title"`
 	Type       int    `json:"type"`
 	CategoryID int    `json:"categoryId"`
@@ -73,7 +76,8 @@ type PubTemplateKeywordInfo struct {
 // GetPubNewTemplateKeywordsResponse 获取公共模板关键词列表响应
 type GetPubNewTemplateKeywordsResponse struct {
 	core.APIResponse
-	Data []PubTemplateKeywordInfo `json:"data"`
+	Count int                      `json:"count"` // 关键词总数（官方响应含 count）
+	Data  []PubTemplateKeywordInfo `json:"data"`
 }
 
 // WxaPubNewTemplateInfo 个人模板信息
@@ -92,8 +96,10 @@ type GetWxaPubNewTemplateResponse struct {
 }
 
 // AddWxaNewTemplateRequest 添加个人模板请求
+//
+// 说明: 官方 tid 为 string 类型
 type AddWxaNewTemplateRequest struct {
-	TID       int    `json:"tid"`
+	TID       string `json:"tid"`
 	KidList   []int  `json:"kidList"`
 	SceneDesc string `json:"sceneDesc"`
 }
@@ -115,8 +121,9 @@ type DelWxaNewTemplateResponse struct {
 }
 
 // SubscribeMsgData 订阅通知数据
+//
+// 说明: 官方 bizsend 的 data 各项仅含 value 字段，不含 name
 type SubscribeMsgData struct {
-	Name  string `json:"name"`
 	Value string `json:"value"`
 }
 
@@ -219,20 +226,20 @@ func (c *SubscribeNotifyClient) GetPubTemplateTitles(ctx context.Context, catego
 //
 // 参数:
 //   - ctx context.Context 请求上下文
-//   - tid int 公共模板标题 ID（GetPubTemplateTitles 返回的 tid）
+//   - tid string 公共模板标题 ID（GetPubTemplateTitles 返回的 tid，官方为 string）
 //
 // 返回:
 //   - *GetPubNewTemplateKeywordsResponse 关键词列表
 //   - error 请求失败或微信返回业务错误时返回错误
-func (c *SubscribeNotifyClient) GetPubTemplateKeywords(ctx context.Context, tid int) (*GetPubNewTemplateKeywordsResponse, error) {
+func (c *SubscribeNotifyClient) GetPubTemplateKeywords(ctx context.Context, tid string) (*GetPubNewTemplateKeywordsResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	var result GetPubNewTemplateKeywordsResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s&tid=%d",
-		URLGetPubTemplateKeywords, accessToken, tid)
+	apiURL := fmt.Sprintf("%s?access_token=%s&tid=%s",
+		URLGetPubTemplateKeywords, accessToken, url.QueryEscape(tid))
 	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
 		Method: "GET",
 		URL:    apiURL,
@@ -289,14 +296,14 @@ func (c *SubscribeNotifyClient) GetPersonalTemplateList(ctx context.Context) (*G
 //
 // 参数:
 //   - ctx context.Context 请求上下文
-//   - tid int 公共模板标题 ID
+//   - tid string 公共模板标题 ID（官方为 string）
 //   - kidList []int 关键词 ID 列表（与模板关键词顺序对应）
 //   - sceneDesc string 服务场景描述（15 字以内）
 //
 // 返回:
 //   - *AddWxaNewTemplateResponse 含新增的个人模板 ID（PriTmplID）
 //   - error 请求失败或微信返回业务错误时返回错误
-func (c *SubscribeNotifyClient) AddPersonalTemplate(ctx context.Context, tid int, kidList []int, sceneDesc string) (*AddWxaNewTemplateResponse, error) {
+func (c *SubscribeNotifyClient) AddPersonalTemplate(ctx context.Context, tid string, kidList []int, sceneDesc string) (*AddWxaNewTemplateResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
@@ -403,10 +410,16 @@ func (c *SubscribeNotifyClient) SendSubscribeNotify(ctx context.Context, request
 	return &result, nil
 }
 
-// TemplateSubscribeData 一次性订阅消息数据
-type TemplateSubscribeData struct {
+// TemplateSubscribeContent 一次性订阅消息正文
+type TemplateSubscribeContent struct {
 	Value string `json:"value"`
 	Color string `json:"color,omitempty"`
+}
+
+// TemplateSubscribeData 一次性订阅消息 data 体
+// 官方固定结构：data.content.value/color（content 为固定键名，非动态字段）
+type TemplateSubscribeData struct {
+	Content TemplateSubscribeContent `json:"content"`
 }
 
 // TemplateSubscribeRequest 一次性订阅消息请求
@@ -416,12 +429,12 @@ type TemplateSubscribeData struct {
 // 注意：一次性订阅消息只能发送给已经授权订阅的用户
 // 用户授权订阅的URL格式：%s?action=get_confirm&appid=APPID&scene=SCENE&template_id=TEMPLATE_ID&redirect_url=REDIRECT_URL&reserved=RESERVED#wechat_redirect
 type TemplateSubscribeRequest struct {
-	Touser     string                           `json:"touser"`
-	TemplateID string                           `json:"template_id"`
-	URL        string                           `json:"url,omitempty"`
-	Scene      string                           `json:"scene"`
-	Title      string                           `json:"title"`
-	Data       map[string]TemplateSubscribeData `json:"data"`
+	Touser     string                `json:"touser"`
+	TemplateID string                `json:"template_id"`
+	URL        string                `json:"url,omitempty"`
+	Scene      string                `json:"scene"`
+	Title      string                `json:"title"`
+	Data       TemplateSubscribeData `json:"data"`
 }
 
 // TemplateSubscribeResponse 一次性订阅消息响应

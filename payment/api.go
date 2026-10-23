@@ -418,8 +418,8 @@ func (c *Client) Refund(ctx context.Context, req *RefundRequest) (*RefundRespons
 	if req == nil {
 		return nil, fmt.Errorf("请求参数不能为空")
 	}
-	if req.OutTradeNo == "" {
-		return nil, fmt.Errorf("商户订单号不能为空")
+	if req.OutTradeNo == "" && req.TransactionID == "" {
+		return nil, fmt.Errorf("out_trade_no 与 transaction_id 二选一必填")
 	}
 	if req.OutRefundNo == "" {
 		return nil, fmt.Errorf("商户退款单号不能为空")
@@ -464,7 +464,8 @@ func (c *Client) RefundQuery(ctx context.Context, outRefundNo string) (*RefundRe
 		return nil, fmt.Errorf("商户退款单号不能为空")
 	}
 
-	apiURL := fmt.Sprintf(PayRefundQueryURL, url.PathEscape(outRefundNo)) + "?mchid=" + url.QueryEscape(c.config.MchID)
+	// 官方查询单笔退款请求仅含 path 参数 out_refund_no，无 mchid（商户号由签名授权头体现）
+	apiURL := fmt.Sprintf(PayRefundQueryURL, url.PathEscape(outRefundNo))
 
 	var result RefundResponse
 	if err := c.doRequest(ctx, "GET", apiURL, nil, &result, true); err != nil {

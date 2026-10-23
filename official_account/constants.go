@@ -54,8 +54,9 @@ const (
 	URLTemplateGetAllPrivateTemplate = core.BaseAPIURL + "/cgi-bin/template/get_all_private_template"
 	URLTemplateSetIndustry           = core.BaseAPIURL + "/cgi-bin/template/api_set_industry"
 	// URLQueryBlockTmplMsg 查询被拦截的模板消息记录
-	// 参考：https://developers.weixin.qq.com/doc/offiaccount/Message_Management/Template_Message_Interface.html
-	URLQueryBlockTmplMsg = core.BaseAPIURL + "/cgi-bin/message/template/query_block_tmpl_msg"
+	// 官方文档：https://developers.weixin.qq.com/doc/service/api/notify/template/api_queryblocktmplmsg.html
+	// 请求：POST + body {tmpl_msg_id, largest_id, limit}
+	URLQueryBlockTmplMsg = core.BaseAPIURL + "/wxa/sec/queryblocktmplmsg"
 
 	// 客服消息
 	URLMessageCustomSend       = core.BaseAPIURL + "/cgi-bin/message/custom/send"
@@ -77,16 +78,14 @@ const (
 	URLGetCurrentAutoreplyInfo = core.BaseAPIURL + "/cgi-bin/get_current_autoreply_info"
 
 	// 素材管理
-	URLUploadMaterial      = core.BaseAPIURL + "/cgi-bin/media/upload"
-	URLGetMaterial         = core.BaseAPIURL + "/cgi-bin/media/get"
-	URLDeleteMaterial      = core.BaseAPIURL + "/cgi-bin/material/del_material"
-	URLUpdateNews          = core.BaseAPIURL + "/cgi-bin/material/update_news"
-	URLGetMaterialCount    = core.BaseAPIURL + "/cgi-bin/material/get_materialcount"
-	URLBatchGetMaterial    = core.BaseAPIURL + "/cgi-bin/material/batchget_material"
-	URLAddNews             = core.BaseAPIURL + "/cgi-bin/material/add_news"
-	URLMaterialUploadImage = core.BaseAPIURL + "/cgi-bin/media/uploadimg"
-	URLUploadVideo         = core.BaseAPIURL + "/cgi-bin/material/add_material"
-	URLGetHDVoice          = core.BaseAPIURL + "/cgi-bin/media/get/jssdk"
+	URLUploadMaterial       = core.BaseAPIURL + "/cgi-bin/media/upload"          // 上传临时素材（POST multipart + query type）
+	URLGetMaterial          = core.BaseAPIURL + "/cgi-bin/media/get"             // 获取临时素材（GET + query media_id）
+	URLGetMaterialPermanent = core.BaseAPIURL + "/cgi-bin/material/get_material" // 获取永久素材（POST + body {media_id}）
+	URLDeleteMaterial       = core.BaseAPIURL + "/cgi-bin/material/del_material"
+	URLGetMaterialCount     = core.BaseAPIURL + "/cgi-bin/material/get_materialcount"
+	URLBatchGetMaterial     = core.BaseAPIURL + "/cgi-bin/material/batchget_material"
+	URLUploadVideo          = core.BaseAPIURL + "/cgi-bin/material/add_material"
+	URLGetHDVoice           = core.BaseAPIURL + "/cgi-bin/media/get/jssdk"
 
 	// 草稿管理
 	URLAddDraft      = core.BaseAPIURL + "/cgi-bin/draft/add"
@@ -142,39 +141,6 @@ const (
 	URLDataCubeGetUpStreamMsgDistMonthly = core.BaseAPIURL + "/datacube/getupstreammsgdistmonth"
 	URLDataCubeGetInterfaceSummary       = core.BaseAPIURL + "/datacube/getinterfacesummary"
 	URLDataCubeGetInterfaceSummaryHour   = core.BaseAPIURL + "/datacube/getinterfacesummaryhour"
-
-	// 微信卡券
-	URLCardCodeDecrypt        = core.BaseAPIURL + "/card/code/decrypt"
-	URLCardCodeGet            = core.BaseAPIURL + "/card/code/get"
-	URLCardCodeUnavailable    = core.BaseAPIURL + "/card/code/unavailable"
-	URLCardCodeUpdate         = core.BaseAPIURL + "/card/code/update"
-	URLCardCreateQRCode       = core.BaseAPIURL + "/card/qrcode/create"
-	URLCardCreate             = core.BaseAPIURL + "/card/create"
-	URLCardDelete             = core.BaseAPIURL + "/card/delete"
-	URLCardGetHTML            = core.BaseAPIURL + "/card/gethtml"
-	URLCardGetUserCardList    = core.BaseAPIURL + "/card/user/getcardlist"
-	URLCardOrderInfo          = core.BaseAPIURL + "/card/pay/getorderinfo"
-	URLCardSetPayCell         = core.BaseAPIURL + "/card/pay/setcell"
-	URLCardSetSelfConsumeCell = core.BaseAPIURL + "/card/pay/setselfconsumecell"
-	URLCardStockGetCount      = core.BaseAPIURL + "/card/stock/getcount"
-	URLCardStockBatchGet      = core.BaseAPIURL + "/card/batchget"
-	URLCardTestWhiteListSet   = core.BaseAPIURL + "/card/testwhitelist/set"
-	URLCardUpdate             = core.BaseAPIURL + "/card/update"
-	URLCardQrCodeCreate       = core.BaseAPIURL + "/card/qrcode/create"
-
-	// 微信支付
-	// TODO: 后续移至payment包或公共常量文件
-	URLPayNotify = core.PayAPIURL + "/pay/unifiedorder"
-
-	// 微信扫一扫
-	URLScanCodePush = core.BaseAPIURL + "/cgi-bin/message/custom/send"
-
-	// 开放平台相关
-	// TODO: 后续移至openplatform包
-	URLComponentAccessToken = core.BaseAPIURL + "/cgi-bin/component/api_component_token"
-	URLAuthorizerToken      = core.BaseAPIURL + "/cgi-bin/component/api_authorizer_token"
-	URLGetAuthorizerInfo    = core.BaseAPIURL + "/cgi-bin/component/api_get_authorizer_info"
-	URLGetPreAuthCode       = core.BaseAPIURL + "/cgi-bin/component/api_create_preauthcode"
 
 	// 事件处理相关
 	// 已在core/constants.go中定义，此处保留仅供兼容性使用

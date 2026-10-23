@@ -1,10 +1,13 @@
 package payment
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net/url"
 	"strings"
 )
@@ -130,10 +133,38 @@ func (c *Client) DownloadBill(ctx context.Context, downloadURL, hashValue string
 		return body, nil
 	}
 
+	// 官方未明确 hash_value 对应压缩前还是压缩后的字节；
+	// 先按原始字节校验，失败且内容为 GZIP 时再按解压后内容校验，两者均失败才报错
 	actual := sha1.Sum(body)
 	if !strings.EqualFold(hex.EncodeToString(actual[:]), hashValue) {
+		if gunzipped, gzErr := gunzipIfGZIP(body); gzErr == nil && !bytes.Equal(gunzipped, body) {
+			decompressed := sha1.Sum(gunzipped)
+			if strings.EqualFold(hex.EncodeToString(decompressed[:]), hashValue) {
+				return body, nil
+			}
+		}
 		return nil, fmt.Errorf("账单哈希校验失败，期望 %s，实际 %s", hashValue, hex.EncodeToString(actual[:]))
 	}
 
+	return body, nil
+}
+
+// gunzipIfGZIP 若 body 为 GZIP 流（魔数 0x1f 0x8b）则返回解压后的内容，否则原样返回
+//
+// 参数:
+//   - body: 原始字节
+//
+// 返回:
+//   - []byte: GZIP 时为解压内容，否则为原字节
+//   - error: GZIP 解压失败时返回错误
+func gunzipIfGZIP(body []byte) ([]byte, error) {
+	if len(body) > 2 && body[0] == 0x1f && body[1] == 0x8b {
+		gz, err := gzip.NewReader(bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		defer gz.Close()
+		return io.ReadAll(gz)
+	}
 	return body, nil
 }

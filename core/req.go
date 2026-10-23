@@ -24,8 +24,8 @@ type VerifyResponseFunc func(ctx context.Context, statusCode int, headers http.H
 //   - 微信支付 V3 等接口在 4xx/5xx 时会返回结构化错误 JSON，需解析后供业务判断
 type ErrorParserFunc func(statusCode int, headers http.Header, body []byte) error
 
-// sensitiveQueryPattern 匹配 URL query 中的敏感参数（token/secret/ticket 等）
-var sensitiveQueryPattern = regexp.MustCompile(`(?i)(access_token|component_access_token|secret|ticket)=([^&]*)`)
+// sensitiveQueryPattern 匹配 URL query 中的敏感参数（token/secret/ticket 等凭证）
+var sensitiveQueryPattern = regexp.MustCompile(`(?i)(component_access_token|authorizer_access_token|authorizer_refresh_token|component_verify_ticket|access_token|refresh_token|session_key|secret|ticket)=([^&]*)`)
 
 // redactSensitiveQuery 脱敏 URL 中的敏感参数，避免凭证进入日志
 func redactSensitiveQuery(rawURL string) string {
@@ -36,10 +36,13 @@ func redactSensitiveQuery(rawURL string) string {
 }
 
 // sensitiveBodyPattern 匹配响应体 JSON 中敏感字段（token/secret/ticket 等）的字符串值
-var sensitiveBodyPattern = regexp.MustCompile(`(?i)("(?:access_token|component_access_token|secret|ticket|api_ticket|jsapi_ticket|encrypt_key|session_key)"\s*:\s*")[^"]*(")`)
+var sensitiveBodyPattern = regexp.MustCompile(`(?i)("(?:access_token|component_access_token|component_verify_ticket|authorizer_access_token|authorizer_refresh_token|refresh_token|secret|ticket|api_ticket|jsapi_ticket|encrypt_key|session_key)"\s*:\s*")[^"]*(")`)
 
-// redactSensitiveBody 脱敏响应体 JSON 中的敏感字段值，保留键名便于排障；
-// 非 JSON 文本（如账单文件流、加密 XML）不含上述键名模式，原样返回
+// sensitiveXMLPattern 匹配响应体 XML 中敏感节点（如回调事件的 <ComponentVerifyTicket>）的文本值
+var sensitiveXMLPattern = regexp.MustCompile(`(?i)(<(?:component_verify_ticket|component_access_token|authorizer_access_token|authorizer_refresh_token|access_token|refresh_token|session_key)>)[^<]*(</)`)
+
+// redactSensitiveBody 脱敏响应体中的敏感字段值（JSON 与 XML 两种形态），保留键名/节点名便于排障；
+// 纯二进制内容（如账单文件流）不含上述键名模式，原样返回
 //
 // 参数：body 原始响应体
 // 返回：脱敏后的字符串
@@ -48,7 +51,8 @@ func redactSensitiveBody(body []byte) string {
 	if len(body) == 0 {
 		return ""
 	}
-	return sensitiveBodyPattern.ReplaceAllString(string(body), "${1}[REDACTED]${2}")
+	s := sensitiveBodyPattern.ReplaceAllString(string(body), "${1}[REDACTED]${2}")
+	return sensitiveXMLPattern.ReplaceAllString(s, "${1}[REDACTED]${2}")
 }
 
 type ReqMakeOpt struct {
@@ -205,7 +209,8 @@ func (r *Request) Make(ctx context.Context, options *ReqMakeOpt) error {
 				return parsed
 			}
 		}
-		return fmt.Errorf("HTTP请求失败 - 状态码: %d, 响应: %s", resp.StatusCode, string(respBody))
+		// 非 2xx 错误信息同样脱敏，与日志口径保持一致，避免凭证经错误信息旁路泄露
+		return fmt.Errorf("HTTP请求失败 - 状态码: %d, 响应: %s", resp.StatusCode, safeBody)
 	}
 
 	// 执行响应验证
@@ -273,5 +278,6 @@ func CheckRawResponseStatus(statusCode int, body []byte) error {
 	if json.Unmarshal(body, &apiResp) == nil && apiResp.ErrCode != 0 {
 		return fmt.Errorf("HTTP请求失败，状态码: %d, errcode: %d, errmsg: %s", statusCode, apiResp.ErrCode, apiResp.ErrMsg)
 	}
-	return fmt.Errorf("HTTP请求失败，状态码: %d, 响应体: %.512s", statusCode, body)
+	// 非 JSON 错误信息可能包含敏感内容（如网关回显的 token），脱敏后再输出
+	return fmt.Errorf("HTTP请求失败，状态码: %d, 响应体: %.512s", statusCode, redactSensitiveBody(body))
 }

@@ -102,29 +102,6 @@ type NewsArticle struct {
 	OnlyFansCanComment int    `json:"only_fans_can_comment"`
 }
 
-// AddNewsRequest 新增图文素材请求
-type AddNewsRequest struct {
-	Articles []NewsArticle `json:"articles"`
-}
-
-// AddNewsResponse 新增图文素材响应
-type AddNewsResponse struct {
-	core.APIResponse
-	MediaID string `json:"media_id"`
-}
-
-// UpdateNewsRequest 修改图文素材请求
-type UpdateNewsRequest struct {
-	MediaID  string      `json:"media_id"`
-	Index    int         `json:"index"`
-	Articles NewsArticle `json:"articles"`
-}
-
-// UpdateNewsResponse 修改图文素材响应
-type UpdateNewsResponse struct {
-	core.APIResponse
-}
-
 // MaterialUploadImageResponse 素材管理上传图片响应
 type MaterialUploadImageResponse struct {
 	core.APIResponse
@@ -236,7 +213,6 @@ type GetMaterialResponse struct {
 	Title       string `json:"title"`       // 视频素材标题（仅视频素材返回）
 	Description string `json:"description"` // 视频素材描述（仅视频素材返回）
 	DownURL     string `json:"down_url"`    // 视频素材下载地址（仅视频素材返回，官方文档字段）
-	VideoURL    string `json:"video_url"`   // 视频素材地址（部分场景返回 video_url 而非 down_url）
 }
 
 // GetMaterial 获取永久素材
@@ -246,7 +222,7 @@ type GetMaterialResponse struct {
 //   - mediaID: 素材 media_id
 //
 // 返回:
-//   - *GetMaterialResponse: 二进制素材填充 Data/ContentType；视频素材填充 Title/Description/DownURL(或 VideoURL)
+//   - *GetMaterialResponse: 二进制素材填充 Data/ContentType；视频素材填充 Title/Description/DownURL
 //   - error: 请求失败或微信返回错误时返回错误
 //
 // 文档:
@@ -257,7 +233,7 @@ func (c *MaterialClient) GetMaterial(ctx context.Context, mediaID string) (*GetM
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetMaterial, accessToken)
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetMaterialPermanent, accessToken)
 
 	// 素材接口的响应可能是二进制流，必须走 MakeRaw 并按 Content-Type 区分处理
 	requestBody, err := json.Marshal(map[string]string{"media_id": mediaID})
@@ -339,38 +315,6 @@ func (c *MaterialClient) DeleteMaterial(ctx context.Context, mediaID string) (*D
 	return &result, nil
 }
 
-// UpdateMaterial 修改永久图文素材
-func (c *MaterialClient) UpdateMaterial(ctx context.Context, mediaID string, index int, article NewsArticle) (*UpdateNewsResponse, error) {
-	accessToken, err := c.Client.GetAccessToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	request := UpdateNewsRequest{
-		MediaID:  mediaID,
-		Index:    index,
-		Articles: article,
-	}
-
-	var result UpdateNewsResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLUpdateNews, accessToken)
-	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "POST",
-		URL:    apiURL,
-		Body:   request,
-		Result: &result,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if !result.IsSuccess() {
-		return nil, &result.APIResponse
-	}
-
-	return &result, nil
-}
-
 // GetMaterialCount 获取素材总数
 func (c *MaterialClient) GetMaterialCount(ctx context.Context) (*GetMaterialCountResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
@@ -428,36 +372,6 @@ func (c *MaterialClient) BatchGetMaterial(ctx context.Context, materialType Mate
 	return &result, nil
 }
 
-// AddNews 新增永久图文素材
-func (c *MaterialClient) AddNews(ctx context.Context, articles []NewsArticle) (*AddNewsResponse, error) {
-	accessToken, err := c.Client.GetAccessToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	request := AddNewsRequest{
-		Articles: articles,
-	}
-
-	var result AddNewsResponse
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLAddNews, accessToken)
-	err = c.Client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "POST",
-		URL:    apiURL,
-		Body:   request,
-		Result: &result,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if !result.IsSuccess() {
-		return nil, &result.APIResponse
-	}
-
-	return &result, nil
-}
-
 // UploadImage 上传图文消息内的图片获取URL
 // 接口文档：https://developers.weixin.qq.com/doc/offiaccount/Asset_Management/Adding_Permanent_Assets.html
 // 功能：上传图文消息内的图片获取URL，该URL可用于图文消息的图片展示
@@ -469,7 +383,7 @@ func (c *MaterialClient) UploadImage(ctx context.Context, filename string, data 
 		return nil, err
 	}
 
-	apiURL := fmt.Sprintf("%s?access_token=%s", URLMaterialUploadImage, accessToken)
+	apiURL := fmt.Sprintf("%s?access_token=%s", URLUploadImage, accessToken)
 
 	// 创建multipart/form-data请求
 	body := &bytes.Buffer{}
@@ -556,6 +470,10 @@ type AddMaterialResponse struct {
 //   - 缩略图大小不超过64KB，支持JPG格式
 //   - 视频素材需要通过UploadMaterial先上传临时素材，再调用UploadVideo转换为永久素材
 func (c *MaterialClient) AddMaterial(ctx context.Context, materialType MaterialType, filename string, data []byte) (*AddMaterialResponse, error) {
+	if materialType == MaterialTypeVideo {
+		return nil, fmt.Errorf("视频素材请使用 AddMaterialVideo 方法（官方要求额外携带 description 表单字段）")
+	}
+
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
@@ -566,6 +484,107 @@ func (c *MaterialClient) AddMaterial(ctx context.Context, materialType MaterialT
 	// 创建multipart/form-data请求
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
+
+	// 创建文件字段
+	part, err := writer.CreateFormFile("media", filename)
+	if err != nil {
+		return nil, fmt.Errorf("创建文件字段失败: %v", err)
+	}
+
+	// 写入文件数据
+	if _, err := part.Write(data); err != nil {
+		return nil, fmt.Errorf("写入文件数据失败: %v", err)
+	}
+
+	// 关闭writer
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("关闭multipart writer失败: %v", err)
+	}
+
+	// 创建HTTP请求
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, body)
+	if err != nil {
+		return nil, fmt.Errorf("创建HTTP请求失败: %v", err)
+	}
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	// 发送请求
+	resp, err := c.Client.req.MakeRaw(req)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// 读取响应
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应失败: %v", err)
+	}
+
+	// 非 2xx 状态码提前判错，避免把网关/代理层错误当响应体解析
+	if err := core.CheckRawResponseStatus(resp.StatusCode, respBody); err != nil {
+		return nil, err
+	}
+
+	var result AddMaterialResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("解析响应失败: %v", err)
+	}
+
+	if !result.IsSuccess() {
+		return nil, &result.APIResponse
+	}
+
+	return &result, nil
+}
+
+// AddMaterialVideo 新增永久视频素材
+//
+// 官方文档：https://developers.weixin.qq.com/doc/offiaccount/Asset_Management/Adding_Permanent_Assets.html
+// 接口说明：新增永久视频素材（type=video），视频最大不超过 20M
+// 请求方式：POST multipart/form-data
+// 注意事项：
+//   - 视频素材除 media 文件字段外，必须额外携带 description 表单字段
+//   - description 值为 JSON 字符串：{"title":TITLE,"introduction":INTRODUCTION}（注意是 introduction）
+//
+// 参数:
+//   - ctx context.Context 请求上下文
+//   - filename string 视频文件名（如 demo.mp4）
+//   - data []byte 视频文件内容
+//   - title string 视频标题
+//   - introduction string 视频介绍
+//
+// 返回:
+//   - *AddMaterialResponse 上传结果（MediaID）
+//   - error 请求失败或微信返回业务错误时返回错误
+func (c *MaterialClient) AddMaterialVideo(ctx context.Context, filename string, data []byte, title, introduction string) (*AddMaterialResponse, error) {
+	if title == "" {
+		return nil, fmt.Errorf("title不能为空")
+	}
+	if introduction == "" {
+		return nil, fmt.Errorf("introduction不能为空")
+	}
+
+	accessToken, err := c.Client.GetAccessToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	apiURL := fmt.Sprintf("%s?access_token=%s&type=%s", URLUploadVideo, accessToken, MaterialTypeVideo)
+
+	// 创建multipart/form-data请求
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// description 表单字段（官方要求 JSON：{"title":..,"introduction":..}）
+	description, err := json.Marshal(map[string]string{"title": title, "introduction": introduction})
+	if err != nil {
+		return nil, fmt.Errorf("序列化description失败: %v", err)
+	}
+	if err := writer.WriteField("description", string(description)); err != nil {
+		return nil, fmt.Errorf("写入description字段失败: %v", err)
+	}
 
 	// 创建文件字段
 	part, err := writer.CreateFormFile("media", filename)

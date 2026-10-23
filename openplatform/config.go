@@ -21,8 +21,12 @@ func (c *Config) Validate() error {
 	if c.ComponentAppSecret == "" {
 		return fmt.Errorf("ComponentAppSecret不能为空")
 	}
-	if c.EncodingAESKey != "" && len(c.EncodingAESKey) != 43 {
-		return fmt.Errorf("EncodingAESKey必须是43位长度")
+	// 第三方平台强制安全模式，消息加解密必需，不允许为空
+	if c.EncodingAESKey == "" {
+		return fmt.Errorf("EncodingAESKey不能为空（第三方平台强制安全模式，消息加解密必需）")
+	}
+	if len(c.EncodingAESKey) != 43 {
+		return fmt.Errorf("EncodingAESKey必须是43位长度，当前为%d位", len(c.EncodingAESKey))
 	}
 	return nil
 }

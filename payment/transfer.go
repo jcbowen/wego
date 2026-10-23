@@ -34,7 +34,18 @@ type TransferBillCreateRequest struct {
 	TransferRemark           string                    `json:"transfer_remark"`                       // 转账备注（UTF8，最长 32 字符，用户可见）
 	NotifyURL                string                    `json:"notify_url,omitempty"`                  // 回调通知地址（https）
 	UserRecvPerception       string                    `json:"user_recv_perception,omitempty"`        // 用户收款感知（如 "佣金报酬"、"现金奖励"）
+	UserRecvStyle            *UserRecvStyle            `json:"user_recv_style,omitempty"`             // 用户收款样式（收款确认页/红包，不传默认收款确认页）
 	TransferSceneReportInfos []TransferSceneReportInfo `json:"transfer_scene_report_infos,omitempty"` // 转账场景报备信息
+}
+
+// UserRecvStyle 用户收款样式（发起转账 user_recv_style）
+//
+// 说明:
+//   - 官方为对象结构，仅含样式类型；不传时默认按收款确认页样式展示
+//   - Type 取值：CONFIRM_PAGE 收款确认页样式 / RED_PACKET 红包样式
+//     （红包单笔金额需 ≤200 元，仅部分转账场景可用，取值可能新增需兼容）
+type UserRecvStyle struct {
+	Type string `json:"type"` // 用户收款样式类型
 }
 
 // TransferBillCreateResponse 发起转账响应
@@ -167,9 +178,18 @@ func (c *Client) CreateTransferBill(ctx context.Context, req *TransferBillCreate
 		return nil, err
 	}
 
+	// user_name 为 RSA 加密字段，必须声明与加密密钥一致的 Wechatpay-Serial（官方要求）
+	serial := ""
+	if req.UserName != "" {
+		s, err := c.EncryptSerialNo(ctx)
+		if err != nil {
+			return nil, err
+		}
+		serial = s
+	}
+
 	var result TransferBillCreateResponse
-	err := c.doRequest(ctx, "POST", MchTransferCreateURL, req, &result, true)
-	if err != nil {
+	if err := c.doRequestWithSerial(ctx, "POST", MchTransferCreateURL, req, &result, true, serial); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -235,9 +255,18 @@ func (c *Client) TransferAfterUserAuth(ctx context.Context, req *TransferAfterUs
 		return nil, fmt.Errorf("authorization_id 与 out_authorization_no 二选一必填")
 	}
 
+	// user_name 为 RSA 加密字段，必须声明与加密密钥一致的 Wechatpay-Serial（官方要求）
+	serial := ""
+	if req.UserName != "" {
+		s, err := c.EncryptSerialNo(ctx)
+		if err != nil {
+			return nil, err
+		}
+		serial = s
+	}
+
 	var result TransferBillResponse
-	err := c.doRequest(ctx, "POST", MchTransferTransferURL, req, &result, true)
-	if err != nil {
+	if err := c.doRequestWithSerial(ctx, "POST", MchTransferTransferURL, req, &result, true, serial); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -263,8 +292,8 @@ func (c *Client) CancelTransferBill(ctx context.Context, outBillNo string) (*Tra
 	apiURL := fmt.Sprintf(MchTransferCancelURL, outBillNo)
 
 	var result TransferBillCancelResponse
-	// 撤销接口请求体为空，需携带空 JSON 对象以符合 Content-Type 约定
-	err := c.doRequest(ctx, "POST", apiURL, struct{}{}, &result, true)
+	// 官方撤销转账接口无请求体参数，不发送 body（此前误传空 JSON 对象）
+	err := c.doRequest(ctx, "POST", apiURL, nil, &result, true)
 	if err != nil {
 		return nil, err
 	}

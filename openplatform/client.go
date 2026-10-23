@@ -19,15 +19,27 @@ import (
 	"github.com/jcbowen/wego/storage"
 )
 
+// tokenExpireMargin token 过期安全余量，避免网络延迟导致临界过期（对齐 miniprogram 包写法）
+const tokenExpireMargin = 5 * time.Minute
+
 // Client API客户端
 type Client struct {
 	config       *Config
 	httpClient   core.HTTPClient
 	storage      storage.TokenStorage
 	logger       logger.LoggerInterface
-	eventHandler EventHandler          // 事件处理器
-	crypt        *crypto.WXBizMsgCrypt // 消息加解密实例
+	eventHandler EventHandler // 事件处理器
 	req          *core.Request
+
+	// cryptMu 保护 config.EncodingAESKey 的读写（encoding_aes_key_changed 事件回调
+	// 会更新密钥，而消息解密并发进行，直接读写存在数据竞争）
+	cryptMu sync.RWMutex
+
+	// compTokenMu 串行化 component_access_token 的刷新，避免并发重复请求微信API
+	compTokenMu sync.Mutex
+
+	// authTokMu 串行化授权方 access_token 的刷新，避免并发重复请求微信API
+	authTokMu sync.Mutex
 
 	eventErrorCallback EventErrorCallback // 事件处理异常回调（可选，用于上层落盘排障）
 
@@ -83,7 +95,6 @@ func NewClientWithStorageE(config *Config, tokenStorage storage.TokenStorage, op
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		storage:    tokenStorage,
 		logger:     logger.NewDefaultLoggerInterface(),
-		crypt:      crypto.NewWXBizMsgCrypt(config.ComponentToken, config.EncodingAESKey, config.ComponentAppID),
 	}
 
 	// 遍历所有可选参数，根据类型进行相应设置
@@ -212,12 +223,23 @@ func (c *Client) GetComponentToken(ctx context.Context) (*storage.ComponentAcces
 		return nil, err
 	}
 
-	// 如果令牌存在且未过期，直接返回
-	if token != nil && token.ExpiresAt.After(time.Now()) {
+	// 如果令牌存在且仍在有效期内（含安全余量），直接返回
+	if token != nil && c.isTokenValid(token.ExpiresAt) {
 		return token, nil
 	}
 
-	// 令牌不存在或已过期，自动获取新令牌
+	// 令牌不存在或临近过期，加锁刷新（内部双重检查，避免并发重复请求微信API）
+	c.compTokenMu.Lock()
+	defer c.compTokenMu.Unlock()
+
+	token, err = c.storage.GetComponentToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if token != nil && c.isTokenValid(token.ExpiresAt) {
+		return token, nil
+	}
+
 	c.logger.Info("ComponentAccessToken不存在或已过期，自动获取新令牌...")
 	newToken, err := c.GetComponentAccessToken(ctx, "")
 	if err != nil {
@@ -232,9 +254,29 @@ func (c *Client) SetPreAuthCode(ctx context.Context, preAuthCode *storage.PreAut
 	return c.storage.SavePreAuthCode(ctx, preAuthCode)
 }
 
-// GetPreAuthCode 获取预授权码
+// GetPreAuthCode 获取预授权码（优先复用缓存，临近过期自动重新获取）
+//
+// 复用策略：先读存储，取到且未过期（留 60 秒安全余量）则直接返回，
+// 避免每次都调微信API；否则调用微信API获取新预授权码并写回存储
 func (c *Client) GetPreAuthCode(ctx context.Context) (*storage.PreAuthCode, error) {
-	return c.storage.GetPreAuthCode(ctx)
+	// 先读缓存：取到且未过期（留 60 秒余量）则直接复用
+	code, err := c.storage.GetPreAuthCode(ctx)
+	if err == nil && code != nil && code.PreAuthCode != "" &&
+		time.Now().Before(code.ExpiresAt.Add(-preAuthCodeExpireMargin)) {
+		return code, nil
+	}
+
+	// 缓存缺失或临近过期，从微信API获取（内部获取成功后会写回存储）
+	resp, err := c.GetPreAuthCodeFromAPI(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &storage.PreAuthCode{
+		PreAuthCode: resp.PreAuthCode,
+		ExpiresIn:   resp.ExpiresIn,
+		ExpiresAt:   time.Now().Add(time.Duration(resp.ExpiresIn) * time.Second),
+	}, nil
 }
 
 // SetAuthorizerToken 设置授权方token信息
@@ -258,12 +300,18 @@ func (c *Client) GetAuthorizerAccessToken(ctx context.Context, authorizerAppID s
 		return "", err
 	}
 
-	if token != nil && time.Now().Before(token.ExpiresAt) {
+	// 仍在有效期内（含安全余量）则直接返回
+	if token != nil && c.isTokenValid(token.ExpiresAt) {
 		return token.AuthorizerAccessToken, nil
 	}
 
-	// 重新获取授权方access_token
+	// 重新获取授权方access_token（内部加锁，避免并发重复刷新）
 	return c.refreshAuthorizerAccessToken(ctx, authorizerAppID)
+}
+
+// isTokenValid 判断 token 是否仍在有效期内（考虑安全余量，对齐 miniprogram 包写法）
+func (c *Client) isTokenValid(expiresAt time.Time) bool {
+	return time.Now().Before(expiresAt.Add(-tokenExpireMargin))
 }
 
 // GetComponentVerifyTicket 获取验证票据
@@ -284,13 +332,17 @@ func (c *Client) SaveComponentVerifyTicket(ctx context.Context, ticket string) e
 
 // refreshAuthorizerAccessToken 刷新授权方access_token
 func (c *Client) refreshAuthorizerAccessToken(ctx context.Context, authorizerAppID string) (string, error) {
-	// 双重检查：再次从存储中获取
+	// 加锁串行化刷新，避免并发重复请求微信API
+	c.authTokMu.Lock()
+	defer c.authTokMu.Unlock()
+
+	// 双重检查：加锁后再次从存储中获取
 	token, err := c.storage.GetAuthorizerToken(ctx, authorizerAppID)
 	if err != nil {
 		return "", err
 	}
 
-	if token != nil && time.Now().Before(token.ExpiresAt) {
+	if token != nil && c.isTokenValid(token.ExpiresAt) {
 		return token.AuthorizerAccessToken, nil
 	}
 
@@ -464,10 +516,14 @@ func (c *Client) GetComponentAccessToken(ctx context.Context, verifyTicket strin
 	return token, nil
 }
 
+// preAuthCodeExpireMargin 预授权码过期安全余量，避免授权流程进行中预授权码失效
+const preAuthCodeExpireMargin = 60 * time.Second
+
 // GetPreAuthCodeFromAPI 从微信API获取预授权码
 func (c *Client) GetPreAuthCodeFromAPI(ctx context.Context) (*PreAuthCodeResponse, error) {
-	// 先从存储中获取
-	if preAuthCode, err := c.storage.GetPreAuthCode(ctx); err == nil && preAuthCode != nil && preAuthCode.ExpiresAt.After(time.Now()) {
+	// 先从存储中获取（留 60 秒安全余量，与 GetPreAuthCode 复用策略保持一致）
+	if preAuthCode, err := c.storage.GetPreAuthCode(ctx); err == nil && preAuthCode != nil &&
+		time.Now().Before(preAuthCode.ExpiresAt.Add(-preAuthCodeExpireMargin)) {
 		return &PreAuthCodeResponse{
 			APIResponse: core.APIResponse{ErrCode: 0, ErrMsg: ""},
 			PreAuthCode: preAuthCode.PreAuthCode,
@@ -532,25 +588,19 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 	c.logger.Info(fmt.Sprintf("处理授权事件，参数 - timestamp: %s, nonce: %s, encrypt_type: %s, msg_signature: %s",
 		timestamp, nonce, encryptType, msgSignature))
 
-	// 判断消息类型：根据encrypt_type参数或XML内容检测
-	isEncrypted := encryptType == "aes" && msgSignature != ""
+	// 解析XML判断消息类型：以 XML 是否包含 Encrypt 字段为准，
+	// 不依赖 encrypt_type query 参数（宿主网关可能未透传该参数，
+	// 若仅按 encrypt_type 判定会导致加密事件被静默丢弃，如 component_verify_ticket）
+	if err := xml.Unmarshal(xmlData, &encryptedMsg); err != nil {
+		c.logger.Error(fmt.Sprintf("解析消息XML失败: %v", err))
+		c.notifyEventError("parse_encrypted_xml", err)
+		return "success", nil // 即使解析失败也返回success
+	}
 
-	// 如果URL参数表明是加密消息，或者XML内容包含Encrypt字段，则进行解密
-	if isEncrypted {
-		c.logger.Info("URL参数表明是加密消息，开始解密处理")
-
-		// 尝试解析XML获取加密内容
-		if err := xml.Unmarshal(xmlData, &encryptedMsg); err != nil {
-			c.logger.Error(fmt.Sprintf("解析加密消息XML失败: %v", err))
-			c.notifyEventError("parse_encrypted_xml", err)
-			return "success", nil // 即使解析失败也返回success
+	if encryptedMsg.Encrypt != "" {
+		if encryptType != "" && encryptType != "aes" {
+			c.logger.Warn(fmt.Sprintf("XML包含Encrypt字段但encrypt_type=%s，仍按加密消息处理", encryptType))
 		}
-
-		if encryptedMsg.Encrypt == "" {
-			c.logger.Warn("URL参数表明是加密消息，但XML中未找到Encrypt字段")
-			return "success", nil
-		}
-
 		c.logger.Info(fmt.Sprintf("检测到加密消息，开始解密处理，AppId: %s", encryptedMsg.AppId))
 
 		// 解密消息
@@ -565,12 +615,6 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 
 		// 使用解密后的数据继续处理
 		xmlData = decryptedData
-	} else {
-		// 明文消息：检查XML是否包含Encrypt字段（可能是误传参数）
-		if err := xml.Unmarshal(xmlData, &encryptedMsg); err == nil && encryptedMsg.Encrypt != "" {
-			c.logger.Warn("XML包含Encrypt字段但URL参数未表明是加密消息，可能参数传递有误")
-			// 继续按明文处理，但记录警告
-		}
 	}
 
 	// 解析XML获取基础事件信息
@@ -665,18 +709,23 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 			break
 		}
 		c.logger.Info(fmt.Sprintf("解析EncodingAESKey变更事件成功，事件内容: %+v", event))
-		// 保存上一次的EncodingAESKey
-		if c.crypt != nil {
-			err2 := c.crypt.SetPrevEncodingAESKey(c.config.EncodingAESKey)
-			if err2 != nil {
-				c.logger.Error(fmt.Sprintf("设置上一次EncodingAESKey失败: %v", err2))
-				c.notifyEventError("set_prev_encoding_aes_key", err2)
-				break
+
+		// 持久化旧密钥（官方要求支持密钥轮换过渡期使用旧密钥解密），
+		// 之后解密实例通过 NewWXBizMsgCryptWithStorage 从存储加载该密钥作为 PrevKey
+		c.cryptMu.RLock()
+		oldKey := c.config.EncodingAESKey
+		c.cryptMu.RUnlock()
+		if oldKey != "" && oldKey != event.NewEncodingAESKey {
+			if err := c.storage.SavePrevEncodingAESKey(ctx, c.config.ComponentAppID, oldKey); err != nil {
+				c.logger.Error(fmt.Sprintf("保存上一次EncodingAESKey失败: %v", err))
+				c.notifyEventError("save_prev_encoding_aes_key", err)
 			}
 		}
 
-		// 更新配置中的EncodingAESKey
+		// 更新配置中的EncodingAESKey（加锁保护，避免与并发解密产生数据竞争）
+		c.cryptMu.Lock()
 		c.config.EncodingAESKey = event.NewEncodingAESKey
+		c.cryptMu.Unlock()
 
 		if err := c.GetEventHandler().HandleEncodingAESKeyChanged(ctx, &event); err != nil {
 			c.logger.Error(fmt.Sprintf("处理EncodingAESKey变更事件失败: %v", err))
@@ -693,8 +742,11 @@ func (c *Client) HandleAuthorizationEvent(ctx context.Context, xmlData []byte, m
 
 // validateAuthorizationEvent 验证授权事件
 func (c *Client) validateAuthorizationEvent(event *AuthorizationEvent) error {
-	// 验证AppID是否匹配
-	if event.AppId != c.config.ComponentAppID {
+	// 验证AppID是否匹配（官方对事件AppID校验标注为「可选」：
+	// 部分事件回调可能不携带AppId，为空时跳过校验仅记告警；非空且不匹配时才判为错误）
+	if event.AppId == "" {
+		c.logger.Warn("授权事件未携带AppId，跳过AppID校验")
+	} else if event.AppId != c.config.ComponentAppID {
 		return fmt.Errorf("AppID不匹配: expected=%s, actual=%s", c.config.ComponentAppID, event.AppId)
 	}
 
@@ -716,14 +768,23 @@ func (c *Client) validateAuthorizationEvent(event *AuthorizationEvent) error {
 }
 
 // DecryptMessage 解密消息（用于处理加密的授权事件）
+//
+// 使用带存储的加解密实例：密钥轮换过渡期会自动降级尝试存储中的上一次密钥（PrevKey）
 func (c *Client) DecryptMessage(encryptedMsg, msgSignature, timestamp, nonce string) ([]byte, error) {
 	// 验证消息签名
 	if err := c.verifySignature(msgSignature, timestamp, nonce, encryptedMsg); err != nil {
 		return nil, fmt.Errorf("消息签名验证失败: %v", err)
 	}
 
-	// 使用crypto包中的解密实现
-	wxCrypt := crypto.NewWXBizMsgCrypt(c.config.ComponentToken, c.config.EncodingAESKey, c.config.ComponentAppID)
+	c.cryptMu.RLock()
+	aesKey := c.config.EncodingAESKey
+	c.cryptMu.RUnlock()
+
+	// 使用crypto包中的解密实现（带存储，支持密钥轮换过渡期的旧密钥解密）
+	wxCrypt, err := crypto.NewWXBizMsgCryptWithStorage(c.config.ComponentToken, aesKey, c.config.ComponentAppID, c.storage)
+	if err != nil {
+		return nil, fmt.Errorf("创建解密实例失败: %v", err)
+	}
 
 	// 解密消息
 	decryptedMsg, err := wxCrypt.DecryptMsg(msgSignature, timestamp, nonce, encryptedMsg)
@@ -743,7 +804,10 @@ func (c *Client) verifySignature(signature, timestamp, nonce, encryptedMsg strin
 	token := c.config.ComponentToken
 
 	// 使用crypto包中的签名验证实现
-	wxCrypt := crypto.NewWXBizMsgCrypt(token, c.config.EncodingAESKey, c.config.ComponentAppID)
+	c.cryptMu.RLock()
+	aesKey := c.config.EncodingAESKey
+	c.cryptMu.RUnlock()
+	wxCrypt := crypto.NewWXBizMsgCrypt(token, aesKey, c.config.ComponentAppID)
 
 	// 验证签名
 	if !wxCrypt.VerifySignature(signature, timestamp, nonce, encryptedMsg) {

@@ -45,11 +45,10 @@ type APIError struct {
 
 // APIErrorDetail 微信支付错误明细
 type APIErrorDetail struct {
-	Field      string   `json:"field,omitempty"`       // 出错字段名
-	Value      string   `json:"value,omitempty"`       // 出错字段值
-	Issue      string   `json:"issue,omitempty"`       // 具体问题
-	Location   string   `json:"location,omitempty"`    // 出错位置
-	DetailList []string `json:"detail_list,omitempty"` // 补充说明
+	Field    string `json:"field,omitempty"`    // 出错字段名
+	Value    string `json:"value,omitempty"`    // 出错字段值
+	Issue    string `json:"issue,omitempty"`    // 具体问题
+	Location string `json:"location,omitempty"` // 出错位置
 }
 
 // Error 实现 error 接口

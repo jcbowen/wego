@@ -185,15 +185,11 @@ const (
 // 回调应答相关常量
 //
 // 说明:
-//   - 商户处理回调成功后必须应答 200/204，否则微信会按 15s/15s/30s/3m/10m/20m/30m/30m/30m/60m/3h/3h/3h/6h/6h/6h 的频率重试 15 次
-//   - 处理失败需返回 5xx 或 4xx 并带上 code/message，微信会据此重试
+//   - 商户处理回调成功后必须应答 HTTP 204 + 空响应体（官方规范，勿返回 {"code":"SUCCESS"} 之类 JSON），
+//     否则微信会按 15s/15s/30s/3m/10m/20m/30m/30m/30m/60m/3h/3h/3h/6h/6h/6h 的频率重试 15 次，
+//     应答构造见 NotificationSuccess / NotificationFail
+//   - 处理失败需返回 4xx/5xx，响应体仅允许 {"code":"FAIL","message":"..."}（FAIL 为唯一取值）
 const (
-	// NotificationAckJSON 处理成功时推荐返回的应答体
-	NotificationAckJSON = `{"code":"SUCCESS","message":"成功"}`
-
-	// NotificationAckCodeSuccess 处理成功应答的 code 值
-	NotificationAckCodeSuccess = "SUCCESS"
-
-	// NotificationAckCodeFail 处理失败应答的 code 值
+	// NotificationAckCodeFail 处理失败应答的 code 值（官方唯一取值）
 	NotificationAckCodeFail = "FAIL"
 )

@@ -24,7 +24,6 @@ const (
 	// 参考：https://developers.weixin.qq.com/doc/oplatform/openApi/openapi/api_componentclearquota_v2.html
 	URLClearComponentQuota = core.BaseAPIURL + "/cgi-bin/component/clear_quota/v2"
 	URLModifyServerDomain  = core.BaseAPIURL + "/cgi-bin/component/modify_wxa_server_domain"
-	URLGetJumpDomainFile   = core.BaseAPIURL + "/cgi-bin/component/get_domain_confirmfile"
 	URLModifyJumpDomain    = core.BaseAPIURL + "/cgi-bin/component/modify_wxa_jump_domain"
 
 	// 通用接口
@@ -51,9 +50,6 @@ const (
 
 	// 小程序码
 	URLGetWxaCode = core.BaseAPIURL + "/wxa/getwxacode"
-
-	// 用户信息
-	URLGetUserInfo = core.BaseAPIURL + "/cgi-bin/user/info"
 
 	// URLSnsOAuth2ComponentRefreshToken 第三方平台代公众号刷新**网页授权** access_token
 	// 注意：刷新「授权方 access_token」请使用 URLAuthorizerToken（api_authorizer_token），两者不可混用

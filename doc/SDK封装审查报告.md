@@ -355,3 +355,182 @@ P2 批次：
 - **component clear_quota/v2**（使用 AppSecret 重置）：`POST /cgi-bin/component/clear_quota/v2`，**无 query 参数**，body 为 `{"component_appid":...,"appsecret":...}`，代授权方时追加 `"appid"`；字段名为 `appsecret` 而非 `component_appsecret`；与 clear_quota 共用每月 10 次机会
 - **quota/get**：`POST /cgi-bin/openapi/quota/get?access_token=ACCESS_TOKEN`，body 同样仅 `{"appid":"..."}`
 - **微信支付 APIv3**：`WECHATPAY2-SHA256-RSA2048` 请求签名、应答验签串 `timestamp\nnonce\nbody\n`、平台证书与微信支付公钥双模式（以 `Wechatpay-Serial` 为准）—— 本库实现与之一致，无需改动
+
+---
+
+## 九、第九批 —— 官方文档全量验证（2026-10-23）
+
+> 需求确认文件：项目根 `要求确认_第九批_官方文档全量验证.md`
+> 核对基准：微信官方文档现行页面（公众号/开放平台走 `developers.weixin.qq.com/doc/service/**` 与 `/doc/oplatform/**` 服务端渲染版；小程序走 `/miniprogram/dev/server/API/**`；支付走 `pay.weixin.qq.com/doc/v3/merchant/**`）
+> 处理方式：**只出报告，未改动任何代码**（P0 项待逐条确认后再修）
+> 基线：`HEAD = 030b703`，`go build` / `go vet` / `gofmt -l` 全绿
+
+**里程碑结论：前八批修复方向正确（客服消息内容体、群发按类型命名键、模板消息 miniprogram 指针、配额接口、datacube 字段均已复核通过），但本批仍发现 8 项 P0——其中 `crypto` 的 PKCS#7 填充问题是前八批从未触及的遗漏，且会导致消息加解密约半数失败。**
+
+### 9.1 P0 —— 接口必然失败或数据错误
+
+| # | 问题 | 位置 | 官方要求 | 当前实现 | 影响面 |
+|---|---|---|---|---|---|
+| 1 | **PKCS#7 填充块大小用了 16，官方为 32** | `crypto/aes.go:50`、`100` | 「PKCS#7：K 为秘钥字节数（**采用 32**）…KK….KK (K 个字节) if (N%K==0)」[技术方案](https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html) | `blockSize := aes.BlockSize`（16）；去填充校验 `padLen > aes.BlockSize` | **探针实证：模拟微信服务端按 K=32 加密，本库解密失败率 52%**（100 次失败 52 次）。影响消息推送、授权事件、`component_verify_ticket` 全链路，且失败与消息长度相关，表现为「时好时坏」极难定位。加密侧 padLen∈[1,16] 落在服务端接受范围内，故单向可用 |
+| 2 | 获取**永久**素材打到了**临时**素材路径 | `official_account/constants.go:81`、`material_client.go:260` | `POST /cgi-bin/material/get_material`，body `{media_id}` [文档](https://developers.weixin.qq.com/doc/service/api/material/permanent/api_getmaterial.html) | `URLGetMaterial = /cgi-bin/media/get` + POST + JSON body | 永久素材 100% 拿不到；该常量还被 `openplatform/auth_client.go:870` 复用（那边恰好 GET+query 歪打正着），常量归属本身错误 |
+| 3 | 查询拦截模板消息接口整体错误 | `official_account/constants.go:58`、`template_client.go:34-54,166` | `POST /wxa/sec/queryblocktmplmsg`，body `{tmpl_msg_id, largest_id, limit}`，响应 `msginfo{id,tmpl_msg_id,title,content,send_timestamp,openid}` [文档](https://developers.weixin.qq.com/doc/service/api/notify/template/api_queryblocktmplmsg.html) | `/cgi-bin/message/template/query_block_tmpl_msg` + `begin_date/end_date/offset/count` + 响应 `total_count/list` | 接口完全不可用。**说明第六批那次「改成 query_block_tmpl_msg」的修复方向本身就是错的**（官方早已迁到 `/wxa/sec/`） |
+| 4 | 自动回复规则响应字段名错（静默丢数据） | `official_account/message_client.go:615,619` | `add_friend_autoreply_info` / `message_default_autoreply_info` [文档](https://developers.weixin.qq.com/doc/service/api/notify/autoreplies/api_getcurrentautoreplyinfo.html) | `add_friend_reply_info` / `message_default_reply_info` | `errcode=0` 判定成功，但关注自动回复与消息自动回复两块**永远解析不到且不报错**，属静默数据丢失。（`keyword_autoreply_info` 及内部结构正确） |
+| 5 | 网络通信检测响应类型错误 | `official_account/api_client.go:29-33` | `dns`/`ping` 均为 **objarray**：`dns[]{ip,real_operator}`、`ping[]{ip,from_operator,package_loss}` [文档](https://developers.weixin.qq.com/doc/service/api/base/api_callbackcheck.html) | `DNS []string` / `Ping []string` | 返回非空数组时 `json.Unmarshal` 直接报 `cannot unmarshal object into Go value of type string`，接口恒定报错 |
+| 6 | 内容安全 `media_type` 常量值错误 | `miniprogram/subscribe_client.go:31-35` | **1:音频；2:图片**，错误码 40004 原文「目前支持多媒体类型 1 音频；2 图片」[文档](https://developers.weixin.qq.com/miniprogram/dev/server/API/sec-center/sec-check/api_mediacheckasync.html) | `Audio = 3`、`Image = 2`、另有官方不存在的 `Video = 4` | 调用方只要使用库自带常量提交音频，微信必然返回 40004 |
+| 7 | `GetWXACode` 把图片二进制当 JSON 解析 | `openplatform/auth_client.go:1309-1351` | `POST /wxa/getwxacode` 成功时返回**图片二进制**（失败才是 JSON） | `var result WXACodeResponse`（json tag）+ `req.Make`，`core/req.go:233` 对非空响应体强制 JSON 反序列化 | 100% 报 `invalid character`。同包 `GetWxaTrialQrcode`、`official_account` 二维码接口都已用 `MakeRaw` + Content-Type 分流，此处是唯一漏网 |
+| 8 | `CallAPIWithQuery` 二次拼接 `?access_token=` | `openplatform/auth_client.go:347,350` → `:276` | 代调用 `xxx?access_token=AUTHORIZER_ACCESS_TOKEN` | `fullURL` 已含 `?access_token=T1&type=xxx`，再传入 `CallAPI` 又拼一次 | 结果 `...?access_token=T1&type=xxx?access_token=T2`：有 query 时参数值被污染；**queryParams 为空时 access_token 值变成 `T1?access_token=T2`，必然 40001** |
+
+### 9.2 P1 —— 偏离官方规范 / 功能不完整
+
+**payment（5 项）**
+
+| # | 问题 | 位置 |
+|---|---|---|
+| P1-1 | 商家转账加密 `user_name` 时未发 `Wechatpay-Serial`（官方标必填），平台证书模式下微信无法确认解密密钥；≥2000 元转账 `user_name` 强制必传 | `transfer.go:171,239`；对比 `profitsharing.go:71` 正确 |
+| P1-2 | 请求分账 `Wechatpay-Serial` 仅条件发送，且未强制 `receivers.name`（MERCHANT_ID 时官方必传） | `profitsharing.go:61-68`、`types.go:370-376` |
+| P1-3 | 退款不支持 `transaction_id`（官方与 `out_trade_no` 二选一），`amount.currency` 缺失；`api.go:421` 强制 `out_trade_no` | `types.go:287-294`、`api.go:417-445` |
+| P1-4 | 非 2xx 应答不做验签（官方要求所有应答均验签，并会下发 `WECHATPAY/SIGNTEST/` 探测流量检验）→ 伪造失败响应可诱导重复退款 | `client.go:507-509` |
+| P1-5 | `AppPayParams` 字段名为全小写（V2 遗留），官方 APIv3 为 `appId/partnerId/prepayId/package/nonceStr/timeStamp/sign`；签名串内容本身正确 | `types.go:236-244` |
+
+**official_account（9 项）**
+
+| # | 问题 | 位置 |
+|---|---|---|
+| P1-6 | 群发图片内容键应为 **`images`**（内含 `media_ids` 数组 + `recommend`/`title`/`need_open_comment`/`only_fans_can_comment`），`msgtype` 才是 `image`；官方示例已照抄确认 | `message_client.go:85-90,145-152` |
+| P1-7 | 群发速度：官方为 **POST**；响应字段为 `realspeed`（无下划线），当前 `real_speed` 恒为 0 | `message_client.go:406`、`:49` |
+| P1-8 | 客服会话查询 `getsession`/`getsessionlist` 官方为 **GET + Query**，实现为 POST + Body | `custom_client.go:663,692` |
+| P1-9 | 删除个性化菜单 `menuid` 应在**请求体**（`{"menuid":"208379533"}`），实现走 Query | `menu_client.go:241` |
+| P1-10 | 选用模板缺必填 `keyword_name_list`（官方：为空或不在模板库返回 40246） | `template_client.go:22-25,122-149` |
+| P1-11 | 一次性订阅消息 `data` 官方为固定结构 `{"content":{"value":..,"color":..}}`，实现用 `map[string]` 导致键名任意 | `subscribe_notify_client.go:424` |
+| P1-12 | `material/add_news`、`material/update_news` 在现行官方接口目录中已无此二接口（永久图文已被草稿箱 `/cgi-bin/draft/*` 取代） | `constants.go:83,86` |
+| P1-13 | 永久视频素材上传缺官方 `description` 表单字段（`{"title":..,"introduction":..}`，注意是 introduction） | `material_client.go:550-622` |
+| P1-14 | 网页授权链接多了官方不存在的 `connect_redirect=1`，且用 `url.Values.Encode()` 打乱参数顺序——官方明确「对授权链接做正则**强匹配**校验，参数顺序不对授权页无法正常访问」 | `oauth_client.go:47-57` |
+
+**openplatform / miniprogram / 公共层（13 项）**
+
+| # | 问题 | 位置 |
+|---|---|---|
+| P1-15 | 加密事件判定依赖 `encrypt_type` query 参数；若宿主网关未透传（常见），`component_verify_ticket` 被静默丢弃 → 所有接口在 ticket 过期后整体失效，日志仅一条 Warn | `client.go:536,568-574` |
+| P1-16 | `EncodingAESKey` 变更事件：`SetPrevEncodingAESKey` 设在 `c.crypt`，但解密路径每次 `crypto.NewWXBizMsgCrypt` 重建 → PrevKey 恒空，属**死调用**；且回调中直接写 `c.config.EncodingAESKey` 有数据竞争 | `client.go:669-679,726` |
+| P1-17 | `CallAPIWithRetry` 遇 40001 删除整条授权记录（含 refresh_token），重试时 refresh_token 已丢失 → 代调用永久不可用，只能重新授权 | `auth_client.go:419-443` |
+| P1-18 | `GetRidInfo` 用 component_access_token 调公众号专用接口 `openapi/rid/get`（官方页 404，待复核） | `client.go:1129-1156` |
+| P1-19 | `GetApiQuota` 空参时用 component_access_token 查自身额度（官方页 404，待复核） | `client.go:1086-1126` |
+| P1-20 | `msg_sec_check` / `media_check_async` 的 `version` 官方为 **number**（示例 `"version": 2`），实现为 `string "2"` | `security_client.go:15,99` |
+| P1-21 | `getwxacode` 的 `path` 官方**必填**（空返回 40159），实现用 `omitempty` 吞掉；注释「空则默认主页」是错的（该语义属 `getwxacodeunlimit` 的 `page`）；缺 `env_version` | `wxacode_client.go:25-31` |
+| P1-22 | `getwxacodeunlimit` 的 `check_path` 官方**默认 true**，实现为 `bool` 无 `omitempty` → 零值发 `false`，与注释所述行为完全相反，未发布页面被静默放行 | `wxacode_client.go:46` |
+| P1-23 | `createwxaqrcode` 的 `path` 官方必填（≤128 字符），实现用 `omitempty` | `wxacode_client.go:57-60` |
+| P1-24 | 订阅消息 `miniprogram_state` / `lang` 无 `omitempty`，未设置时发空串（官方 lang 默认 zh_CN，另有 zh_HK/zh_TW 未定义常量） | `subscribe_client.go:50-51` |
+| P1-25 | 密钥轮换回包未按官方「用哪个 AESKey 解密成功，就用此 AESKey 加密回包」处理；`message` 层实例未注入 storage → `PrevEncodingAESKey` 恒空，降级分支永不触发 | `crypto/client.go:187-201`、`message/client.go:200` |
+| P1-26 | 脱敏正则未覆盖 `component_verify_ticket` / `authorizer_access_token` / `refresh_token`（键名精确匹配失败），且不处理 XML 形态 `<ComponentVerifyTicket>` | `core/req.go:28,39` |
+| P1-27 | 非 2xx 的错误信息使用**未脱敏**原始响应体，与日志脱敏口径不一致，形成旁路泄露 | `core/req.go:208,276` |
+
+### 9.3 P2 —— 一致性与字段完整性（择要）
+
+- **payment**：4 个下单结构缺 `time_expire`/`support_fapiao`/`detail`/`settle_info`（`settle_info` 缺失会使「下单时声明分账」链路断裂，官方明确支付后无法补设）；H5 缺 `attach`；`SceneInfo` 缺 `device_id`/`store_info`；分账与退款查询多传 `mchid`；分账/回退应答缺 `create_time`/`finish_time`/`return_id`；撤销转账发空 `{}` body（官方无 body 参数）；回调成功应答体 `{"code":"SUCCESS"}` 非官方取值（官方仅 `FAIL`，成功应 204 空体）；`APIErrorDetail` 含非官方字段 `detail_list`；转账缺 `user_recv_style`、`fail_reason`；**10+ 处注释中的官方文档 doc id 失效或错位**
+- **official_account**：`bizsend` data 多序列化 `name`；`getpubtemplatekeywords` 缺 `count`；`tid` 官方为 string；`mass/get` 的 `msg_id` 官方为 string（当前 int64，若返回字符串会反序列化失败）；`filter.is_to_all`/`tag_id` 官方为 string；`uploadnews`/预览缺 `clientmsgid`/`towxname`/`msg_data_id`；客服 `kf_id` 类型、`kf_list` 字段不全、缺 `customservice`/`mpnewsarticle`/`msgmenu` 类型；菜单缺 `article_id`；素材视频多出 `video_url`（属临时素材字段）；`getuserread` 的 `user_source` 枚举注释错误；5 个 `datacube/getupstreammsg*` 常量定义了但无方法实现；17 个 `/card/*` 卡券常量与 `/pay/unifiedorder`（V2 已下线）零引用；多组重复常量；稳定版 token 未提示「不支持第三方平台调用」
+- **openplatform**：`config.Validate` 允许 EncodingAESKey 为空（第三方平台强制安全模式应必填 43 位）；事件 AppID 强校验 + 5 分钟时间戳窗口可能误杀合法事件（AppID 校验官方标「可选」）；component/authorizer token 无并发保护与过期余量（`miniprogram`/`official_account` 已对齐，仅此模块未对齐）；JS-SDK config 缓存按 7200s 算而非按 ticket 实际过期时间；`SendCustomMessage` 仅支持 text/image，`voice`/`video`/`music`/`news` 会产生非法请求体；死常量 `URLGetJumpDomainFile`/`URLGetUserInfo` 与死类型 `OAuthComponentAccessTokenRequest`；`AuthorizerInfo` 缺 `idc` 与部分网络域字段；pre_auth_code 复用缓存
+- **miniprogram / 公共层**：`openid`/`scene` 必填未本地校验；`msgSecCheck` 请求体含官方未定义字段 `head_avatar`；响应 `detail` 缺 `keyword`，`label` 枚举注释漏 20013 且把 20012 注释错；`media_url` 注释「5MB」应为 10M；`getwxacode` 的 path 注释「不能带参数」已过时（官方示例带 query）；未暴露 `Num-Used` 响应头；`GetPhoneNumberResponse` 缺 `phone_info.watermark`；未提供稳定版 access_token；去填充未校验填充字节一致性；16 字节随机串取模偏置；`crypto/client.go:194` 错误包装取到被遮蔽的变量；`EventTimestampTolerance` 定义未使用；`WXBizMsgCrypt.DecryptMsg`/`VerifyURL` 无时间戳校验；`DecryptMiniProgramData` 注释与实现不符；`storage/file.go` 临时文件名固定（多进程互相踩踏）、未 `Sync()` 即 rename、权限 0644 明文落盘、Windows 失败路径残留 `.tmp`
+
+### 9.4 已核对正确（复核通过）
+
+- **payment 核心链路全部正确**：请求签名五行串、GET 空 body 处理、Authorization 头五字段、`serial_no` 用商户证书序列号、签名 URL 用 `EscapedPath()+RawQuery`、应答验签三行串、204 空 body 特例、时间戳 5 分钟双向校验、以 `Wechatpay-Serial` 前缀 `PUB_KEY_ID_` 判定公钥/平台证书模式、回调 AES-256-GCM（nonce 作 IV、associated_data 作 AAD）、敏感信息 RSAES-OAEP + SHA-1、平台证书下载跳过验签、账单下载跳过验签仍带签名；URL/方法/参数逐接口核对通过；未封装任何 V2 或已下线接口（付款码支付、撤销订单 V3 官方仍在维护）
+- **official_account**：`token`/`stable_token`（含 force_refresh 20 次/天 + 30s 限频）、菜单 7 个接口、二维码、客服消息历史修复（内容体不含 msgtype）、`sendall` 按类型命名键的方向、模板消息 `miniprogram` 指针、订阅通知 7 个路径且 `miniprogram_state` 为 string 枚举、素材上传与草稿箱 6 个接口、用户管理与标签全套、网页授权 GET+Query 字段名、JSAPI ticket、datacube 15 个路径与跨度校验（第六批对齐结果复核通过）
+- **openplatform**：`api_component_token`、`api_create_preauthcode`、`api_query_auth`、`api_authorizer_token`、`api_get_authorizer_info`、`api_start_push_ticket`（无 query、凭证走 body）、`clear_quota`、`component/clear_quota/v2`（`appsecret` 字段名正确）、代小程序 commit/体验版二维码/类目/提审/提审素材/审核状态/发布/回退、`modify_wxa_server_domain`/`modify_wxa_jump_domain`、代调用通用通道、`sns/oauth2/component/*`（第八批修复正确）、授权页 URL、JS-SDK 签名串与 ticket 缓存、事件 XML 结构、加解密算法本体
+- **miniprogram**：`code2Session`、`getuserphonenumber`、`token`、订阅消息 send、三个小程序码 URL（v1/v2 **共用同一路径靠 body `version` 区分**，故 README 写 v2 而常量无 `/v2` 后缀**并不矛盾**）、二进制/JSON 分流、access_token 并发刷新
+- **公共层**：GET/HEAD/DELETE 不加 Content-Type、Query 合并转义、AESKey 解码与 43 位校验、AES-256-CBC + IV 取前 16 字节、明文结构、网络字节序、签名 SHA1 字典序 + `ConstantTimeCompare`、`DecryptMiniProgramData`、message 回包复用请求 timestamp/nonce、`SecureMessageProcessor` 时间戳窗口与并发缓存
+
+### 9.5 需人工复核（未臆断为错误）
+
+1. 群发图片 `image` 与 `images` 微信是否双向兼容（旧文档为 `image/media_id`），建议真机验证后再决定保留兼容分支
+2. `mass/get` 的 `msg_id`、`sendall` 的 `is_to_all`/`tag_id` 官方标 string，实际返回类型需抓包确认（若为字符串，`int64`/`bool` 会直接反序列化失败，P2 可能升级为 P0）
+3. 授权链接 `connect_redirect=1` 是否真触发正则强匹配失败（需非测试号真机验证）
+4. `/card/*` 17 个卡券常量：现行服务号 API 目录无卡券分类，但可能已迁独立文档，不能断定下线
+5. `openapi/rid/get`、`openapi/quota/get` 是否支持 component_access_token（官方页 404）
+6. `clear_quota/v2` 的 `appid`：官方参数表标必填，但示例 5.1 不传，二者矛盾
+7. `version` 传字符串 `"2"` 是否被微信拒绝（若实测通过，P1-20 可降 P2）
+8. `submit_audit` 回包 `auditid`：官方参数表写 String、示例写数字，当前 int64 可能解析失败
+9. 退款 `amount.currency` 是否真必填（官方 SDK 模型中为可选）
+10. 4xx/5xx 应答是否**一定**携带 `Wechatpay-*` 签名头（P1-4 修复需「头缺失时跳过」兜底）
+11. `material/add_news`/`update_news` 是否已下线，建议用官方 API 诊断工具或直接调用确认返回码后再删
+12. GZIP 账单的 `hash_value` 对应压缩前还是压缩后字节（官方语义未明确）
+
+### 9.6 建议修复顺序
+
+1. **P0-1**（PKCS#7 K=32）——唯一会造成「整站消息链路半数失败」的问题，且前八批从未触及，建议最先修并用官方 `cryptoDemo.zip` 示例数据做 round-trip 验证
+2. **P0-2 / P0-3 / P0-4 / P0-5**（公众号 4 个必然失败/静默丢数据的接口）
+3. **P0-6**（media_type 常量，改常量即可，成本极低）
+4. **P0-7 / P0-8**（openplatform，前者可直接复用 `GetWxaTrialQrcode` 现成实现，后者改 query 拼接）
+5. **P1-1 / P1-4**（支付资金安全：Wechatpay-Serial 与错误应答验签）
+6. **P1-6 / P1-7 / P1-8 / P1-9**（公众号方法/参数位置与字段）
+7. **P1-15 / P1-16 / P1-17**（开放平台加解密与代调用健壮性）+ **P1-25 / P1-26 / P1-27**（公共层安全）
+8. 其余 P1 与 P2 随版本迭代清理
+
+> 本批为**只读核查**，除临时探针（`crypto/zz_probe_test.go`，用于实证 P0-1，跑通后已删除）外，未修改、创建或删除任何文件。
+
+---
+
+## 十、第九批问题修复状态（2026-10-23 第十批执行）
+
+> 依据：根目录《问题核实报告单_第九批.md》核实结论（P0 8 项属实、P1 25 项属实 + 2 项待复核、P2 择要属实）+ 官方文档二次抽查
+> 用户决策：「全部处理，允许破坏性变更；无法真机验证的保守兼容处理」
+> 需求确认文件：项目根 `要求确认_第十批_第九批核实问题修复.md`
+> 验证：`go build ./...` / `go vet ./...` / `gofmt -l .` / `go test ./...` 全部通过
+
+### 10.1 P0（8 项）全部修复
+
+| # | 修复摘要 |
+|---|---|
+| P0-1 | `crypto/aes.go` PKCS#7 填充/去填充改用 K=32（`len(aesKey)`），去填充校验填充字节一致性；`generateRandomString` 拒绝采样修复取模偏置 |
+| P0-2 | 永久素材接口改 `URLGetMaterialPermanent`（POST `/cgi-bin/material/get_material`），临时素材 `URLGetMaterial`（GET）保留；删除 `URLAddNews`/`URLUpdateNews`/`URLMaterialUploadImage` 及 `AddNews`/`UpdateMaterial` 方法 |
+| P0-3 | 查询拦截模板消息改官方 `/wxa/sec/queryblocktmplmsg`，请求/响应结构与官方对齐 |
+| P0-4 | 自动回恢复字段名 `add_friend_autoreply_info`/`message_default_autoreply_info` |
+| P0-5 | 网络检测响应改为 `dns[]{ip,real_operator}`、`ping[]{ip,from_operator,package_loss}` 结构 |
+| P0-6 | `media_type` 常量：音频 1、图片 2，删除官方不存在的 Video=4；补 `zh_HK`/`zh_TW` 语言常量 |
+| P0-7 | `GetWXACode` 改 `MakeRaw` + Content-Type 分流（JSON 错误/图片二进制），`ContentType`/`Buffer` 改 `json:"-"` |
+| P0-8 | `CallAPI` 检测 URL 已含 `?` 时用 `&` 追加；`CallAPIWithQuery` 不再自行注入 access_token，彻底消除二次拼接 |
+
+### 10.2 P1（27 项）25 项修复、2 项待复核
+
+| # | 修复摘要 |
+|---|---|
+| P1-1 | 商家转账加密字段时按需发送 `Wechatpay-Serial`（`CreateTransferBill`/`TransferAfterUserAuth`） |
+| P1-3 | 退款支持 `transaction_id`（与 `out_trade_no` 二选一并本地校验）；`RefundAmount` 补 `currency` |
+| P1-4 | 非 2xx 应答先验签再解析错误（带「签名头缺失时跳过」兜底） |
+| P1-5 | `AppPayParams` 字段名改官方驼峰 `appId/partnerId/prepayId/...` |
+| P1-6 | 群发图片新格式 `images`（`media_ids` 数组等），旧 `image` 格式标 `Deprecated`；`is_to_all` 用 `FlexBool` 双形态兼容 |
+| P1-7 | 群发速度改 POST，响应字段 `realspeed` |
+| P1-8 | 客服会话查询改 GET+Query |
+| P1-9 | 删除个性化菜单 `menuid` 移入请求体 |
+| P1-10 | 选用模板补必填 `keyword_name_list` |
+| P1-11 | 一次性订阅 `data` 改官方固定结构 `{"content":{"value","color"}}` |
+| P1-12 | 删除 `material/add_news`/`update_news` 常量（随 P0-2） |
+| P1-13 | 新增 `AddMaterialVideo`（永久视频上传携带 `description` 表单字段 `{"title","introduction"}`）；`AddMaterial` 对 video 类型报错引导 |
+| P1-14 | 授权链接删除 `connect_redirect=1`，参数按官方示例顺序拼接（不使用字典序 `Encode`） |
+| P1-15 | 加密事件判定改为以 XML `Encrypt` 字段为准，不再依赖 `encrypt_type` query |
+| P1-16 | `encoding_aes_key_changed` 改为将旧密钥持久化到 storage（`SavePrevEncodingAESKey`）；`config.EncodingAESKey` 读写加 `cryptMu` 互斥锁；删除死字段 `c.crypt` |
+| P1-17 | 40001/42001 重试改为仅失效 access_token（保留 refresh_token），新增 `invalidateAuthorizerAccessToken` |
+| P1-20 | `version` 改 number（int，固定 2） |
+| P1-21 | `getwxacode` 的 `path` 去除 `omitempty`（官方必填，方法级校验）、补 `env_version`，修正注释 |
+| P1-22 | `check_path` 改 `*bool` + `omitempty`（不传时官方默认 true） |
+| P1-23 | `createwxaqrcode` 的 `path` 去除 `omitempty` 并校验 |
+| P1-24 | 订阅消息 `miniprogram_state`/`lang` 加 `omitempty`；补 `zh_HK`/`zh_TW` |
+| P1-25 | 新增 `DecryptMsgWithKey`/`EncryptMsgWithKey`（官方「用哪个 AESKey 解密成功就用它加密回包」）；`SecureMessageProcessor` 新增 `WithTokenStorage` 注入存储加载 PrevKey |
+| P1-26 | 脱敏正则显式覆盖 `component_verify_ticket`/`authorizer_access_token`/`authorizer_refresh_token`/`refresh_token`/`session_key`，并新增 XML 形态脱敏 |
+| P1-27 | 非 2xx 错误信息与 `CheckRawResponseStatus` 均脱敏后再输出 |
+| P1-18 | **保留现状待复核**（`openapi/rid/get` 官方页 404，无法核实 component_access_token 支持，改动风险大于收益） |
+| P1-19 | **保留现状待复核**（`openapi/quota/get` 同上） |
+
+### 10.3 P2 择要（全部处理）
+
+- **payment**：4 个下单结构补 `time_expire`/`support_fapiao`/`detail`/`settle_info`（`detail.goods_detail` 按官方补 `wechatpay_goods_id`，官方无 `invoice_amount`）；H5 补 `attach`；`SceneInfo` 补 `device_id`/`store_info`；分账/退款查询删除多传 `mchid`；分账/回退应答补 `create_time`/`finish_time`/`return_id`；撤销转账不再发空 `{}` body；回调成功应答改为 204 空体（新增 `NotificationSuccess`/`NotificationFail`，删除非官方的 `{"code":"SUCCESS"}` 应答）；`APIErrorDetail` 删除 `detail_list`；转账补 `user_recv_style`（官方为对象 `{type}`，按对象实现）与应答 `fail_reason`；**注释中的官方文档 doc id 失效问题未逐条修订**（需逐条联网核验新文档 ID，错误风险大于收益，待后续随接口注释更新）
+- **official_account**：`bizsend` data 删除多序列化的 `name`；`getpubtemplatekeywords` 补 `count`；`tid` 改 string（破坏性，含兼容层签名）；群发/预览补 `clientmsgid`/`towxname`/`msg_data_id`；客服补 `customservice`/`msgmenu` 类型；菜单 `Button` 补 `article_id`；素材响应删除非官方 `video_url`；`getuserread` 的 `user_source` 枚举注释按官方文档修正；补齐 5 个 `getupstreammsg*` 无方法常量的实现；稳定版 token 注释补「不支持第三方平台代调用」
+- **openplatform**：`config.Validate` 强制 EncodingAESKey 必填 43 位（破坏性：空配置将校验失败）；事件 AppID 校验放宽（空值跳过并 Warn）；component/authorizer token 获取对齐并发保护 + 5 分钟过期余量；JS-SDK config 缓存按 ticket 实际过期时间；`SendCustomMessage` 补 voice/video/music/news（video 含官方必填 `thumb_media_id`）；删除死常量 `URLGetJumpDomainFile`/`URLGetUserInfo` 与死类型 `OAuthComponentAccessTokenRequest`；`AuthorizerInfo` 补 `idc`；pre_auth_code 缓存复用（60 秒余量）
+- **miniprogram/公共层**：`msgSecCheck`/`mediaCheckAsync` 补 openid/scene 本地校验；`head_avatar` 字段保守恢复保留（官方 v2 初版参数表含该字段用于头像画像检测，现行参数表已不再列出——按保守兼容原则恢复并新增 `MsgSecCheckFull` 完整参数方法，顺带补齐 title/nickname/signature 的透传入口，微信侧会忽略未知字段）；响应 `detail` 补 `keyword`、`label` 枚举注释按官方修正（20012 低俗、20013 版权）；`media_url` 注释改 10M；`WXACodeResponse` 暴露 `Num-Used` 响应头；`PhoneInfo` 补 `Watermark`；新增小程序稳定版 access_token（`GetStableAccessToken`，不写入默认缓存）；`EventTimestampTolerance` 接入 `DecryptMsgWithKey`/`VerifyURL`（时间戳为空/非数字时保守跳过）；`storage/file.go` 原子写修复（`CreateTemp` 唯一临时名防多进程互踩、`Sync()` 后 rename、权限 0600（已存在文件保留原模式）、消除双重 Close、失败路径清理临时文件）
+- **待人工复核项保守处理**：`submit_audit` 回包 `auditid` 改 `core.FlexString` 双形态兼容（官方参数表 string、示例数字）；GZIP 账单 `hash_value` 校验改为「先按原始字节、失败再按解压后字节」双路径（官方语义未明确）；`mass/get` 的 `msg_id` 保持 int64、`tag_id` 保持 int（现行官方参数表与示例均为 number）；`clear_quota/v2` 的 `appid` 必填性官方自相矛盾，保持现状
+
+### 10.4 本批破坏性变更清单
+
+1. **删除**：`official_account` 的 `URLAddNews`/`URLUpdateNews`/`URLMaterialUploadImage` 常量与 `AddNews`/`UpdateMaterial` 方法及配套请求/响应类型；17 个 `/card/*` 卡券常量、`URLPayNotify`、`URLScanCodePush`、4 个零引用开放平台常量（随第九批核实）；`openplatform` 的 `URLGetJumpDomainFile`/`URLGetUserInfo` 常量与 `OAuthComponentAccessTokenRequest` 类型；`payment.APIErrorDetail.DetailList` 字段；`payment.NotificationAckJSON`/`NotificationAckCodeSuccess` 常量（成功应答改 `NotificationSuccess`）
+2. **类型变更**：`TemplateSubscribeRequest.Data` 由 `map[string]TemplateSubscribeData` 改为固定结构 `TemplateSubscribeData{Content}`；`tid` 相关字段/参数由 int 改 string；`msg_sec_check`/`media_check_async` 的 `version` 由 string 改 int；`SubmitWxaAuditResponse.AuditID` 由 int64 改 `core.FlexString`；`GetWxaCodeUnlimitRequest.CheckPath` 由 `bool` 改 `*bool`；`MassFilter.IsToAll` 改 `core.FlexBool`
+3. **行为变更**：`AddMaterial` 对 video 类型返回错误（引导使用 `AddMaterialVideo`）；`GetWxaCode`/`CreateWxaQrcode` 对空 `path` 返回错误；`MsgSecCheck`/`MediaCheckAsync` 对空 openid/非法 scene 返回错误；微信支付回调成功应答由 `{"code":"SUCCESS"}` JSON 改为 204 空体；`openplatform` 客户端构造时 EncodingAESKey 必填 43 位；授权方 token 40001 重试不再删除整条授权记录；`WXBizMsgCrypt.DecryptMsg`/`VerifyURL` 增加时间戳校验（±300 秒，空/非法时间戳跳过）；网页授权 URL 不再附加 `connect_redirect=1`
+4. **新增导出**：`crypto.DecryptMsgWithKey`/`EncryptMsgWithKey`；`core.FlexString`/`FlexBool`；`message.WithTokenStorage`；`miniprogram.GetStableAccessToken`；`official_account.AddMaterialVideo`、`GetUpStreamMsg*` 5 个方法、客服 `customservice`/`msgmenu` 类型；`payment.NotificationSuccess`/`NotificationFail`；`openplatform.Client.DecryptMessage` 支持密钥轮换降级解密

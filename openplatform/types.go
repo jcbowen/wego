@@ -6,16 +6,6 @@ import (
 	"github.com/jcbowen/wego/core"
 )
 
-// OAuthComponentAccessTokenRequest 第三方平台代公众号获取网页授权access_token请求参数
-type OAuthComponentAccessTokenRequest struct {
-	ComponentAppID       string `json:"component_appid"`        // 第三方平台appid
-	ComponentAppSecret   string `json:"component_appsecret"`    // 第三方平台appsecret
-	AppID                string `json:"appid"`                  // 授权公众号appid
-	Code                 string `json:"code"`                   // 填写第一步获取的code参数
-	GrantType            string `json:"grant_type"`             // 填写为authorization_code
-	ComponentAccessToken string `json:"component_access_token"` // 第三方平台component_access_token
-}
-
 // OAuthComponentRefreshTokenRequest 第三方平台代公众号刷新网页授权access_token请求参数
 type OAuthComponentRefreshTokenRequest struct {
 	ComponentAppID       string `json:"component_appid"`        // 第三方平台appid
@@ -70,6 +60,8 @@ type AuthorizerInfo struct {
 	AccountStatus   int              `json:"account_status"`
 	BasicConfig     *BasicConfigInfo `json:"basic_config,omitempty"`
 	ChannelsInfo    *ChannelsInfo    `json:"channels_info,omitempty"`
+	// IDC idc 查询机房信息（官方 api_get_authorizer_info 返回字段）
+	IDC string `json:"idc,omitempty"`
 }
 
 // ServiceTypeInfo 账号类型

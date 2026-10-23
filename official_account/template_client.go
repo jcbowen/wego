@@ -21,7 +21,8 @@ func NewTemplateClient(client *Client) *TemplateClient {
 
 // AddTemplateRequest 选用模板请求
 type AddTemplateRequest struct {
-	TemplateIDShort string `json:"template_id_short"`
+	TemplateIDShort string   `json:"template_id_short"`
+	KeywordNameList []string `json:"keyword_name_list"` // 模板中关键词的名称（必填，须与模板库中模板对应的关键词匹配，为空返回 40246）
 }
 
 // AddTemplateResponse 选用模板响应
@@ -31,26 +32,28 @@ type AddTemplateResponse struct {
 }
 
 // QueryBlockTmplMsgRequest 查询拦截的模板消息请求
+//
+// 官方文档：https://developers.weixin.qq.com/doc/service/api/notify/template/api_queryblocktmplmsg.html
 type QueryBlockTmplMsgRequest struct {
-	BeginDate string `json:"begin_date"`
-	EndDate   string `json:"end_date"`
-	Offset    int    `json:"offset"`
-	Count     int    `json:"count"`
+	TmplMsgID string `json:"tmpl_msg_id"` // 被拦截的模板消息id（必填）
+	LargestID int64  `json:"largest_id"`  // 上一页查询结果最大的id，用于翻页，第一次传0（必填）
+	Limit     int    `json:"limit"`       // 单页查询的大小，最大100（必填）
 }
 
-// BlockTmplMsg 拦截的模板消息
-type BlockTmplMsg struct {
-	TemplateID  string `json:"template_id"`
-	BlockTime   string `json:"block_time"`
-	BlockType   int    `json:"block_type"`
-	BlockReason string `json:"block_reason"`
+// BlockTmplMsgInfo 被拦截的模板消息记录
+type BlockTmplMsgInfo struct {
+	ID            core.FlexString `json:"id"`             // 记录唯一ID，用于多次查询的largest_id（官方参数表为 string、示例为数字，做双形态兼容）
+	TmplMsgID     string          `json:"tmpl_msg_id"`    // 被拦截的模板消息id
+	Title         string          `json:"title"`          // 模板消息的标题
+	Content       string          `json:"content"`        // 模板消息的内容
+	SendTimestamp int64           `json:"send_timestamp"` // 下发的时间戳
+	OpenID        string          `json:"openid"`         // 下发目标用户的openid
 }
 
 // QueryBlockTmplMsgResponse 查询拦截的模板消息响应
 type QueryBlockTmplMsgResponse struct {
 	core.APIResponse
-	TotalCount int            `json:"total_count"`
-	List       []BlockTmplMsg `json:"list"`
+	MsgInfo *BlockTmplMsgInfo `json:"msginfo"` // 消息信息
 }
 
 // DeleteTemplateRequest 删除模板请求
@@ -119,7 +122,16 @@ func (c *TemplateClient) SendTemplateMessage(ctx context.Context, request *Templ
 }
 
 // AddTemplate 选用模板
-func (c *TemplateClient) AddTemplate(ctx context.Context, templateIDShort string) (*AddTemplateResponse, error) {
+//
+// 参数:
+//   - ctx: 上下文
+//   - templateIDShort: 模板库中模板的编号
+//   - keywordNameList: 模板中关键词的名称（须与模板库中模板对应的关键词匹配，为空返回 40246）
+//
+// 返回:
+//   - *AddTemplateResponse: 含选用后获得的模板ID
+//   - error: 请求失败或微信返回错误时返回错误
+func (c *TemplateClient) AddTemplate(ctx context.Context, templateIDShort string, keywordNameList []string) (*AddTemplateResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
@@ -127,6 +139,7 @@ func (c *TemplateClient) AddTemplate(ctx context.Context, templateIDShort string
 
 	request := AddTemplateRequest{
 		TemplateIDShort: templateIDShort,
+		KeywordNameList: keywordNameList,
 	}
 
 	var result AddTemplateResponse
@@ -149,17 +162,29 @@ func (c *TemplateClient) AddTemplate(ctx context.Context, templateIDShort string
 }
 
 // QueryBlockTmplMsg 查询拦截的模板消息
-func (c *TemplateClient) QueryBlockTmplMsg(ctx context.Context, beginDate, endDate string, offset, count int) (*QueryBlockTmplMsgResponse, error) {
+//
+// 参数:
+//   - ctx: 上下文
+//   - tmplMsgID: 被拦截的模板消息id（必填）
+//   - largestID: 上一页查询结果最大的id，用于翻页，第一次传0
+//   - limit: 单页查询的大小，最大100
+//
+// 返回:
+//   - *QueryBlockTmplMsgResponse: 被拦截的模板消息信息
+//   - error: 请求失败或微信返回错误时返回错误
+//
+// 文档:
+//   - https://developers.weixin.qq.com/doc/service/api/notify/template/api_queryblocktmplmsg.html
+func (c *TemplateClient) QueryBlockTmplMsg(ctx context.Context, tmplMsgID string, largestID int64, limit int) (*QueryBlockTmplMsgResponse, error) {
 	accessToken, err := c.Client.GetAccessToken(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	request := QueryBlockTmplMsgRequest{
-		BeginDate: beginDate,
-		EndDate:   endDate,
-		Offset:    offset,
-		Count:     count,
+		TmplMsgID: tmplMsgID,
+		LargestID: largestID,
+		Limit:     limit,
 	}
 
 	var result QueryBlockTmplMsgResponse

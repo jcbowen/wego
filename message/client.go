@@ -10,6 +10,7 @@ import (
 	"github.com/jcbowen/wego/core"
 	"github.com/jcbowen/wego/crypto"
 	"github.com/jcbowen/wego/openplatform"
+	"github.com/jcbowen/wego/storage"
 )
 
 // MessageClient 消息客户端
@@ -49,6 +50,7 @@ type SecureMessageProcessor struct {
 	configProvider CryptoConfigProvider             // 授权方加解密配置来源
 	defaultToken   string                           // 默认消息校验Token（单授权方/自建公众号场景）
 	defaultAESKey  string                           // 默认消息加解密EncodingAESKey
+	tokenStorage   storage.TokenStorage             // 令牌存储（可选，注入后可加载密钥轮换过渡期的上一次密钥）
 }
 
 // SecureOption 安全消息处理器的可选配置
@@ -67,6 +69,16 @@ func WithDefaultCryptoConfig(token, encodingAESKey string) SecureOption {
 	return func(p *SecureMessageProcessor) {
 		p.defaultToken = token
 		p.defaultAESKey = encodingAESKey
+	}
+}
+
+// WithTokenStorage 注入令牌存储（可选）
+//
+// 注入后加解密实例会从存储加载密钥轮换过渡期的上一次 EncodingAESKey（PrevKey）；
+// 未注入时 PrevKey 恒为空，轮换过渡期用旧密钥加密的消息将无法解密。
+func WithTokenStorage(s storage.TokenStorage) SecureOption {
+	return func(p *SecureMessageProcessor) {
+		p.tokenStorage = s
 	}
 }
 
@@ -109,8 +121,8 @@ func (p *SecureMessageProcessor) ProcessSecureMessage(
 		return nil, fmt.Errorf("消息签名验证不通过，请检查msg_signature参数")
 	}
 
-	// 解密消息
-	decryptedMsg, err := cryptoInstance.DecryptMsg(msgSignature, timestamp, nonce, encryptedMsg)
+	// 解密消息（同时取回实际解密成功所用的密钥，用于密钥轮换过渡期的回包加密）
+	decryptedMsg, usedAesKey, err := cryptoInstance.DecryptMsgWithKey(msgSignature, timestamp, nonce, encryptedMsg)
 	if err != nil {
 		return nil, fmt.Errorf("消息解密失败: %v", err)
 	}
@@ -132,8 +144,14 @@ func (p *SecureMessageProcessor) ProcessSecureMessage(
 		return nil, fmt.Errorf("转换回复为XML失败: %v", err)
 	}
 
-	// 加密回复（使用相同的timestamp和nonce）
-	encryptedReply, _, err := cryptoInstance.EncryptMsg(replyXML, timestamp, nonce)
+	// 加密回复：官方要求「用哪个 AESKey 解密成功，就用此 AESKey 加密回包」，
+	// 密钥轮换过渡期用旧密钥解密成功时，回包也必须使用旧密钥
+	var encryptedReply string
+	if usedAesKey != "" && usedAesKey != cryptoInstance.EncodingAESKey {
+		encryptedReply, _, err = cryptoInstance.EncryptMsgWithKey(replyXML, timestamp, nonce, usedAesKey)
+	} else {
+		encryptedReply, _, err = cryptoInstance.EncryptMsg(replyXML, timestamp, nonce)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("回复加密失败: %v", err)
 	}
@@ -197,7 +215,16 @@ func (p *SecureMessageProcessor) getCryptoInstance(authorizerAppID string) (*cry
 		return cryptoInstance, nil
 	}
 
-	cryptoInstance := crypto.NewWXBizMsgCrypt(token, encodingAESKey, authorizerAppID)
+	// 配置了存储时使用带存储的构造器，自动加载密钥轮换过渡期的上一次密钥（PrevKey）
+	var cryptoInstance *crypto.WXBizMsgCrypt
+	if p.tokenStorage != nil {
+		cryptoInstance, err = crypto.NewWXBizMsgCryptWithStorage(token, encodingAESKey, authorizerAppID, p.tokenStorage)
+		if err != nil {
+			return nil, fmt.Errorf("创建加解密实例失败: %v", err)
+		}
+	} else {
+		cryptoInstance = crypto.NewWXBizMsgCrypt(token, encodingAESKey, authorizerAppID)
+	}
 	p.cryptoCache[authorizerAppID] = cryptoInstance
 
 	return cryptoInstance, nil

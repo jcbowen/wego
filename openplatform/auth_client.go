@@ -78,9 +78,10 @@ type VoiceMessage struct {
 
 // VideoMessage 视频消息
 type VideoMessage struct {
-	MediaID     string `json:"media_id"`
-	Title       string `json:"title,omitempty"`
-	Description string `json:"description,omitempty"`
+	MediaID      string `json:"media_id"`
+	ThumbMediaID string `json:"thumb_media_id"` // 视频缩略图的媒体ID（官方要求必填）
+	Title        string `json:"title,omitempty"`
+	Description  string `json:"description,omitempty"`
 }
 
 // MusicMessage 音乐消息
@@ -119,12 +120,31 @@ func (c *AuthorizerClient) SendCustomMessage(ctx context.Context, toUser string,
 		"msgtype": c.getMessageType(message),
 	}
 
-	// 根据消息类型设置对应的字段
+	// 根据消息类型设置对应的字段（与官方一致：msgtype 在外层，内容体不含 msgtype）
 	switch msg := message.(type) {
 	case *TextMessage:
 		request["text"] = map[string]string{"content": msg.Content}
 	case *ImageMessage:
 		request["image"] = map[string]string{"media_id": msg.MediaID}
+	case *VoiceMessage:
+		request["voice"] = map[string]string{"media_id": msg.MediaID}
+	case *VideoMessage:
+		request["video"] = map[string]string{
+			"media_id":       msg.MediaID,
+			"thumb_media_id": msg.ThumbMediaID,
+			"title":          msg.Title,
+			"description":    msg.Description,
+		}
+	case *MusicMessage:
+		request["music"] = map[string]string{
+			"title":          msg.Title,
+			"description":    msg.Description,
+			"musicurl":       msg.MusicURL,
+			"hqmusicurl":     msg.HQMusicURL,
+			"thumb_media_id": msg.ThumbMediaID,
+		}
+	case *NewsMessage:
+		request["news"] = map[string]interface{}{"articles": msg.Articles}
 	default:
 		return fmt.Errorf("不支持的客服消息类型")
 	}
@@ -272,8 +292,11 @@ func (c *AuthorizerClient) CallAPI(ctx context.Context, apiURL string, params in
 		return nil, fmt.Errorf("获取AccessToken失败: %v", err)
 	}
 
-	// 2. 构造完整URL
+	// 2. 构造完整URL（兼容调用方已携带 query 的场景，避免出现双 ? 破坏参数解析）
 	fullURL := fmt.Sprintf("%s?access_token=%s", apiURL, token)
+	if strings.Contains(apiURL, "?") {
+		fullURL = fmt.Sprintf("%s&access_token=%s", apiURL, token)
+	}
 
 	// 3. 创建HTTP请求
 	var req *http.Request
@@ -330,27 +353,23 @@ func (c *AuthorizerClient) CallAPI(ctx context.Context, apiURL string, params in
 }
 
 // CallAPIWithQuery 支持查询参数的API调用
+//
+// 说明: access_token 由 CallAPI 统一注入，此处仅拼接业务查询参数，
+// 避免 access_token 被二次拼接导致参数污染（历史缺陷，已修复）。
 func (c *AuthorizerClient) CallAPIWithQuery(ctx context.Context, baseURL string, queryParams map[string]string, postData interface{}) ([]byte, error) {
-	// 获取授权方AccessToken
-	token, err := c.authClient.client.GetAuthorizerAccessToken(ctx, c.authorizerAppID)
-	if err != nil {
-		return nil, fmt.Errorf("获取AccessToken失败: %v", err)
-	}
-
-	// 构造查询参数
+	// 构造业务查询参数（不含 access_token，由 CallAPI 统一注入）
 	params := url.Values{}
-	params.Set("access_token", token)
 	for key, value := range queryParams {
 		params.Set(key, value)
 	}
 
-	fullURL := fmt.Sprintf("%s?%s", baseURL, params.Encode())
+	fullURL := baseURL
+	if encoded := params.Encode(); encoded != "" {
+		fullURL = fmt.Sprintf("%s?%s", baseURL, encoded)
+	}
 
 	// 根据是否有postData决定请求方法
-	if postData != nil {
-		return c.CallAPI(ctx, fullURL, postData)
-	}
-	return c.CallAPI(ctx, fullURL, nil)
+	return c.CallAPI(ctx, fullURL, postData)
 }
 
 // SendTextMessage 发送文本消息
@@ -414,8 +433,8 @@ func (c *AuthorizerClient) DeleteConditionalMenu(ctx context.Context, menuID str
 }
 
 // CallAPIWithRetry 带重试的API调用
-// 遇到 40001（access_token 无效）/ 42001（access_token 过期）时会清除本地缓存的
-// 授权方 token 并重新获取后重试；其他错误直接返回
+// 遇到 40001（access_token 无效）/ 42001（access_token 过期）时会将本地缓存的
+// 授权方 access_token 置为过期（保留 refresh_token）并重新获取后重试；其他错误直接返回
 func (c *AuthorizerClient) CallAPIWithRetry(ctx context.Context, apiURL string, params interface{}, maxRetries int) ([]byte, error) {
 	for i := 0; i < maxRetries; i++ {
 		resp, err := c.CallAPI(ctx, apiURL, params)
@@ -425,13 +444,9 @@ func (c *AuthorizerClient) CallAPIWithRetry(ctx context.Context, apiURL string, 
 
 		// 检查是否是Token过期/无效错误
 		if strings.Contains(err.Error(), "40001") || strings.Contains(err.Error(), "42001") {
-			// Token过期：删除本地缓存的授权方token，强制下次调用重新获取
-			if delErr := c.authClient.client.storage.DeleteAuthorizerToken(ctx, c.authorizerAppID); delErr != nil {
-				c.authClient.client.logger.Warn("清除授权方token缓存失败", map[string]interface{}{
-					"authorizer_appid": c.authorizerAppID,
-					"error":            delErr.Error(),
-				})
-			}
+			// Token过期/无效：仅失效 access_token，强制下次调用走 refresh 流程；
+			// 必须保留 refresh_token（删除整条记录会导致 refresh_token 丢失，代调用将永久不可用）
+			c.invalidateAuthorizerAccessToken(ctx)
 			continue
 		}
 
@@ -440,6 +455,33 @@ func (c *AuthorizerClient) CallAPIWithRetry(ctx context.Context, apiURL string, 
 	}
 
 	return nil, fmt.Errorf("API调用重试%d次后失败", maxRetries)
+}
+
+// invalidateAuthorizerAccessToken 将授权方 access_token 置为过期（保留 refresh_token）
+//
+// 用于 40001/42001 后强制下次调用走 refresh_token 刷新流程；
+// 若缓存记录不存在则不做任何处理（下次调用会因缺少 token 自然报错）。
+func (c *AuthorizerClient) invalidateAuthorizerAccessToken(ctx context.Context) {
+	token, err := c.authClient.client.storage.GetAuthorizerToken(ctx, c.authorizerAppID)
+	if err != nil {
+		c.authClient.client.logger.Warn("读取授权方token缓存失败", map[string]interface{}{
+			"authorizer_appid": c.authorizerAppID,
+			"error":            err.Error(),
+		})
+		return
+	}
+	if token == nil {
+		return
+	}
+
+	token.AuthorizerAccessToken = ""
+	token.ExpiresAt = time.Time{}
+	if err := c.authClient.client.storage.SaveAuthorizerToken(ctx, c.authorizerAppID, token); err != nil {
+		c.authClient.client.logger.Warn("失效授权方token缓存失败", map[string]interface{}{
+			"authorizer_appid": c.authorizerAppID,
+			"error":            err.Error(),
+		})
+	}
 }
 
 // CacheStats 缓存统计信息
@@ -457,14 +499,23 @@ type JSSDKCacher struct {
 	mu    sync.RWMutex
 }
 
+// isJSSDKConfigValid 判断缓存的 JS-SDK 配置是否仍有效
+// 优先按 ticket 实际过期时间判断；历史缓存缺失该值时回退固定 defaultTicketExpiresIn 秒
+func isJSSDKConfigValid(config *JSSDKConfig) bool {
+	if !config.expiresAt.IsZero() {
+		return time.Now().Before(config.expiresAt)
+	}
+	return time.Now().Unix()-config.Timestamp < defaultTicketExpiresIn
+}
+
 // GetCachedConfig 获取缓存的JS-SDK配置 - 带统计功能
 func (c *JSSDKCacher) GetCachedConfig(url string, jsAPIList []string) (*JSSDKConfig, error) {
 	cacheKey := c.generateCacheKey(url, jsAPIList)
 
 	if cached, exists := c.cache.Load(cacheKey); exists {
 		if config, ok := cached.(*JSSDKConfig); ok {
-			// 检查配置是否过期（7200秒有效期）
-			if time.Now().Unix()-config.Timestamp < 7200 {
+			// 按 ticket 实际过期时间判断是否有效
+			if isJSSDKConfigValid(config) {
 				c.mu.Lock()
 				c.stats.Hits++
 				c.mu.Unlock()
@@ -499,11 +550,11 @@ func (c *JSSDKCacher) GetStats() CacheStats {
 // CleanupExpired 清理过期缓存
 func (c *JSSDKCacher) CleanupExpired() {
 	expiredCount := 0
-	now := time.Now().Unix()
 
 	c.cache.Range(func(key, value interface{}) bool {
 		if config, ok := value.(*JSSDKConfig); ok {
-			if now-config.Timestamp >= 7200 { // 7200秒有效期
+			// 按 ticket 实际过期时间判断是否过期（缺失该值时回退固定 7200 秒）
+			if !isJSSDKConfigValid(config) {
 				c.cache.Delete(key)
 				expiredCount++
 			}
@@ -572,12 +623,14 @@ func (jm *JSSDKManager) GetConfigOptimized(ctx context.Context, url string, jsAP
 		return nil, fmt.Errorf("%w: %v", ErrAccessTokenFailed, err)
 	}
 
-	ticket, err := jm.getJSAPITicket(ctx, accessToken)
+	ticket, ticketExpiresAt, err := jm.getJSAPITicket(ctx, accessToken)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrTicketFetchFailed, err)
 	}
 
 	config := jm.generateSignature(url, ticket, jsAPIList)
+	// 记录 ticket 实际过期时间，供缓存按真实有效期判断
+	config.expiresAt = ticketExpiresAt
 
 	// 缓存新生成的配置
 	jm.cacher.CacheConfig(url, jsAPIList, config)
@@ -1103,6 +1156,10 @@ type JSSDKConfig struct {
 	NonceStr  string   `json:"nonceStr" ini:"nonce_str"`    // 随机字符串
 	Signature string   `json:"signature" ini:"signature"`   // 签名
 	JSAPIList []string `json:"jsApiList" ini:"js_api_list"` // JS-SDK调用权限列表
+
+	// expiresAt 所依赖 JSAPI ticket 的实际过期时间（用于缓存过期判断；
+	// 历史缓存缺失该值时回退按 defaultTicketExpiresIn 计算）
+	expiresAt time.Time
 }
 
 // GetConfig 生成JS-SDK配置
@@ -1129,8 +1186,8 @@ func (jm *JSSDKManager) GetConfig(ctx context.Context, url string, jsAPIList []s
 		return nil, fmt.Errorf("%w: %v", ErrAccessTokenFailed, err)
 	}
 
-	// 获取JSAPI Ticket
-	ticket, err := jm.getJSAPITicket(ctx, accessToken)
+	// 获取JSAPI Ticket（GetConfig 不走缓存器，仅生成配置）
+	ticket, _, err := jm.getJSAPITicket(ctx, accessToken)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrTicketFetchFailed, err)
 	}
@@ -1144,6 +1201,10 @@ func (jm *JSSDKManager) GetConfig(ctx context.Context, url string, jsAPIList []s
 // jsapiTicketExpireMargin JSAPI Ticket 过期安全余量
 const jsapiTicketExpireMargin = 5 * time.Minute
 
+// defaultTicketExpiresIn ticket 有效期默认值（秒），官方正常返回 7200；
+// 响应缺失 expires_in 时以此回退
+const defaultTicketExpiresIn = 7200
+
 // jsapiTicketInfo JSAPI Ticket 缓存项
 type jsapiTicketInfo struct {
 	ticket    string
@@ -1151,44 +1212,55 @@ type jsapiTicketInfo struct {
 }
 
 // getCachedJSAPITicket 读取缓存的JSAPI Ticket（含安全余量判断）
-func (c *Client) getCachedJSAPITicket(appID string) (string, bool) {
+//
+// 返回票据内容、实际过期时间及是否命中缓存
+func (c *Client) getCachedJSAPITicket(appID string) (string, time.Time, bool) {
 	c.jsapiTicketMu.Lock()
 	defer c.jsapiTicketMu.Unlock()
 
 	info, ok := c.jsapiTicketMap[appID]
 	if !ok {
-		return "", false
+		return "", time.Time{}, false
 	}
 	if time.Now().Before(info.expiresAt.Add(-jsapiTicketExpireMargin)) {
-		return info.ticket, true
+		return info.ticket, info.expiresAt, true
 	}
 	// 已过期（含余量），移除
 	delete(c.jsapiTicketMap, appID)
-	return "", false
+	return "", time.Time{}, false
 }
 
-// cacheJSAPITicket 缓存JSAPI Ticket
-func (c *Client) cacheJSAPITicket(appID, ticket string, expiresIn int) {
+// cacheJSAPITicket 缓存JSAPI Ticket，返回写入的过期时间
+// expiresIn 缺失（<=0）时回退 defaultTicketExpiresIn
+func (c *Client) cacheJSAPITicket(appID, ticket string, expiresIn int) time.Time {
 	c.jsapiTicketMu.Lock()
 	defer c.jsapiTicketMu.Unlock()
 
+	if expiresIn <= 0 {
+		expiresIn = defaultTicketExpiresIn
+	}
 	if c.jsapiTicketMap == nil {
 		c.jsapiTicketMap = make(map[string]*jsapiTicketInfo)
 	}
+	expiresAt := time.Now().Add(time.Duration(expiresIn) * time.Second)
 	c.jsapiTicketMap[appID] = &jsapiTicketInfo{
 		ticket:    ticket,
-		expiresAt: time.Now().Add(time.Duration(expiresIn) * time.Second),
+		expiresAt: expiresAt,
 	}
+	return expiresAt
 }
 
 // getJSAPITicket 获取JSAPI Ticket（优先使用缓存）
 // ticket 接口有独立调用配额，不能每次生成 JSSDK 配置都请求
-func (jm *JSSDKManager) getJSAPITicket(ctx context.Context, accessToken string) (string, error) {
+//
+// 返回票据内容及其对应后端的有效期（响应缺失 expires_in 时回退 7200 秒），
+// 供 JSSDK 配置缓存按 ticket 实际过期时间判断
+func (jm *JSSDKManager) getJSAPITicket(ctx context.Context, accessToken string) (string, time.Time, error) {
 	appID := jm.authorizerClient.authorizerAppID
 
 	// 优先读缓存
-	if ticket, ok := jm.authorizerClient.authClient.client.getCachedJSAPITicket(appID); ok {
-		return ticket, nil
+	if ticket, expiresAt, ok := jm.authorizerClient.authClient.client.getCachedJSAPITicket(appID); ok {
+		return ticket, expiresAt, nil
 	}
 
 	apiURL := official_account.URLGetTicket
@@ -1212,21 +1284,21 @@ func (jm *JSSDKManager) getJSAPITicket(ctx context.Context, accessToken string) 
 		Result: &result,
 	})
 	if err != nil {
-		return "", fmt.Errorf("调用微信API获取JSAPI Ticket失败: %v", err)
+		return "", time.Time{}, fmt.Errorf("调用微信API获取JSAPI Ticket失败: %v", err)
 	}
 
 	if result.ErrCode != 0 {
-		return "", fmt.Errorf("获取JSAPI Ticket失败，错误码: %d, 错误信息: %s", result.ErrCode, result.ErrMsg)
+		return "", time.Time{}, fmt.Errorf("获取JSAPI Ticket失败，错误码: %d, 错误信息: %s", result.ErrCode, result.ErrMsg)
 	}
 
 	if result.Ticket == "" {
-		return "", fmt.Errorf("获取JSAPI Ticket失败，返回票据为空")
+		return "", time.Time{}, fmt.Errorf("获取JSAPI Ticket失败，返回票据为空")
 	}
 
-	// 写入缓存
-	jm.authorizerClient.authClient.client.cacheJSAPITicket(appID, result.Ticket, result.ExpiresIn)
+	// 写入缓存并取回按实际 expiresIn 计算的过期时间
+	expiresAt := jm.authorizerClient.authClient.client.cacheJSAPITicket(appID, result.Ticket, result.ExpiresIn)
 
-	return result.Ticket, nil
+	return result.Ticket, expiresAt, nil
 }
 
 // generateSignature 生成签名
@@ -1305,14 +1377,28 @@ type WXACodeRequest struct {
 	Width int    `json:"width,omitempty"`
 }
 
-// WXACodeResponse 小程序码响应
+// WXACodeResponse 获取小程序码响应
+//
+// 成功时 Buffer 为图片二进制数据、ContentType 为图片类型；失败时返回 core.APIResponse 错误。
 type WXACodeResponse struct {
 	core.APIResponse
-	ContentType string `json:"contentType"`
-	Buffer      []byte `json:"buffer"`
+	ContentType string `json:"-"` // 图片 Content-Type（如 image/jpeg）
+	Buffer      []byte `json:"-"` // 图片二进制数据
 }
 
 // GetWXACode 获取小程序码
+//
+// 参数:
+//   - ctx: 上下文
+//   - request: 小程序码请求（Path 必填）
+//
+// 返回:
+//   - *WXACodeResponse: 成功时 Buffer 为图片二进制，可直接保存为图片
+//   - error: 请求失败或微信返回错误时返回错误
+//
+// 说明:
+//   - 官方接口成功时返回图片二进制、失败时才返回 JSON，因此必须走 MakeRaw
+//     并按 Content-Type 分流，不能当作普通 JSON 接口解析
 func (mpc *MiniProgramClient) GetWXACode(ctx context.Context, request *WXACodeRequest) (*WXACodeResponse, error) {
 	// 验证参数
 	if request == nil {
@@ -1332,22 +1418,51 @@ func (mpc *MiniProgramClient) GetWXACode(ctx context.Context, request *WXACodeRe
 
 	apiURL := fmt.Sprintf("%s?access_token=%s", URLGetWxaCode, accessToken)
 
-	var result WXACodeResponse
-	err = mpc.authorizerClient.authClient.client.req.Make(ctx, &core.ReqMakeOpt{
-		Method: "POST",
-		URL:    apiURL,
-		Body:   request,
-		Result: &result,
-	})
+	requestBody, err := json.Marshal(request)
 	if err != nil {
+		return nil, fmt.Errorf("序列化请求体失败: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("创建HTTP请求失败: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := mpc.authorizerClient.authClient.client.req.MakeRaw(req)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应失败: %w", err)
+	}
+
+	// 非 2xx 状态码提前判错，避免把网关/代理层错误当小程序码数据返回
+	if err := core.CheckRawResponseStatus(resp.StatusCode, respBody); err != nil {
 		return nil, err
 	}
 
-	if !result.IsSuccess() {
-		return nil, &result.APIResponse
+	contentType := resp.Header.Get("Content-Type")
+	// JSON 响应说明获取失败，解析错误码（正常成功时返回 image/* 二进制）
+	if strings.Contains(contentType, "application/json") {
+		var apiResp core.APIResponse
+		if err := json.Unmarshal(respBody, &apiResp); err != nil {
+			return nil, fmt.Errorf("解析响应失败: %w", err)
+		}
+		if !apiResp.IsSuccess() {
+			return nil, &apiResp
+		}
+		return nil, fmt.Errorf("接口返回异常: 收到 JSON 成功响应但无小程序码数据, errmsg: %s", apiResp.ErrMsg)
 	}
 
-	return &result, nil
+	return &WXACodeResponse{
+		APIResponse: core.APIResponse{ErrCode: 0, ErrMsg: "success"},
+		ContentType: contentType,
+		Buffer:      respBody,
+	}, nil
 }
 
 // GetUserInfo 获取用户信息

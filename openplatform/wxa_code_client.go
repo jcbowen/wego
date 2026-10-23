@@ -102,7 +102,9 @@ type SubmitWxaAuditRequest struct {
 // SubmitWxaAuditResponse 提交审核响应
 type SubmitWxaAuditResponse struct {
 	core.APIResponse
-	AuditID int64 `json:"auditid"` // 审核编号（查询审核状态时使用）
+	// AuditID 审核编号（查询审核状态时使用）
+	// 官方参数表写 String、示例写数字，用 FlexString 双形态兼容，取值用 .String()/.Int64()
+	AuditID core.FlexString `json:"auditid"`
 }
 
 // GetWxaAuditStatusRequest 查询审核状态请求（POST /wxa/get_auditstatus）

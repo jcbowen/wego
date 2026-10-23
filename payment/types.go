@@ -16,8 +16,9 @@ type Amount struct {
 
 // RefundAmount 退款金额
 type RefundAmount struct {
-	Refund int `json:"refund"` // 退款金额，单位为分
-	Total  int `json:"total"`  // 原订单金额，单位为分
+	Refund   int    `json:"refund"`             // 退款金额，单位为分
+	Total    int    `json:"total"`              // 原订单金额，单位为分
+	Currency string `json:"currency,omitempty"` // 币种，官方默认 CNY（必填性官方文档与 SDK 模型存在出入，按可选处理）
 }
 
 // Payer JSAPI 支付 payer 信息
@@ -36,8 +37,20 @@ type H5Info struct {
 
 // SceneInfo 支付场景信息
 type SceneInfo struct {
-	PayerClientIP string  `json:"payer_client_ip"`   // 用户终端 IP
-	H5Info        *H5Info `json:"h5_info,omitempty"` // H5 场景信息
+	PayerClientIP string          `json:"payer_client_ip"`      // 用户终端 IP
+	H5Info        *H5Info         `json:"h5_info,omitempty"`    // H5 场景信息
+	DeviceID      string          `json:"device_id,omitempty"`  // 商户端设备号（门店号或收银设备 ID）
+	StoreInfo     *SceneStoreInfo `json:"store_info,omitempty"` // 商户门店信息
+}
+
+// SceneStoreInfo 下单场景门店信息（SceneInfo.StoreInfo）
+//
+// 说明:
+//   - ID 为官方必填（商户侧门店编号），Name 选填
+//   - 与付款码支付的 CodePayStoreInfo 不同：下单接口门店信息无 out_id
+type SceneStoreInfo struct {
+	ID   string `json:"id,omitempty"`   // 门店编号，商户侧门店编号
+	Name string `json:"name,omitempty"` // 门店名称
 }
 
 // JSAPIRequest JSAPI 统一下单请求
@@ -51,6 +64,11 @@ type JSAPIRequest struct {
 	Payer       Payer      `json:"payer"`                // 支付者信息
 	Attach      string     `json:"attach,omitempty"`     // 附加数据
 	SceneInfo   *SceneInfo `json:"scene_info,omitempty"` // 场景信息
+
+	TimeExpire    string       `json:"time_expire,omitempty"`    // 交易过期时间（RFC3339 格式，如 2018-06-08T10:34:56+08:00）
+	SupportFapiao bool         `json:"support_fapiao,omitempty"` // 是否支持开发票（true 时支付成功页出现开票入口，需开通电子发票功能）
+	SettleInfo    *SettleInfo  `json:"settle_info,omitempty"`    // 结算信息（下单时声明是否分账，官方明确支付成功后无法补设）
+	Detail        *OrderDetail `json:"detail,omitempty"`         // 订单优惠信息（单品优惠）
 }
 
 // NativeRequest Native 支付下单请求
@@ -64,6 +82,11 @@ type NativeRequest struct {
 	Attach      string     `json:"attach,omitempty"`     // 附加数据
 	GoodsTag    string     `json:"goods_tag,omitempty"`  // 订单优惠标记
 	SceneInfo   *SceneInfo `json:"scene_info,omitempty"` // 场景信息
+
+	TimeExpire    string       `json:"time_expire,omitempty"`    // 交易过期时间（RFC3339 格式，如 2018-06-08T10:34:56+08:00）
+	SupportFapiao bool         `json:"support_fapiao,omitempty"` // 是否支持开发票（true 时支付成功页出现开票入口，需开通电子发票功能）
+	SettleInfo    *SettleInfo  `json:"settle_info,omitempty"`    // 结算信息（下单时声明是否分账，官方明确支付成功后无法补设）
+	Detail        *OrderDetail `json:"detail,omitempty"`         // 订单优惠信息（单品优惠）
 }
 
 // AppRequest App 支付下单请求
@@ -77,17 +100,28 @@ type AppRequest struct {
 	Attach      string     `json:"attach,omitempty"`     // 附加数据
 	GoodsTag    string     `json:"goods_tag,omitempty"`  // 订单优惠标记
 	SceneInfo   *SceneInfo `json:"scene_info,omitempty"` // 场景信息
+
+	TimeExpire    string       `json:"time_expire,omitempty"`    // 交易过期时间（RFC3339 格式，如 2018-06-08T10:34:56+08:00）
+	SupportFapiao bool         `json:"support_fapiao,omitempty"` // 是否支持开发票（true 时支付成功页出现开票入口，需开通电子发票功能）
+	SettleInfo    *SettleInfo  `json:"settle_info,omitempty"`    // 结算信息（下单时声明是否分账，官方明确支付成功后无法补设）
+	Detail        *OrderDetail `json:"detail,omitempty"`         // 订单优惠信息（单品优惠）
 }
 
 // H5Request H5 支付请求
 type H5Request struct {
-	AppID       string     `json:"appid"`        // 应用 ID
-	MchID       string     `json:"mchid"`        // 商户号
-	Description string     `json:"description"`  // 商品描述
-	OutTradeNo  string     `json:"out_trade_no"` // 商户订单号
-	NotifyURL   string     `json:"notify_url"`   // 通知地址
-	Amount      Amount     `json:"amount"`       // 订单金额
-	SceneInfo   *SceneInfo `json:"scene_info"`   // H5 场景信息必填
+	AppID       string     `json:"appid"`            // 应用 ID
+	MchID       string     `json:"mchid"`            // 商户号
+	Description string     `json:"description"`      // 商品描述
+	OutTradeNo  string     `json:"out_trade_no"`     // 商户订单号
+	NotifyURL   string     `json:"notify_url"`       // 通知地址
+	Amount      Amount     `json:"amount"`           // 订单金额
+	Attach      string     `json:"attach,omitempty"` // 附加数据
+	SceneInfo   *SceneInfo `json:"scene_info"`       // H5 场景信息必填
+
+	TimeExpire    string       `json:"time_expire,omitempty"`    // 交易过期时间（RFC3339 格式，如 2018-06-08T10:34:56+08:00）
+	SupportFapiao bool         `json:"support_fapiao,omitempty"` // 是否支持开发票（true 时支付成功页出现开票入口，需开通电子发票功能）
+	SettleInfo    *SettleInfo  `json:"settle_info,omitempty"`    // 结算信息（下单时声明是否分账，官方明确支付成功后无法补设）
+	Detail        *OrderDetail `json:"detail,omitempty"`         // 订单优惠信息（单品优惠）
 }
 
 // CodePayer 付款码支付支付者信息
@@ -121,15 +155,16 @@ type CodePaySceneInfo struct {
 // GoodsDetail 单品优惠明细（OrderDetail.GoodsDetail 元素）
 //
 // 说明:
-//   - 微信侧商品编码字段在官方不同接口文档中存在 wxpay_goods_id / wechatpay_goods_id
-//     两种写法，本结构当前仅被付款码支付（codepay）使用，按其官方文档口径使用 wxpay_goods_id；
-//     若后续复用到 JSAPI 下单等接口，需核对该接口文档的拼写
+//   - 微信侧商品编码字段在官方不同接口文档中拼写不同：付款码支付（codepay）为
+//     wxpay_goods_id，JSAPI/Native/App/H5 等下单接口为 wechatpay_goods_id，
+//     按所用接口选择其一传入
 type GoodsDetail struct {
-	MerchantGoodsID string `json:"merchant_goods_id"`        // 商户侧商品编码
-	WxpayGoodsID    string `json:"wxpay_goods_id,omitempty"` // 微信支付商品编码（官方统一商品编号，没有可不传）
-	GoodsName       string `json:"goods_name,omitempty"`     // 商品名称
-	Quantity        int    `json:"quantity"`                 // 商品数量
-	UnitPrice       int    `json:"unit_price"`               // 商品单价，单位为分（如有优惠传优惠后单价）
+	MerchantGoodsID  string `json:"merchant_goods_id"`            // 商户侧商品编码
+	WxpayGoodsID     string `json:"wxpay_goods_id,omitempty"`     // 微信支付商品编码（付款码支付接口拼写，官方统一商品编号，没有可不传）
+	WechatpayGoodsID string `json:"wechatpay_goods_id,omitempty"` // 微信支付商品编码（JSAPI/Native/App/H5 下单接口拼写）
+	GoodsName        string `json:"goods_name,omitempty"`         // 商品名称
+	Quantity         int    `json:"quantity"`                     // 商品数量
+	UnitPrice        int    `json:"unit_price"`                   // 商品单价，单位为分（如有优惠传优惠后单价）
 }
 
 // OrderDetail 订单优惠信息（下单时的 detail 字段）
@@ -231,15 +266,15 @@ type NativeResponse struct {
 // AppPayParams App 端调起支付所需的参数
 //
 // 说明:
-//   - 字段名大小写敏感，需与微信开放平台 SDK 要求一致
+//   - 字段名为官方 APIv3 要求的驼峰式，大小写敏感，需与微信开放平台 SDK 要求一致
 //   - Package 官方暂固定为 Sign=WXPay
 type AppPayParams struct {
-	AppID     string `json:"appid"`
-	PartnerID string `json:"partnerid"`
-	PrepayID  string `json:"prepayid"`
+	AppID     string `json:"appId"`
+	PartnerID string `json:"partnerId"`
+	PrepayID  string `json:"prepayId"`
 	Package   string `json:"package"`
-	NonceStr  string `json:"noncestr"`
-	Timestamp string `json:"timestamp"`
+	NonceStr  string `json:"nonceStr"`
+	Timestamp string `json:"timeStamp"`
 	Sign      string `json:"sign"`
 }
 
@@ -286,11 +321,12 @@ type Order struct {
 
 // RefundRequest 退款申请请求
 type RefundRequest struct {
-	OutTradeNo  string       `json:"out_trade_no"`         // 商户订单号
-	OutRefundNo string       `json:"out_refund_no"`        // 商户退款单号
-	Reason      string       `json:"reason,omitempty"`     // 退款原因
-	NotifyURL   string       `json:"notify_url,omitempty"` // 退款结果通知地址
-	Amount      RefundAmount `json:"amount"`               // 退款金额
+	OutTradeNo    string       `json:"out_trade_no,omitempty"`   // 商户订单号（与 TransactionID 二选一）
+	TransactionID string       `json:"transaction_id,omitempty"` // 微信支付订单号（与 OutTradeNo 二选一）
+	OutRefundNo   string       `json:"out_refund_no"`            // 商户退款单号
+	Reason        string       `json:"reason,omitempty"`         // 退款原因
+	NotifyURL     string       `json:"notify_url,omitempty"`     // 退款结果通知地址
+	Amount        RefundAmount `json:"amount"`                   // 退款金额
 }
 
 // RefundResponse 退款申请与退款查询响应
@@ -397,11 +433,13 @@ type ProfitSharingReceiverResult struct {
 
 // ProfitSharingResponse 分账请求与查询结果响应
 type ProfitSharingResponse struct {
-	TransactionID string                        `json:"transaction_id"` // 微信支付订单号
-	OutOrderNo    string                        `json:"out_order_no"`   // 商户分账单号
-	OrderID       string                        `json:"order_id"`       // 微信分账单号
-	State         string                        `json:"state"`          // 分账单状态，PROCESSING / FINISHED
-	Receivers     []ProfitSharingReceiverResult `json:"receivers"`      // 分账接收方结果列表
+	TransactionID string                        `json:"transaction_id"`        // 微信支付订单号
+	OutOrderNo    string                        `json:"out_order_no"`          // 商户分账单号
+	OrderID       string                        `json:"order_id"`              // 微信分账单号
+	State         string                        `json:"state"`                 // 分账单状态，PROCESSING / FINISHED
+	CreateTime    string                        `json:"create_time,omitempty"` // 分账创建时间（RFC3339）
+	FinishTime    string                        `json:"finish_time,omitempty"` // 分账完成时间（RFC3339，分账单完成时返回）
+	Receivers     []ProfitSharingReceiverResult `json:"receivers"`             // 分账接收方结果列表
 }
 
 // ProfitSharingReturnRequest 请求分账回退参数
@@ -419,11 +457,14 @@ type ProfitSharingReturnResponse struct {
 	OrderID     string `json:"order_id,omitempty"`    // 微信分账单号
 	OutOrderNo  string `json:"out_order_no"`          // 商户分账单号
 	OutReturnNo string `json:"out_return_no"`         // 商户回退单号
+	ReturnID    string `json:"return_id,omitempty"`   // 微信分账回退单号
 	ReturnMchID string `json:"return_mchid"`          // 回退商户号
 	Amount      int    `json:"amount"`                // 回退金额，单位为分
 	Description string `json:"description"`           // 回退描述
 	Result      string `json:"result"`                // 回退结果，PROCESSING / SUCCESS / FAILED
 	FailReason  string `json:"fail_reason,omitempty"` // 回退失败原因
+	CreateTime  string `json:"create_time,omitempty"` // 分账回退创建时间（RFC3339）
+	FinishTime  string `json:"finish_time,omitempty"` // 分账回退完成时间（RFC3339）
 }
 
 // ProfitSharingUnfreezeRequest 解冻剩余资金参数

@@ -12,9 +12,10 @@ type Code2SessionResponse struct {
 
 // PhoneInfo 手机号信息
 type PhoneInfo struct {
-	PhoneNumber     string `json:"phoneNumber"`     // 用户绑定的手机号（国外手机号会有国家码）
-	PurePhoneNumber string `json:"purePhoneNumber"` // 没有国家码的手机号
-	CountryCode     string `json:"countryCode"`     // 国家码
+	PhoneNumber     string     `json:"phoneNumber"`         // 用户绑定的手机号（国外手机号会有国家码）
+	PurePhoneNumber string     `json:"purePhoneNumber"`     // 没有国家码的手机号
+	CountryCode     string     `json:"countryCode"`         // 国家码
+	Watermark       *Watermark `json:"watermark,omitempty"` // 数据水印
 }
 
 // GetPhoneNumberRequest 通过组件 code 换取手机号请求
@@ -44,6 +45,7 @@ type GetPhoneNumberResponse struct {
 type Watermark struct {
 	AppID     string `json:"appid"`     // 小程序 appid
 	Timestamp int64  `json:"timestamp"` // 数据水印时间戳
+	Nonce     string `json:"nonce"`     // 随机字符串（getuserphonenumber 响应的水印携带）
 }
 
 // UserInfo 解密后的微信小程序用户信息

@@ -46,13 +46,11 @@ func EncryptMsg(plainText, appID string, aesKey []byte) (string, error) {
 		plainText,
 		appID)
 
-	// PKCS7填充（符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
-	blockSize := aes.BlockSize
+	// PKCS7填充（符合微信官方规范：K 为秘钥字节数，官方明确采用 32，即 AESKey 的长度）
+	// 官方原文「PKCS#7：K 为秘钥字节数（采用 32）…if (N%K==0) N=N+K」
+	blockSize := len(aesKey)
 	textBytes := []byte(text)
 	padLen := blockSize - len(textBytes)%blockSize
-	if padLen == 0 {
-		padLen = blockSize
-	}
 	padText := bytes.Repeat([]byte{byte(padLen)}, padLen)
 	textBytes = append(textBytes, padText...)
 
@@ -92,16 +90,14 @@ func DecryptMsg(encryptedMsg string, aesKey []byte) (string, error) {
 	mode := cipher.NewCBCDecrypter(block, aesKey[:aes.BlockSize])
 	mode.CryptBlocks(plainText, cipherText)
 
-	// PKCS7去填充（符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
+	// PKCS7去填充（符合微信官方规范：K 为秘钥字节数，官方采用 32，并校验填充字节一致性）
 	if len(plainText) == 0 {
 		return "", errors.New("解密后数据为空")
 	}
-	padLen := int(plainText[len(plainText)-1])
-	if padLen < 1 || padLen > aes.BlockSize {
-		return "", errors.New("填充数据无效")
+	plainText, err = unpadPKCS7(plainText, len(aesKey))
+	if err != nil {
+		return "", err
 	}
-
-	plainText = plainText[:len(plainText)-padLen]
 
 	// 解析消息结构：random(16字节) + msg_len(4字节) + msg + appid（符合微信官方规范）<mcreference link="https://developers.weixin.qq.com/doc/oplatform/Third-party_Platforms/2.0/api/Before_Develop/Technical_Plan.html" index="1">1</mcreference>
 	if len(plainText) < 20 {
@@ -123,19 +119,30 @@ func DecryptMsg(encryptedMsg string, aesKey []byte) (string, error) {
 }
 
 // generateRandomString 生成安全的随机字符串（符合微信官方规范）
+//
+// 采用拒绝采样避免取模偏置：丢弃超过 charset 长度整数倍边界的随机字节，
+// 保证 62 个字符中每个字符出现的概率严格相等。
 func generateRandomString(length int) (string, error) {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-	// 使用加密安全的随机数生成器
-	randomBytes := make([]byte, length)
-	_, err := rand.Read(randomBytes)
-	if err != nil {
-		return "", fmt.Errorf("生成随机数失败: %w", err)
-	}
+	// 拒绝采样上界：小于该值的随机字节取模后均匀分布
+	const maxValid = 256 - (256 % len(charset))
 
-	result := make([]byte, length)
-	for i := 0; i < length; i++ {
-		result[i] = charset[int(randomBytes[i])%len(charset)]
+	result := make([]byte, 0, length)
+	buf := make([]byte, length)
+	for len(result) < length {
+		if _, err := rand.Read(buf); err != nil {
+			return "", fmt.Errorf("生成随机数失败: %w", err)
+		}
+		for _, b := range buf {
+			if int(b) >= maxValid {
+				continue
+			}
+			result = append(result, charset[int(b)%len(charset)])
+			if len(result) == length {
+				break
+			}
+		}
 	}
 
 	return string(result), nil
@@ -171,7 +178,7 @@ func networkBytesOrderToInt(bytes []byte) int {
 //   - error: 解密或反序列化失败时返回错误
 //
 // 说明:
-//   - 使用 AES-128-CBC（兼容 AES-192/AES-256）与 PKCS7 填充
+//   - 小程序 session_key 为 16 字节，即 AES-128-CBC + PKCS7 填充（密钥长度固定校验为 16 字节）
 func DecryptMiniProgramData(sessionKey, encryptedData, iv string, result interface{}) error {
 	key, err := base64.StdEncoding.DecodeString(sessionKey)
 	if err != nil {
@@ -208,7 +215,7 @@ func DecryptMiniProgramData(sessionKey, encryptedData, iv string, result interfa
 	mode := cipher.NewCBCDecrypter(block, nonce)
 	mode.CryptBlocks(plainText, cipherText)
 
-	plainText, err = unpadPKCS7(plainText)
+	plainText, err = unpadPKCS7(plainText, aes.BlockSize)
 	if err != nil {
 		return fmt.Errorf("去除PKCS7填充失败: %w", err)
 	}
@@ -222,14 +229,18 @@ func DecryptMiniProgramData(sessionKey, encryptedData, iv string, result interfa
 	return nil
 }
 
-// unpadPKCS7 去除 PKCS7 填充
-func unpadPKCS7(data []byte) ([]byte, error) {
+// unpadPKCS7 去除 PKCS7 填充，并校验尾部填充字节的一致性
+//
+// 参数:
+//   - data: 待去填充的字节数据
+//   - blockSize: PKCS7 块大小（微信开放平台消息加解密官方采用 32；小程序数据为 AES 块大小 16）
+func unpadPKCS7(data []byte, blockSize int) ([]byte, error) {
 	if len(data) == 0 {
 		return nil, errors.New("数据为空")
 	}
 
 	padLen := int(data[len(data)-1])
-	if padLen < 1 || padLen > aes.BlockSize || padLen > len(data) {
+	if padLen < 1 || padLen > blockSize || padLen > len(data) {
 		return nil, errors.New("填充数据无效")
 	}
 

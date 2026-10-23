@@ -48,7 +48,7 @@ func (c *SubscribeClient) GetPubNewTemplateTitles(ctx context.Context, categoryI
 // GetPubNewTemplateKeywords 获取公共模板关键词列表
 //
 // Deprecated: 请改用 SubscribeNotifyClient.GetPubTemplateKeywords。
-func (c *SubscribeClient) GetPubNewTemplateKeywords(ctx context.Context, tid int) (*GetPubNewTemplateKeywordsResponse, error) {
+func (c *SubscribeClient) GetPubNewTemplateKeywords(ctx context.Context, tid string) (*GetPubNewTemplateKeywordsResponse, error) {
 	return c.notify.GetPubTemplateKeywords(ctx, tid)
 }
 
@@ -62,7 +62,7 @@ func (c *SubscribeClient) GetWxaPubNewTemplate(ctx context.Context) (*GetWxaPubN
 // AddWxaNewTemplate 添加个人模板
 //
 // Deprecated: 请改用 SubscribeNotifyClient.AddPersonalTemplate。
-func (c *SubscribeClient) AddWxaNewTemplate(ctx context.Context, tid int, kidList []int, sceneDesc string) (*AddWxaNewTemplateResponse, error) {
+func (c *SubscribeClient) AddWxaNewTemplate(ctx context.Context, tid string, kidList []int, sceneDesc string) (*AddWxaNewTemplateResponse, error) {
 	return c.notify.AddPersonalTemplate(ctx, tid, kidList, sceneDesc)
 }
 

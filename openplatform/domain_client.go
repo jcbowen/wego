@@ -42,7 +42,7 @@ type ModifyWxaServerDomainResponse struct {
 // ModifyWxaJumpDomainRequest 设置第三方平台小程序业务域名请求
 //
 // 注意：
-//   - 配置前需将校验文件放置在域名根目录（校验文件通过 URLGetJumpDomainFile 获取）
+//   - 配置前需将校验文件放置在域名根目录（校验文件需先通过官方 get_domain_confirmfile 接口获取）
 //   - 域名最多 200 个，以 ; 隔开；不带协议头与 URI 路径
 //   - action=get 时无需传域名字段
 type ModifyWxaJumpDomainRequest struct {

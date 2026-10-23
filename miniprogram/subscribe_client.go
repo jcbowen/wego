@@ -16,6 +16,8 @@ const (
 // 订阅消息 lang 取值
 const (
 	SubscribeMsgLangZhCN = "zh_CN" // 简体中文
+	SubscribeMsgLangZhHK = "zh_HK" // 繁体中文（香港）
+	SubscribeMsgLangZhTW = "zh_TW" // 繁体中文（台湾）
 	SubscribeMsgLangEn   = "en_US" // 英文
 )
 
@@ -28,10 +30,11 @@ const (
 )
 
 // 内容安全检测 media_type 取值
+// 官方文档：https://developers.weixin.qq.com/miniprogram/dev/server/API/sec-center/sec-check/api_mediacheckasync.html
+// 官方原文「1:音频;2:图片」，官方不存在视频类型（提交视频将返回 40004）
 const (
+	SecCheckMediaTypeAudio = 1 // 音频
 	SecCheckMediaTypeImage = 2 // 图片
-	SecCheckMediaTypeAudio = 3 // 音频
-	SecCheckMediaTypeVideo = 4 // 视频
 )
 
 // SubscribeMessageDataValue 订阅消息数据项的值
@@ -44,12 +47,12 @@ type SubscribeMessageData map[string]SubscribeMessageDataValue
 
 // SendSubscribeMessageRequest 发送订阅消息请求
 type SendSubscribeMessageRequest struct {
-	ToUser           string               `json:"touser"`            // 接收用户的 OpenID
-	TemplateID       string               `json:"template_id"`       // 订阅消息模板 ID
-	Page             string               `json:"page,omitempty"`    // 点击模板卡片跳转页面（空则无跳转）
-	MiniprogramState string               `json:"miniprogram_state"` // 跳转小程序类型：formal/trial/developer
-	Lang             string               `json:"lang"`              // 语言类型：zh_CN/en_US
-	Data             SubscribeMessageData `json:"data"`              // 模板内容
+	ToUser           string               `json:"touser"`                      // 接收用户的 OpenID
+	TemplateID       string               `json:"template_id"`                 // 订阅消息模板 ID
+	Page             string               `json:"page,omitempty"`              // 点击模板卡片跳转页面（空则无跳转）
+	MiniprogramState string               `json:"miniprogram_state,omitempty"` // 跳转小程序类型：formal/trial/developer（不传时由微信按默认值处理）
+	Lang             string               `json:"lang,omitempty"`              // 语言类型：zh_CN/zh_HK/zh_TW/en_US（不传时官方默认 zh_CN）
+	Data             SubscribeMessageData `json:"data"`                        // 模板内容
 }
 
 // SendSubscribeMessageResponse 发送订阅消息响应

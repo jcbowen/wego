@@ -119,9 +119,9 @@ func (c *Client) ProfitSharingQuery(ctx context.Context, outOrderNo, transaction
 		return nil, fmt.Errorf("微信支付订单号不能为空")
 	}
 
+	// 官方查询分账结果请求仅含 path 参数 out_order_no 与 query 参数 transaction_id，无 mchid
 	apiURL := fmt.Sprintf(ProfitSharingQueryURL, url.PathEscape(outOrderNo)) +
-		"?mchid=" + url.QueryEscape(c.config.MchID) +
-		"&transaction_id=" + url.QueryEscape(transactionID)
+		"?transaction_id=" + url.QueryEscape(transactionID)
 
 	var result ProfitSharingResponse
 	if err := c.doRequest(ctx, "GET", apiURL, nil, &result, true); err != nil {
