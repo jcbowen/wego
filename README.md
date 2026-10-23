@@ -18,16 +18,17 @@ WeGo是一个模块化的微信开发封装库，专门为微信开放平台第�
 
 ```
 wego/
-├── core/           # 核心配置和客户端
-├── crypto/         # 加密解密功能
-├── message/        # 消息处理功能
-├── miniprogram/    # 小程序开发功能
+├── core/            # 核心配置、HTTP请求封装（含日志脱敏）与通用类型
+├── crypto/          # 加密解密功能
+├── logger/          # 日志抽象与适配器
+├── message/         # 消息处理功能
+├── miniprogram/     # 小程序开发功能
 ├── official_account/ # 公众号开发功能
-├── openplatform/   # 开放平台功能
-├── payment/        # 微信支付 V3 功能
-├── storage/        # 存储抽象层
-├── types/          # 类型定义
-└── doc/           # 技术文档
+├── openplatform/    # 开放平台功能
+├── payment/         # 微信支付 V3 功能
+├── storage/         # 存储抽象层
+├── types/           # 类型定义
+└── doc/             # 技术文档
 ```
 
 ## 导出类型
@@ -76,6 +77,10 @@ type (
     OfficialAccountMiniProgramPageMessage = official_account.MessageMiniProgramPage
     OfficialAccountNewsArticle            = official_account.NewsArticle
     UserInfo                              = types.OAuthUserInfoResponse
+
+    // 微信小程序相关类型
+    MiniProgramConfig                 = miniprogram.Config
+    MiniProgramClient                 = miniprogram.Client
 
     // 微信支付相关类型
     PaymentConfig              = payment.Config
@@ -432,7 +437,7 @@ func main() {
 - 订阅消息：`SendSubscribeMessage`
 - 内容安全：`MsgSecCheck`（文本，v2 同步，便捷方法）、`MsgSecCheckFull`（完整参数，透传 title/nickname/signature/head_avatar 头像画像检测）、`MediaCheckAsync`（音视频，v2 异步）
 - 稳定版 access_token：`GetStableAccessToken`（`/cgi-bin/stable_token`，不写入默认缓存）
-- 小程序码：`GetWxaCode`、`GetWxaCodeUnlimit`（scene 参数，不限量）、`CreateWxaQrcode`（旧接口）；`path` 为官方必填参数（空值会返回 40129/40159 错误）
+- 小程序码：`GetWxaCode`、`GetWxaCodeUnlimit`（scene 参数，不限量）、`CreateWxaQrcode`（旧接口）；`path` 为官方必填参数（空值会返回 40159 错误，`GetWxaCode`/`CreateWxaQrcode` 生成码总数上限共 10 万）
 - 用户数据解密：`DecryptUserInfo`
 
 ### OpenPlatform 模块
@@ -543,9 +548,11 @@ func main() {
 查看 `doc/` 目录获取完整的使用示例和技术文档：
 
 - [微信公众号开发库使用指南](doc/officialaccount/README.md)
+- [微信小程序模块说明](doc/miniprogram/小程序模块说明.md)
 - [微信支付模块说明](doc/微信支付模块说明.md)
 - [授权流程技术说明](doc/openplatform/01-授权流程技术说明.md)
 - [消息加解密技术介绍](doc/openplatform/06-消息加解密技术介绍.md)
+- [完整文档索引](doc/README.md)
 
 ## 文档
 

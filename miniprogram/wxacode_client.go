@@ -21,9 +21,10 @@ const (
 
 // GetWxaCodeRequest 获取小程序码请求（getwxacode）
 //
-// 注意：path 为官方必填参数（不能带参数，空将返回 40159 错误），总数量 10 万个，如需大量生成请使用 getwxacodeunlimit。
+// 注意：path 为官方必填参数（最长 1024 字符，可携带页面参数，空将返回 40159 错误），
+// 与 createwxaqrcode 生成的码总数上限共 10 万（超限报 45029），如需大量生成请使用 getwxacodeunlimit。
 type GetWxaCodeRequest struct {
-	Path       string     `json:"path"`                  // 页面路径（不能带参数，官方必填）
+	Path       string     `json:"path"`                  // 页面路径（官方必填，最长 1024 字符）
 	Width      int        `json:"width,omitempty"`       // 小程序码宽度（280-1280，默认 430）
 	AutoColor  bool       `json:"auto_color"`            // 自动配置线条颜色
 	LineColor  *LineColor `json:"line_color,omitempty"`  // 线条颜色（auto_color 为 false 时生效）
@@ -67,7 +68,7 @@ type WXACodeResponse struct {
 	core.APIResponse
 	Data        []byte `json:"-"` // 图片二进制数据
 	ContentType string `json:"-"` // 响应 Content-Type（如 image/jpeg）
-	NumUsed     string `json:"-"` // 今日剩余可调用次数（官方响应头 Num-Used，仅 getwxacodeunlimit 返回，其他接口此字段为空）
+	NumUsed     string `json:"-"` // 响应头 Num-Used（已生成码数量，与 10 万总量上限对照；官方在 getwxacode/createQRCode 文档记载该头，getwxacodeunlimit 无总量限制，官方未记载其返回，为空属正常）
 }
 
 // GetWxaCode 获取不限制数量之外的小程序码（带 path，总数上限 10 万）

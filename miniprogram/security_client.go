@@ -141,8 +141,8 @@ func (c *Client) MsgSecCheckFull(ctx context.Context, req *MsgSecCheckRequest) (
 
 // MediaCheckAsyncRequest 音视频内容安全检测请求（version 2，异步）
 type MediaCheckAsyncRequest struct {
-	MediaURL  string `json:"media_url"`  // 要检测的图片/音频/视频的 url（支持图片和音频，音频小于 10M）
-	MediaType int    `json:"media_type"` // 媒体类型：2图片 3音频 4视频
+	MediaURL  string `json:"media_url"`  // 要检测的图片或音频的 url（官方 v2 仅支持图片和音频，单个文件不超过 10M）
+	MediaType int    `json:"media_type"` // 媒体类型（官方 v2 取值）：1音频 2图片
 	Version   int    `json:"version"`    // 接口版本号，固定填 2（官方参数类型为 number）
 	OpenID    string `json:"openid"`     // 用户的 openid（用户需在近两小时访问过小程序）
 	Scene     int    `json:"scene"`      // 场景值：1资料 2评论 3论坛 4社交日志
@@ -159,7 +159,7 @@ type MediaCheckAsyncResponse struct {
 // 参数:
 //   - ctx: 上下文
 //   - mediaURL: 要检测的媒体资源 url
-//   - mediaType: 媒体类型（2图片 3音频 4视频）
+//   - mediaType: 媒体类型（官方 v2 取值：1音频 2图片；官方不存在视频类型）
 //   - openID: 内容发布用户的 openid
 //   - scene: 场景值（1资料 2评论 3论坛 4社交日志）
 //
