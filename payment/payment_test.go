@@ -15,6 +15,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -257,7 +258,7 @@ func TestBuildJSAPIPayParams(t *testing.T) {
 	mock := &mockHTTPClient{statusCode: 204}
 	c, km := newTestClient(t, mock)
 
-	params, err := c.BuildJSAPIPayParams("wx2912")
+	params, err := c.BuildJSAPIPayParams("", "wx2912")
 	if err != nil {
 		t.Fatalf("生成 JSAPI 参数失败: %v", err)
 	}
@@ -275,8 +276,37 @@ func TestBuildJSAPIPayParams(t *testing.T) {
 		t.Fatalf("paySign 验签失败: %v", err)
 	}
 
-	if _, err := c.BuildJSAPIPayParams(""); err == nil {
+	if _, err := c.BuildJSAPIPayParams("", ""); err == nil {
 		t.Fatal("空 prepay_id 应报错")
+	}
+}
+
+// TestBuildJSAPIPayParamsAppID 覆盖请求级 AppID 覆盖配置默认值、以及两者皆空时报错
+// 一个商户号可关联多个 AppID，调起签名必须用下单时实际那个
+func TestBuildJSAPIPayParamsAppID(t *testing.T) {
+	mock := &mockHTTPClient{statusCode: 204}
+	c, km := newTestClient(t, mock)
+
+	params, err := c.BuildJSAPIPayParams("wxMINIPROGRAM", "wx2912")
+	if err != nil {
+		t.Fatalf("指定请求级 AppID 生成参数失败: %v", err)
+	}
+	if params.AppID != "wxMINIPROGRAM" {
+		t.Fatalf("请求级 AppID 未生效: %+v", params)
+	}
+	message := strings.Join([]string{params.AppID, params.TimeStamp, params.NonceStr, params.Package}, "\n") + "\n"
+	hash := sha256.Sum256([]byte(message))
+	sig, err := base64.StdEncoding.DecodeString(params.PaySign)
+	if err != nil {
+		t.Fatalf("paySign 非 base64: %v", err)
+	}
+	if err := rsa.VerifyPKCS1v15(km.pub, crypto.SHA256, hash[:], sig); err != nil {
+		t.Fatalf("请求级 AppID 的 paySign 验签失败: %v", err)
+	}
+
+	c.config.AppID = ""
+	if _, err := c.BuildJSAPIPayParams("", "wx2912"); !errors.Is(err, ErrAppIDNotSpecified) {
+		t.Fatalf("请求级与配置级均空应报 ErrAppIDNotSpecified，实际: %v", err)
 	}
 }
 
@@ -284,7 +314,7 @@ func TestBuildAppPayParams(t *testing.T) {
 	mock := &mockHTTPClient{statusCode: 204}
 	c, km := newTestClient(t, mock)
 
-	params, err := c.BuildAppPayParams("WX1217752501201407033233368018")
+	params, err := c.BuildAppPayParams("", "WX1217752501201407033233368018")
 	if err != nil {
 		t.Fatalf("生成 App 参数失败: %v", err)
 	}
@@ -303,8 +333,21 @@ func TestBuildAppPayParams(t *testing.T) {
 		t.Fatalf("App sign 验签失败: %v", err)
 	}
 
-	if _, err := c.BuildAppPayParams(""); err == nil {
+	if _, err := c.BuildAppPayParams("wxAPP", ""); err == nil {
 		t.Fatal("空 prepay_id 应报错")
+	}
+
+	// AppID 与 JSAPI 同规则：请求级优先，两者皆空报错
+	appParams, err := c.BuildAppPayParams("wxAPP999", "WX1217752501201407033233368018")
+	if err != nil {
+		t.Fatalf("指定请求级 AppID 生成 App 参数失败: %v", err)
+	}
+	if appParams.AppID != "wxAPP999" {
+		t.Fatalf("请求级 AppID 未生效: %+v", appParams)
+	}
+	c.config.AppID = ""
+	if _, err := c.BuildAppPayParams("", "WX1217752501201407033233368018"); !errors.Is(err, ErrAppIDNotSpecified) {
+		t.Fatalf("请求级与配置级均空应报 ErrAppIDNotSpecified，实际: %v", err)
 	}
 }
 
@@ -525,7 +568,7 @@ func TestReverseOrder(t *testing.T) {
 	c, km := newTestClient(t, mock)
 	mock.headers = signedHeaders(t, km.priv, "PUB_KEY_ID_TEST", reverseBody)
 
-	if err := c.ReverseOrder(context.Background(), "ORDER_001"); err != nil {
+	if err := c.ReverseOrder(context.Background(), "", "ORDER_001"); err != nil {
 		t.Fatalf("ReverseOrder 失败: %v", err)
 	}
 	wantURL := strings.Replace(PayReverseOrderURL, "%s", "ORDER_001", 1)
@@ -540,10 +583,32 @@ func TestReverseOrder(t *testing.T) {
 		t.Fatalf("appid/mchid 未自动填充: %+v", sent)
 	}
 
+	// appid 是官方必填项：请求级须能覆盖配置默认值，两者皆空则本地拒绝，不带空值发给微信
+	if err := c.ReverseOrder(context.Background(), "wxMINIPROGRAM", "ORDER_001"); err != nil {
+		t.Fatalf("指定请求级 AppID 撤销失败: %v", err)
+	}
+	if sent := mustJSONObject(t, mock.lastBody); sent["appid"] != "wxMINIPROGRAM" {
+		t.Fatalf("请求级 AppID 未生效: %+v", sent)
+	}
+	c.config.AppID = ""
+	if err := c.ReverseOrder(context.Background(), "", "ORDER_001"); !errors.Is(err, ErrAppIDNotSpecified) {
+		t.Fatalf("请求级与配置级均空应报 ErrAppIDNotSpecified，实际: %v", err)
+	}
+
 	// 商户订单号为空必须拒绝
-	if err := c.ReverseOrder(context.Background(), ""); err == nil {
+	if err := c.ReverseOrder(context.Background(), "wx1234567890", ""); err == nil {
 		t.Fatal("空订单号未报错")
 	}
+}
+
+// mustJSONObject 解析请求体为 map，供断言 appid 等字段值
+func mustJSONObject(t *testing.T, body []byte) map[string]interface{} {
+	t.Helper()
+	var out map[string]interface{}
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatalf("请求体解析失败: %v", err)
+	}
+	return out
 }
 
 func TestCloseOrder(t *testing.T) {

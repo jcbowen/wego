@@ -9,7 +9,7 @@ import "fmt"
 //   - 仅使用微信支付公钥：填写 PublicKeyID 与 PublicKey，不再依赖平台证书下载
 //   - 两者都配置：优先使用微信支付公钥，但应答/回调仍以响应头 Wechatpay-Serial 为准自动回退到平台证书
 type Config struct {
-	AppID        string `json:"app_id" ini:"app_id"`                 // 应用 ID（公众号/小程序 appid）
+	AppID        string `json:"app_id" ini:"app_id"`                 // 应用 ID（公众号/小程序 appid），仅作请求级未覆盖时的默认值，多应用商户号可留空
 	MchID        string `json:"mch_id" ini:"mch_id"`                 // 商户号
 	APIV3Key     string `json:"api_v3_key" ini:"api_v3_key"`         // API V3 密钥（32 字节）
 	CertSerialNo string `json:"cert_serial_no" ini:"cert_serial_no"` // 商户 API 证书序列号，用于请求签名
@@ -34,10 +34,12 @@ func (c *Config) UsePublicKey() bool {
 //
 // 返回:
 //   - error: 配置无效时返回错误
+//
+// 说明:
+//   - AppID 为可选：它只是「请求级 AppID 未覆盖时的默认值」，一个商户号可关联多个 AppID
+//     （公众号/小程序/H5 各一个），多应用商户号建客户端时无需固定其一；
+//     下单与调起签名方法在请求级与配置级都取不到 AppID 时会明确报错，不会静默发空值
 func (c *Config) Validate() error {
-	if c.AppID == "" {
-		return fmt.Errorf("AppID不能为空")
-	}
 	if c.MchID == "" {
 		return fmt.Errorf("MchID不能为空")
 	}

@@ -58,7 +58,11 @@ func (c *Client) JSAPIPay(ctx context.Context, req *JSAPIRequest) (*PrepayRespon
 		return nil, fmt.Errorf("支付者openid不能为空")
 	}
 
-	req.AppID = defaultString(req.AppID, c.config.AppID)
+	appID, err := c.resolveAppID(req.AppID)
+	if err != nil {
+		return nil, err
+	}
+	req.AppID = appID
 	req.MchID = defaultString(req.MchID, c.config.MchID)
 	req.NotifyURL = defaultString(req.NotifyURL, c.config.NotifyURL)
 
@@ -93,7 +97,11 @@ func (c *Client) H5Pay(ctx context.Context, req *H5Request) (*H5Response, error)
 		return nil, err
 	}
 
-	req.AppID = defaultString(req.AppID, c.config.AppID)
+	appID, err := c.resolveAppID(req.AppID)
+	if err != nil {
+		return nil, err
+	}
+	req.AppID = appID
 	req.MchID = defaultString(req.MchID, c.config.MchID)
 	req.NotifyURL = defaultString(req.NotifyURL, c.config.NotifyURL)
 
@@ -128,7 +136,11 @@ func (c *Client) NativePay(ctx context.Context, req *NativeRequest) (*NativeResp
 		return nil, err
 	}
 
-	req.AppID = defaultString(req.AppID, c.config.AppID)
+	appID, err := c.resolveAppID(req.AppID)
+	if err != nil {
+		return nil, err
+	}
+	req.AppID = appID
 	req.MchID = defaultString(req.MchID, c.config.MchID)
 	req.NotifyURL = defaultString(req.NotifyURL, c.config.NotifyURL)
 
@@ -163,7 +175,11 @@ func (c *Client) AppPay(ctx context.Context, req *AppRequest) (*PrepayResponse, 
 		return nil, err
 	}
 
-	req.AppID = defaultString(req.AppID, c.config.AppID)
+	appID, err := c.resolveAppID(req.AppID)
+	if err != nil {
+		return nil, err
+	}
+	req.AppID = appID
 	req.MchID = defaultString(req.MchID, c.config.MchID)
 	req.NotifyURL = defaultString(req.NotifyURL, c.config.NotifyURL)
 
@@ -219,7 +235,11 @@ func (c *Client) CodePay(ctx context.Context, req *CodePayRequest) (*Order, erro
 		return nil, fmt.Errorf("门店信息不完整：store_info 的 id 与 out_id 需二选一填写")
 	}
 
-	req.AppID = defaultString(req.AppID, c.config.AppID)
+	appID, err := c.resolveAppID(req.AppID)
+	if err != nil {
+		return nil, err
+	}
+	req.AppID = appID
 	req.MchID = defaultString(req.MchID, c.config.MchID)
 
 	var result Order
@@ -233,30 +253,33 @@ func (c *Client) CodePay(ctx context.Context, req *CodePayRequest) (*Order, erro
 // BuildAppPayParams 生成 App 端调起支付所需的参数
 //
 // 参数:
+//   - appID: 本次调起使用的应用 ID，传空则回落到配置中的 Config.AppID
 //   - prepayID: AppPay 返回的预支付交易会话标识
 //
 // 返回:
 //   - *AppPayParams: 含 sign 的调起支付参数，可直接交给客户端 SDK
-//   - error: prepayID 为空或签名失败时返回错误
+//   - error: appID 与配置默认值均为空、prepayID 为空或签名失败时返回错误
 //
 // 说明:
 //   - 官方签名串为四行：appid\ntimestamp\nnoncestr\nprepayid\n，不包含 partnerid 与 package
 //   - 客户端字段名为 appid、partnerid、prepayid、package、noncestr、timestamp、sign，大小写敏感
+//   - appID 必须与 AppPay 下单时实际使用的 AppID 一致（一个商户号可关联多个 AppID），
+//     否则客户端调起时微信会以签名与订单不同源拒绝
 //
 // 使用示例:
 //   - prepay, _ := client.AppPay(ctx, req)
-//   - params, err := client.BuildAppPayParams(prepay.PrepayID)
+//   - params, err := client.BuildAppPayParams(req.AppID, prepay.PrepayID)
 //
 // 文档:
 //   - https://pay.weixin.qq.com/doc/global/v3/zh/4012354778
-func (c *Client) BuildAppPayParams(prepayID string) (*AppPayParams, error) {
+func (c *Client) BuildAppPayParams(appID, prepayID string) (*AppPayParams, error) {
 	if prepayID == "" {
 		return nil, fmt.Errorf("prepay_id不能为空")
 	}
 
-	appID := c.config.AppID
-	if appID == "" {
-		return nil, fmt.Errorf("AppID不能为空")
+	appID, err := c.resolveAppID(appID)
+	if err != nil {
+		return nil, err
 	}
 
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
@@ -369,33 +392,40 @@ func (c *Client) CloseOrder(ctx context.Context, outTradeNo string) error {
 //
 // 参数:
 //   - ctx: 上下文
+//   - appID: 撤销请求所属的应用 ID，须与付款码下单时一致，传空则回落到配置中的 Config.AppID
 //   - outTradeNo: 商户订单号
 //
 // 返回:
-//   - error: 撤销失败时返回错误
+//   - error: appID 与配置默认值均为空、商户订单号为空或撤销失败时返回错误
 //
 // 说明:
 //   - 支付交易返回失败或支付系统超时时调用；USERPAYING（用户支付中）在途交易无法用
 //     CloseOrder 关闭，只能撤销
 //   - 官方语义：订单用户支付失败时微信侧将订单关闭；用户支付成功时微信侧将订单资金退还给用户
 //   - 接口成功时微信返回 200 OK，应答含 appid/mchid/out_trade_no
+//   - appid 为官方必填项：取不到时直接本地报错，不会静默发空值后被微信拒
 //
 // 使用示例:
-//   - if err := client.ReverseOrder(ctx, "ORDER_20240101_001"); err != nil { return err }
+//   - if err := client.ReverseOrder(ctx, req.AppID, "ORDER_20240101_001"); err != nil { return err }
 //
 // 文档:
 //   - https://pay.weixin.qq.com/doc/v3/merchant/4012382161
 //
 // 注意:
 //   - 官方文档中心提示本功能处于灰度测试阶段、暂未全量开放，接入前建议在商户后台实测验证
-func (c *Client) ReverseOrder(ctx context.Context, outTradeNo string) error {
+func (c *Client) ReverseOrder(ctx context.Context, appID, outTradeNo string) error {
 	if outTradeNo == "" {
 		return fmt.Errorf("商户订单号不能为空")
 	}
 
+	appID, err := c.resolveAppID(appID)
+	if err != nil {
+		return err
+	}
+
 	apiURL := fmt.Sprintf(PayReverseOrderURL, url.PathEscape(outTradeNo))
 	req := &ReverseOrderRequest{
-		AppID: c.config.AppID,
+		AppID: appID,
 		MchID: c.config.MchID,
 	}
 
@@ -478,30 +508,33 @@ func (c *Client) RefundQuery(ctx context.Context, outRefundNo string) (*RefundRe
 // BuildJSAPIPayParams 生成前端调起 JSAPI 支付所需的参数
 //
 // 参数:
+//   - appID: 本次调起使用的应用 ID，传空则回落到配置中的 Config.AppID
 //   - prepayID: JSAPIPay 返回的预支付交易会话标识
 //
 // 返回:
 //   - *JSAPIPayParams: 含 paySign 的调起支付参数，可直接交给小程序 wx.requestPayment 或公众号 JS-SDK
-//   - error: prepayID 为空或签名失败时返回错误
+//   - error: appID 与配置默认值均为空、prepayID 为空或签名失败时返回错误
 //
 // 说明:
 //   - 签名串格式为：appId\ntimeStamp\nnonceStr\npackage\n
 //   - 参数大小写需与微信要求一致，前端字段名为 appId、timeStamp、nonceStr、package、signType、paySign
+//   - appID 必须与 JSAPIPay 下单及 openid 所属的 AppID 同源（一个商户号可关联多个 AppID），
+//     否则前端调起时微信报「参数错误」且无法定位原因
 //
 // 使用示例:
 //   - prepay, _ := client.JSAPIPay(ctx, req)
-//   - params, err := client.BuildJSAPIPayParams(prepay.PrepayID)
+//   - params, err := client.BuildJSAPIPayParams(req.AppID, prepay.PrepayID)
 //
 // 文档:
 //   - https://pay.weixin.qq.com/doc/v3/merchant/4012791874
-func (c *Client) BuildJSAPIPayParams(prepayID string) (*JSAPIPayParams, error) {
+func (c *Client) BuildJSAPIPayParams(appID, prepayID string) (*JSAPIPayParams, error) {
 	if prepayID == "" {
 		return nil, fmt.Errorf("prepay_id不能为空")
 	}
 
-	appID := c.config.AppID
-	if appID == "" {
-		return nil, fmt.Errorf("AppID不能为空")
+	appID, err := c.resolveAppID(appID)
+	if err != nil {
+		return nil, err
 	}
 
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
@@ -530,4 +563,25 @@ func defaultString(value, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+// resolveAppID 解析本次调用实际使用的 AppID
+//
+// 参数:
+//   - appID: 调用方指定的应用 ID，传空则回落到 Config.AppID
+//
+// 返回:
+//   - string: 解析后的 AppID（非空）
+//   - error: 请求级与配置默认值都为空时返回 ErrAppIDNotSpecified
+//
+// 说明:
+//   - Config.AppID 可选是因为一个商户号可关联多个 AppID（公众号/小程序/H5 各一个），
+//     但 appid 在各接口本身仍是必填项，所以取不到时必须在本地报错，
+//     不能带着空值发给微信换一个含义不明的 400
+func (c *Client) resolveAppID(appID string) (string, error) {
+	resolved := defaultString(appID, c.config.AppID)
+	if resolved == "" {
+		return "", ErrAppIDNotSpecified
+	}
+	return resolved, nil
 }

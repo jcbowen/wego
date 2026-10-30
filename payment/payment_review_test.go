@@ -435,7 +435,7 @@ func TestNewClientWithStorageEReturnsError(t *testing.T) {
 		cfg  *Config
 	}{
 		{"配置为空", nil},
-		{"缺少AppID", &Config{MchID: "1", APIV3Key: strings.Repeat("a", 32), CertSerialNo: "S", PrivateKey: km.privPEM}},
+		{"缺少MchID", &Config{AppID: "wx1", APIV3Key: strings.Repeat("a", 32), CertSerialNo: "S", PrivateKey: km.privPEM}},
 		{"APIV3Key长度错误", &Config{AppID: "wx1", MchID: "1", APIV3Key: "short", CertSerialNo: "S", PrivateKey: km.privPEM}},
 		{"私钥非法", &Config{AppID: "wx1", MchID: "1", APIV3Key: strings.Repeat("a", 32), CertSerialNo: "S", PrivateKey: "not-a-pem"}},
 		{"公钥只配一半", &Config{AppID: "wx1", MchID: "1", APIV3Key: strings.Repeat("a", 32), CertSerialNo: "S", PrivateKey: km.privPEM, PublicKeyID: "PUB_KEY_ID_X"}},
@@ -452,6 +452,15 @@ func TestNewClientWithStorageEReturnsError(t *testing.T) {
 		CertSerialNo: "S", PrivateKey: km.privPEM,
 	}, st); err != nil {
 		t.Errorf("合法配置不应报错: %v", err)
+	}
+
+	// AppID 可选：一个商户号可关联多个 AppID（公众号/小程序/H5），
+	// 多应用商户号建客户端时无需固定其一，由调用方按请求传入
+	if _, err := NewClientWithStorageE(&Config{
+		MchID: "1", APIV3Key: strings.Repeat("a", 32),
+		CertSerialNo: "S", PrivateKey: km.privPEM,
+	}, st); err != nil {
+		t.Errorf("缺省 AppID 的合法配置不应报错: %v", err)
 	}
 
 	if _, err := NewClientWithStorageE(&Config{

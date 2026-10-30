@@ -55,7 +55,7 @@ type SceneStoreInfo struct {
 
 // JSAPIRequest JSAPI 统一下单请求
 type JSAPIRequest struct {
-	AppID       string     `json:"appid"`                // 应用 ID
+	AppID       string     `json:"appid"`                // 应用 ID，空则回落 Config.AppID，两者皆空报错
 	MchID       string     `json:"mchid"`                // 商户号
 	Description string     `json:"description"`          // 商品描述
 	OutTradeNo  string     `json:"out_trade_no"`         // 商户订单号
@@ -73,7 +73,7 @@ type JSAPIRequest struct {
 
 // NativeRequest Native 支付下单请求
 type NativeRequest struct {
-	AppID       string     `json:"appid"`                // 应用 ID
+	AppID       string     `json:"appid"`                // 应用 ID，空则回落 Config.AppID，两者皆空报错
 	MchID       string     `json:"mchid"`                // 商户号
 	Description string     `json:"description"`          // 商品描述
 	OutTradeNo  string     `json:"out_trade_no"`         // 商户订单号
@@ -91,7 +91,7 @@ type NativeRequest struct {
 
 // AppRequest App 支付下单请求
 type AppRequest struct {
-	AppID       string     `json:"appid"`                // 应用 ID
+	AppID       string     `json:"appid"`                // 应用 ID，空则回落 Config.AppID，两者皆空报错
 	MchID       string     `json:"mchid"`                // 商户号
 	Description string     `json:"description"`          // 商品描述
 	OutTradeNo  string     `json:"out_trade_no"`         // 商户订单号
@@ -109,7 +109,7 @@ type AppRequest struct {
 
 // H5Request H5 支付请求
 type H5Request struct {
-	AppID       string     `json:"appid"`            // 应用 ID
+	AppID       string     `json:"appid"`            // 应用 ID，空则回落 Config.AppID，两者皆空报错
 	MchID       string     `json:"mchid"`            // 商户号
 	Description string     `json:"description"`      // 商品描述
 	OutTradeNo  string     `json:"out_trade_no"`     // 商户订单号
@@ -199,7 +199,7 @@ type SettleInfo struct {
 //   - 官方 V3 文档参数表无 notify_url，结果通过同步应答与查单获取，不走异步通知
 //   - scene_info 必填，其下 store_info 必填（ID 与 OutID 二选一）
 type CodePayRequest struct {
-	AppID         string            `json:"appid"`                    // 应用 ID
+	AppID         string            `json:"appid"`                    // 应用 ID，空则回落 Config.AppID，两者皆空报错
 	MchID         string            `json:"mchid"`                    // 商户号
 	Description   string            `json:"description"`              // 商品描述
 	OutTradeNo    string            `json:"out_trade_no"`             // 商户订单号
@@ -218,7 +218,7 @@ type CodePayRequest struct {
 // 说明:
 //   - 官方 V3 文档中 appid 与 mchid 均为必填
 type ReverseOrderRequest struct {
-	AppID string `json:"appid"` // 应用 ID
+	AppID string `json:"appid"` // 应用 ID，由 ReverseOrder 用入参或 Config.AppID 填入
 	MchID string `json:"mchid"` // 商户号
 }
 

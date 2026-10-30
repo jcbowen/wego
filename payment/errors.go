@@ -17,6 +17,11 @@ var (
 
 	// ErrSignatureHeaderMissing 响应缺少微信支付签名头
 	ErrSignatureHeaderMissing = errors.New("缺少微信支付响应签名头")
+
+	// ErrAppIDNotSpecified 请求级与配置默认值都取不到 AppID
+	// Config.AppID 是可选的（一个商户号可关联多个 AppID），所以每个需要 appid 的接口
+	// 都必须在调用前解析出非空值，不能静默发空值给微信
+	ErrAppIDNotSpecified = errors.New("AppID未指定：请在请求中传入 AppID 或在配置中设置 AppID")
 )
 
 // APIError 微信支付 V3 接口返回的业务错误
